@@ -1,0 +1,5 @@
+# Local agent working notes (specs, handoffs): never versioned.
+.private/
+
+# Personal per-project agent settings.
+.claude/settings.local.json
