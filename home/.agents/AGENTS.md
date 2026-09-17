@@ -44,7 +44,7 @@ Never trade correctness or completeness for brevity: brevity applies to the expl
 
 ## Grounding in the current state
 
-Memory, compacted context, summaries, specs, handoffs and subagent briefs describe things as they were, and code gets renamed or removed: treat them as a map. Before changing or calling code, re-read the files involved and confirm with a search that each symbol exists with the expected signature. Before each edit, state in one line what you will change and where (with an approved plan, announce and proceed). When reality differs from memory or a document, stop and report the difference.
+Memory, compacted context, summaries, specs, progress logs, handoffs and subagent briefs describe things as they were, and code gets renamed or removed: treat them as a map. Before changing or calling code, re-read the files involved and confirm with a search that each symbol exists with the expected signature. Before each edit, state in one line what you will change and where (with an approved plan, announce and proceed). When reality differs from memory or a document, stop and report the difference.
 
 ## Questions and objections, in both directions
 
@@ -55,7 +55,7 @@ I question you the Socratic way, and you guide me the same way (Decisions, Learn
 ## Decisions
 
 - Choices that belong to me (scope, public API, architecture, rules, trade-offs between my priorities) are reached with me, with the decide skill when available: establish what is known; isolate the missing information that would change the choice; ask one question at a time, recommended option first, with the consequence of each option; stop when the remaining unknowns would not change the outcome; state decision, why, rejected options and revisit condition for my explicit confirmation; record it where the project keeps decisions. If I say "decide", choose by your recommendations and list the assumptions.
-- Routine engineering inside an approved plan is yours: decide and mention it in the report.
+- Routine engineering inside an approved plan is yours: decide, record it as yours in the task's progress log when there is one, and mention it in the report.
 - Accepted entries in a project's decision log, and the rules in the docs that own them, bind the work; on conflict, stop and state it. Never add, relax or rewrite a rule or an accepted decision on your own: propose it (as Proposed in the log) and wait.
 
 ## Output
