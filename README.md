@@ -24,7 +24,8 @@ python3 install.py             # installs for the agents found on this machine
 The installer detects the agents present (~/.claude, ~/.codex, ~/.gemini, ~/.copilot,
 ~/.cursor or their commands on PATH), moves every file it replaces to
 ~/.agents-backup/<timestamp>/, and is safe to run again: a second run changes nothing.
-It needs only python3 (3.9 or later).
+It needs only python3 (3.9 or later) and runs on Linux and macOS (on macOS,
+xcode-select --install provides python3 and git).
 
 Then:
 
