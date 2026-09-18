@@ -3,10 +3,12 @@
 """Tests for the shared hooks, fed with each agent's payload shape."""
 
 import json
+import os
 import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 
@@ -159,6 +161,24 @@ class SessionRefresh(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Session restarted from compact", result.stdout)
         self.assertIn("Current branch: work", result.stdout)
+
+    def test_slow_git_stays_within_hook_timeout(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        fake = tmp / "git"
+        fake.write_text('#!/bin/sh\nsleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
+        fake.chmod(0o755)
+        env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
+        start = time.monotonic()
+        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
+                                input=json.dumps({"cwd": str(tmp), "source": "resume"}),
+                                capture_output=True, text=True, check=False, env=env)
+        self.assertEqual(result.returncode, 0)
+        self.assertLess(time.monotonic() - start, 9.5)
+        self.assertIn("Session restarted from resume", result.stdout)
+        self.assertIn("Current branch: work", result.stdout)
+        self.assertIn("Uncommitted changes not shown", result.stdout)
+        self.assertIn("Last commits not shown", result.stdout)
 
 
 if __name__ == "__main__":
