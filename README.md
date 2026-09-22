@@ -10,7 +10,7 @@ What it gives every session, in chat or in a repository:
 - a repository workflow as skills: spec, implement, review, gates, session-close, decide, project-setup;
 - three subagents that keep the main context small: scout (read-only mapping), gate-runner (builds and tests, returns only verdicts), reviewer (independent review);
 - hooks that block git gate bypasses and force pushes, flag em and en dashes, run clang-format, and remind the agent after a compaction that its memory of the code may be stale;
-- a claude.ai skill set (decide, tutor, debugging, verification, scoping, editing, research, decisions, handoffs, prompts), installed locally from this repository for every agent too.
+- a claude.ai skill set (decide, tutor, debugging, verification, tests, scoping, editing, research, decisions, handoffs, prompts), installed locally from this repository for every agent too.
 
 ## Quick start
 
