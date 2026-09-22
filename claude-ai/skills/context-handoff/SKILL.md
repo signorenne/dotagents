@@ -18,6 +18,7 @@ Write forward, as an instruction set, not backward, as a record of what happened
 - Constraints: requirements, deadlines, style rules, technical limits, things the user said they do not want, and how the user wants to be worked with; those preferences are invisible to a fresh session and get violated in its first reply.
 - Artifacts: exact file names, paths, URLs, identifiers, function and table names, versions, test data keys. Reproduce the strings exactly; an approximate file name is worse than none.
 - Verify before use: code-level facts the next session will rely on (files, symbols, signatures) may change before it reads the brief. Mark them so it re-reads them before editing.
+- Refuted assumptions: what was believed, the check that disproved it, and what changed, one line each, so the reader does not build on it again.
 - Open questions: anything unresolved the reader will hit, including what is waiting on the user.
 - Outstanding work, ordered by what should happen first, not by when it came up.
 - Immediate next action: one concrete thing to do first. It is the most valuable line, because it turns a summary into momentum.
@@ -62,6 +63,7 @@ Deliver a single copy-pasteable block the user can drop into a new conversation 
 ## Constraints
 ## Artifacts
 ## Verify before use
+## Refuted assumptions
 ## Open questions
 ## Outstanding work
 ## Start here
