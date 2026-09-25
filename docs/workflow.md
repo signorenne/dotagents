@@ -26,6 +26,7 @@ instructions.
 | New repository or audit | project-setup |
 | Documenting a repository, or updating its docs after a change | as-built-docs |
 | Planning a new system or major component: requirements and architecture | architecture-doc, then spec per increment |
+| Drawing or fixing a PlantUML diagram | plantuml-diagrams |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 

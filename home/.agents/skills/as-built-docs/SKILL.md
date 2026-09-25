@@ -55,7 +55,7 @@ Every document: numbered sections (stable links, findable by number); a header w
 - Trace each expected test value through the code in step order, including the state earlier steps leave.
 - Compute worked examples with a command; choose inputs away from rounding edges.
 - Write "(library)" or "not verified" where a claim rests on something you did not read.
-- Diagrams: PlantUML in the docs' diagrams folder, kb_ or dev_ prefix, no style file, theme or colors, because PlantUML's defaults stay readable in light and dark viewers; render to SVG for the docs and to PNG in a scratch folder, look at each PNG, split any diagram too wide to read. Without plantuml, say so and mark the diagrams not rendered.
+- Diagrams: PlantUML in the docs' diagrams folder, kb_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill. Without plantuml, say so and mark the diagrams not rendered.
 
 ## 6. Verify
 
