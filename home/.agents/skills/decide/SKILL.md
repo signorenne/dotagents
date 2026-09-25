@@ -1,6 +1,6 @@
 ---
 name: decide
-description: "Guides the user to a project decision step by step with maieutic (Socratic) questions instead of deciding for them: establishes what is known, isolates the missing information that would change the choice, asks one question at a time with a recommended option and its consequences, then confirms and records the decision. Use when the user asks to decide, choose or settle a design, scope, API, architecture or workflow question in a project, when a plan or spec reaches a choice that belongs to the user, or when the user invokes decide."
+description: "Guides the user to a project decision step by step with maieutic (Socratic) questions instead of deciding for them: establishes what is known, isolates the missing information that would change the choice, asks one question at a time with a recommended option and its consequences, then confirms and records the decision. Use when the user asks for help to decide, choose or settle a design, scope, API, architecture, workflow or adoption question in a project (including which library, tool or service it adopts), when a plan or spec reaches a choice that belongs to the user, or when the user invokes decide."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -56,8 +56,8 @@ Ask for explicit confirmation of this text. Show the full text in the conversati
 
 ## 6. Record
 
-When the project keeps a decision log and the decision meets its recording bar, add the entry in its format, including the revisit condition: Accepted and decided by the user when confirmed, Proposed when the user defers. Change a rule in an owning doc only with the user's approval of the exact text. If the project has no log and the user did not ask for a record, the confirmed text in the conversation is the record.
+When the project keeps a decision log and the decision meets its recording bar, add the entry in its format and by its authority rules, including the revisit condition: Accepted only when the person those rules name as decider confirmed it (or delegated it, below), otherwise Proposed. Change a rule in an owning doc only with the user's approval of the exact text. If the project has no log and the user did not ask for a record, the confirmed text in the conversation is the record.
 
 ## Delegation
 
-If, once the skill has started, the user answers "decide" or "you decide" (or "decidi tu"), choose using the stated recommendations, show the decision of step 5 with the assumptions one line each, and record it as Accepted with the note "delegated by the user": delegating the choice is the user's acceptance. A request that starts the skill ("decide which library to use") asks for the questions, not for delegation.
+If the user says "decide" or "you decide", in any language and at any point, choose using the stated recommendations, show the decision of step 5 with the assumptions one line each, and record it per step 6 as Accepted with the note "delegated by the user": delegating the choice is the user's acceptance.
