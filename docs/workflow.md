@@ -24,6 +24,7 @@ instructions.
 | Build and tests | gates, or gates narrow <module or test filter> |
 | Writing or reviewing tests | trustworthy-tests (implement and reviewer apply it on their own) |
 | New repository or audit | project-setup |
+| Documenting a repository, or updating its docs after a change | as-built-docs |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 
