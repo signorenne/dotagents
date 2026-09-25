@@ -38,7 +38,7 @@ Table of role and concerns. Include operations, support, security, compliance, m
 ## 3. Context, constraints, assumptions
 
 - Context: the system as one box with the people and systems around it (C4 context diagram); for each interface, what flows, in which direction, over which protocol, and who owns the contract.
-- Constraints: decisions already made elsewhere (technology, budget, deadline, regulation), each with its source.
+- Constraints: decisions already made elsewhere (technology, budget, deadline, regulation, the team's size and skills), each with its source.
 - Assumptions: what you take as true, and what changes if it is false.
 
 ## 4. Functional requirements
@@ -70,12 +70,12 @@ One EARS sentence each:
 1. Introduction and goals: link to the requirements; the top 3 to 5 quality goals.
 2. Constraints: link, plus technical constraints found during design.
 3. Context and scope: business and technical context.
-4. Solution strategy: the few fundamental decisions, each linked to the scenarios it serves, with the tactics chosen for each top scenario (for example redundancy and retries for availability, caching for performance, information hiding for modifiability) and what each costs.
+4. Solution strategy: the few fundamental decisions, each linked to the scenarios it serves, with the tactics chosen for each top scenario (for example redundancy and retries for availability, caching for performance, information hiding for modifiability) and what each costs. For a queue or a retried call, state the delivery guarantee and how the receiver handles duplicates and reordering.
 5. Building blocks: C4 container diagram, component diagrams where useful. For each element: responsibility in one sentence, interfaces, data it owns, requirements it realizes.
 6. Runtime: the key flows as sequence diagrams, including at least one failure flow.
-7. Deployment: nodes, environments, scaling, failover.
+7. Deployment: nodes, environments, scaling, failover. Size it with an estimate computed by a command from confirmed or assumed inputs (peak requests per second, data volume and its yearly growth), and name the component that reaches its limit first and at what load; that load is the revisit condition of the decisions it strains.
 8. Crosscutting concepts that apply: domain model, persistence, error handling, security, observability, configuration.
-9. Decisions: when the project has a decision log, record each decision there and list them here by id, one line each; otherwise one ADR each here (title, status, context, decision, consequences, rejected options), numbered and never deleted, a superseded ADR linking to its replacement.
+9. Decisions: when the project has a decision log, record each decision there and list them here by id, one line each; otherwise one ADR each here (title, status, context, decision, consequences, rejected options, revisit condition), numbered and never deleted, a superseded ADR linking to its replacement.
 10. Quality: for each scenario, the decisions that address it, and a fitness function (an automated check that fails when the design drifts) where possible.
 11. Risks and technical debt, by priority, with mitigation.
 12. Glossary.

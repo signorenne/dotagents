@@ -47,7 +47,7 @@ Then state:
 
 ```
 Decision: one or two sentences.
-Why: the answers and facts it rests on.
+Why: the answers and facts it rests on, and what the chosen option makes harder or rules out.
 Rejected: each alternative and the reason.
 Revisit if: the condition that would reopen it.
 ```
