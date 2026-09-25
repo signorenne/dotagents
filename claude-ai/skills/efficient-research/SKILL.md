@@ -17,11 +17,11 @@ Without a search or fetch tool, answer from knowledge, mark each changeable or l
 ## Sort the claims first
 
 - Timeless or structural (how TCP works, what a P/E ratio means, historical dates): answer from knowledge.
-- Changeable (versions, prices, availability, who holds a role, current law, what exists now): always verify.
+- Changeable (versions, prices, availability, who holds a role, current law, what exists now): verify when being wrong would matter.
 - Consequential and specific (a number going into a deck, a dosage, a legal deadline, a config flag headed for production): verify even when fairly sure.
 - Load-bearing (the recommendation collapses if this one fact is wrong): it needs a source.
 
-Only the last three get searched. This applies even when the user never says search or sources, and even when the question feels like settled knowledge ("is X still true", "what's the best Y right now").
+These get searched when the test above says so. This applies even when the user never says search or sources, and even when the question feels like settled knowledge ("is X still true", "what's the best Y right now").
 
 ## Budget
 

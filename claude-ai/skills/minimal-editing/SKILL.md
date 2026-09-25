@@ -59,7 +59,7 @@ Show what changed, not what did not. When you edited a file directly, report wha
 - Localized code change: a diff or the changed function, with enough context to place it.
 - Prose edit: the revised paragraph or section.
 - Several scattered changes: each one separately, labeled by location.
-- Whole artifact: only when it is more usable that way (a short file, a document meant to be downloaded or published, something regenerated in place) or when asked.
+- Whole artifact: only when asked, or when the artifact itself is the deliverable (a document meant to be downloaded or published).
 
 State in one line what you changed and, when it is not obvious, why. If you deliberately left alone something the user might expect you to touch, say so; silence there reads as an oversight.
 

@@ -8,7 +8,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 A test is a claim that the code does what its contract says, and it is evidence only if it could have failed. A false-positive test is worse than no test: it reports green, so nobody looks, and the bug ships with a certificate. The usual way to write one is to test the code against itself: take the expected value from what the code returns, mock the logic under test, or edit the test until it passes. Each of these turns a refutation into a formality.
 
-These rules apply to every automated test you write, change or review: unit tests first, and the same rules for integration and end-to-end tests. They work the same whether the user asked for tests directly or a caller (the implement skill, a workflow, an orchestrating agent) gave you a step: the caller names the behavior to pin (a spec section, an acceptance criterion, a bug report), the files and the project's test command, and gets back the report described in Output.
+These rules apply to every automated test you write, change or review: unit tests first, and the same rules for integration and end-to-end tests. They work the same whether the user asked for tests directly or a caller (a workflow skill or an orchestrating agent) gave you a step: the caller names the behavior to pin (a spec section, an acceptance criterion, a bug report), the files and the project's test command, and gets back the report described in Output.
 
 ## 1. Start from the contract, not from the code
 
@@ -94,7 +94,7 @@ For each test written or changed:
 - the evidence that it can fail: the command and the failing line, or the change to the code that made it fail;
 - the final passing run, with the number of tests the runner reported.
 
-Then list the test changes that alter an expectation (with their evidence), anything that needs the user's approval under section 4, and the behaviors left untested with the reason. A review lists the false positives found, each with the wrong implementation or change that passes it. A caller (implement, a workflow, an orchestrator) copies this evidence into its progress log or report.
+Then list the test changes that alter an expectation (with their evidence), anything that needs the user's approval under section 4, and the behaviors left untested with the reason. A review lists the false positives found, each with the wrong implementation or change that passes it. A caller (a workflow skill or an orchestrating agent) copies this evidence into its progress log or report.
 
 ## Example
 

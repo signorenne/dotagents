@@ -2,7 +2,7 @@
   "comment": "Skills from home/.agents/skills that are also uploaded to claude.ai. claude.ai accepts descriptions of at most 200 characters, so these replace the longer local description in the build.",
   "skills": {
     "decide": {
-      "description": "Settles a choice that belongs to the user in a project (scope, architecture, API, rules) one Socratic question at a time, then records it. Use when the user asks to decide or settle one."
+      "description": "Settles a choice that belongs to the user in a project (scope, architecture, API, rules) one Socratic question at a time, then records it. Use when the user wants help to decide or settle one."
     }
   }
 }
