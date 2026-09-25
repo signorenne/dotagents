@@ -60,4 +60,4 @@ When the project keeps a decision log and the decision meets its recording bar, 
 
 ## Delegation
 
-If the user says "decide" (or "decidi tu") at any point, choose using the stated recommendations, list the assumptions in one line each, and record the entry as Accepted with the note "delegated by the user".
+If, once the skill has started, the user answers "decide" or "you decide" (or "decidi tu"), choose using the stated recommendations, show the decision of step 5 with the assumptions one line each, and record it as Accepted with the note "delegated by the user": delegating the choice is the user's acceptance. A request that starts the skill ("decide which library to use") asks for the questions, not for delegation.

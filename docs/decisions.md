@@ -2,7 +2,7 @@
 
 Owns the record of decisions behind this setup: what was decided, why, who proposed
 it, who accepted it. The maintainer decides; agents add entries as Proposed and write
-Accepted only for decisions the maintainer explicitly accepted. Changed decisions get
+Accepted only for decisions the maintainer explicitly accepted or delegated ("decide"). Changed decisions get
 a new entry, and the old one becomes "Superseded by D-NNNN".
 
 ## D-0001: One source of truth in ~/.agents, generated copies per tool
