@@ -26,7 +26,7 @@ Cut differences that exist but do not matter, spec-sheet items neither option wi
 
 ## Verify what is checkable
 
-Prices, tiers, limits, current versions and whether a product still exists all move. If any of them carry the recommendation, verify instead of recalling, and say as of when.
+Prices, tiers, limits, current versions and whether a product still exists all move. If any of them carry the recommendation, verify instead of recalling, and say as of when. Without a search tool, mark them unverified and say what to check.
 
 ## Commit
 
