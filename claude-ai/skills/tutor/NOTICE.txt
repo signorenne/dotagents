@@ -13,3 +13,13 @@ requests; an explicit request for the answer or solution is honored, followed by
 a short check; check questions are announced as checks; added the graded help
 ladder, concrete example before the rule, misconception, fading and retention
 rules; removed em dashes and inline emphasis.
+
+Modifications made on 2026-09-25: diagnosis before teaching is always done, also
+for fluent, worked or direct-explanation requests (an explicit request for the
+answer still skips it); heading renamed to Tutor; tool-neutral wording for
+the model's own verdict; removed a repeated rule on explicit answer requests.
+
+Modifications made on 2026-09-25: an explicit request for the solution is honored
+also for graded work; the teaching rules that repeat the user's global Learning
+instructions are left to them; two learning-request examples that also name
+ordinary tasks removed; repeated rules removed.
