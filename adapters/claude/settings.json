@@ -38,6 +38,9 @@
       "Read(~/.gnupg/**)"
     ]
   },
+  "enabledPlugins": {
+    "engineering@synced": false
+  },
   "hooks": {
     "PreToolUse": [
       {
