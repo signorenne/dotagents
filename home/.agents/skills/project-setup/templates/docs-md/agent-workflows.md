@@ -113,7 +113,7 @@ Plan approval: (by the maintainer on <date>, or not required: <reason>)
 
 Steps:
 1. <step> | status: todo, in progress or done | commit: <hash> <subject> | check: <command> -> <result>
-   failing runs (new or changed tests): <command> -> <failing line>
+   failing run per behavior a test pins: <command> -> <failing line>
 
 Decisions (newest last):
 P1 <date> by maintainer | by agent: <decision>
