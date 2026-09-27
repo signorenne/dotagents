@@ -34,7 +34,7 @@ docs/                      workflow guide, skill authoring guide and decision lo
 
 ## Hard rules
 
-- Skills use only the Agent Skills fields name, description and license; the name equals the folder name; descriptions are third person, say what and when, at most 1024 characters (200 for claude.ai).
+- Skills use only the frontmatter fields name, description and license (the Agent Skills specification also allows compatibility, metadata and allowed-tools; fields only Claude Code knows make the claude.ai upload fail); the name equals the folder name; descriptions are third person, say what and when, at most 1024 characters (200 for claude.ai).
 - Every skill folder has a LICENSE.txt. New work is MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). Adapted third-party work keeps its license and records the changes (see claude-ai/skills/tutor/NOTICE.txt).
 - No em dash or en dash characters anywhere, and no inline backticks in skill prose.
 - Instructions are written for models: a positive instruction, a reason only where the rule is not obvious, an example where it shows the expected output, no capitalized emphasis.
