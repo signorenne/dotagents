@@ -14,8 +14,8 @@ Write forward, as an instruction set, not backward, as a record of what happened
 
 - Objective: the end result, concrete enough that the reader could recognize completion. Not "improve the pipeline" but "cut the nightly ETL from 40 minutes to under 10 without changing the output schema".
 - Current state: what exists and works, specifically enough that the reader does not rebuild it.
-- Decisions that still bind, with a one-clause reason each. The reason is what stops a fresh reader from re-litigating: "Postgres, not Redis: ops won't take on a second store."
-- Constraints: requirements, deadlines, style rules, technical limits, things the user said they do not want, and how the user wants to be worked with; those preferences are invisible to a fresh session and get violated in its first reply.
+- Decisions that still apply, with a one-clause reason each. The reason is what stops a fresh reader from re-litigating: "Postgres, not Redis: ops won't take on a second store."
+- Constraints: requirements, deadlines, style rules, technical limits, things the user said they do not want, and how the user asked in this session to be worked with when their standing instructions do not already say it; those preferences are invisible to a fresh session and get violated in its first reply.
 - Artifacts: exact file names, paths, URLs, identifiers, function and table names, versions, test data keys. Reproduce the strings exactly; an approximate file name is worse than none.
 - Verify before use: code-level facts the next session will rely on (files, symbols, signatures) may change before it reads the brief. Mark them so it re-reads them before editing.
 - Refuted assumptions: what was believed, the check that disproved it, and what changed, one line each, so the reader does not build on it again.
@@ -30,25 +30,6 @@ Cut abandoned approaches, dead-end debugging, superseded drafts, conversational 
 Never cut exact values and identifiers, unresolved issues, load-bearing assumptions, dependencies and versions, constraints, and anything the user asked for and has not received.
 
 Compression reduces volume, not precision: drop a paragraph of narrative rather than shorten a file name or round a number.
-
-## Red flags
-
-- Writing chronologically ("first we tried..., then we...") instead of forward.
-- Paraphrasing a file name, path or identifier from memory.
-- Ending without a specific next action.
-- Preserving your own explanations because they were good.
-- Dropping the user's stated preferences as "not part of the work".
-- Adding a "here's your handoff" preamble the user has to delete.
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The next session can just ask" | It cannot. Nobody there has the answer. |
-| "That detail is probably not important" | If it is an exact value, keeping it costs a few tokens. |
-| "The history explains why we're here" | Decisions carry the why. Narrative does not. |
-| "Shorter is better" | Precise is better. Cut narrative, not identifiers. |
-| "They'll figure out what to do next" | They will pick something plausible and wrong. |
 
 ## Output
 

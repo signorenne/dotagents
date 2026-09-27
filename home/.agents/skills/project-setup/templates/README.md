@@ -23,7 +23,7 @@ it writes them down.
 2. Validation commands: run each command once before writing it down.
 3. Hard rules: keep only rules whose absence would make an agent err; keep AGENTS.md under about 200 lines.
 4. Link decisions and agent-workflows from AGENTS.md and from the docs index, if the project has one.
-5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot, Cursor and Claude Code).
+5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot and Cursor; Claude Code reads AGENTS.md files only in a project without a CLAUDE.md).
 
 ## Why AGENTS.md alone
 

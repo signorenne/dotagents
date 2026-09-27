@@ -1,6 +1,6 @@
 ---
 name: decision-analysis
-description: "Compares options on the user's criteria and commits to a recommendation, its tradeoff and what would flip it. Use when choosing products, tools, libraries, vendors or strategies, not project design."
+description: "Compares options on the user's criteria and commits to a recommendation and what would flip it. Use when choosing products, tools, libraries or vendors; a project's own choice goes to decide."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -43,25 +43,11 @@ Keep three kinds of difference distinct: objective facts, matters of taste, and 
 
 ## Red flags
 
-- Ending on "it depends on your needs" or "both are great options".
-- A table with nine rows and no conclusion.
-- Inventing a weakness for the stronger option to look even-handed.
-- Comparing on specs neither option's user will ever hit.
-- Asking three clarifying questions before offering anything.
 - Recommending the option you know best rather than the one that fits.
 
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "It really does depend" | Then say what it depends on, and answer for their case. |
-| "I shouldn't push them either way" | They asked. A withheld view is not neutrality, it is a non-answer. |
-| "I don't know their full situation" | State the assumption and recommend under it. They will correct you. |
-| "Being even-handed is safer" | False balance sends people to the worse option. |
-| "A table is more objective" | A table without a conclusion just relocates the work. |
-| "Too close to call" | Then say it is close and give the tiebreaker. |
-
 ## Output
+
+Give these four parts in this order, as prose like the example below; the labels name the content and are not printed:
 
 ```
 Recommendation: <option>, in one sentence on why.
