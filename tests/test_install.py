@@ -4,6 +4,7 @@
 
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -159,6 +160,42 @@ class Install(unittest.TestCase):
         self.assertNotIn("~/.claude/agents and the Claude Code hooks", alone)
         with_claude = self.install("--tools", "cursor,claude")
         self.assertIn("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks", with_claude)
+
+    def run_hook(self, command: str, payload: dict) -> subprocess.CompletedProcess:
+        env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
+        return subprocess.run(["sh", "-c", command], input=json.dumps(payload), env=env,
+                              capture_output=True, text=True, check=False)
+
+    def test_copilot_hooks_follow_the_documented_native_format(self):
+        # GitHub's hooks reference: camelCase events get the native payload (toolName,
+        # toolArgs) and a matcher compiled as ^(?:PATTERN)$ against toolName; native
+        # tool names are bash, edit, create, view..., and str_replace_editor and
+        # apply_patch are edit tools too. User hooks live in ~/.copilot/hooks/*.json.
+        self.install("--tools", "copilot")
+        config = json.loads((self.home / ".copilot/hooks/agents-global.json").read_text())
+        self.assertEqual(config["version"], 1)
+        self.assertEqual(sorted(config["hooks"]), ["postToolUse", "preToolUse"])
+        (pre,), (post,) = config["hooks"]["preToolUse"], config["hooks"]["postToolUse"]
+        for entry, script, matching, other in (
+                (pre, "guard_bash.py", ["bash"], ["powershell", "edit", "create", "view", "Bash"]),
+                (post, "after_edit.py", ["edit", "create", "str_replace_editor", "apply_patch"],
+                 ["bash", "view", "Edit", "Write"])):
+            self.assertEqual(entry["type"], "command")
+            self.assertEqual(entry["bash"], f'python3 "$HOME/.agents/hooks/{script}" --tool copilot')
+            self.assertIsInstance(entry["timeoutSec"], int)
+            for name in matching:
+                self.assertTrue(re.fullmatch(f"(?:{entry['matcher']})", name), (script, name))
+            for name in other:
+                self.assertFalse(re.fullmatch(f"(?:{entry['matcher']})", name), (script, name))
+        # The native payload as GitHub's Copilot CLI hooks guide shows it.
+        blocked = self.run_hook(pre["bash"], {"timestamp": 1704614400000, "cwd": "/tmp", "toolName": "bash",
+                                              "toolArgs": json.dumps({"command": "git commit --no-verify"})})
+        decision = json.loads(blocked.stdout or "{}").get("permissionDecision")
+        self.assertTrue(blocked.returncode != 0 or decision == "deny", blocked)
+        allowed = self.run_hook(pre["bash"], {"timestamp": 1704614400000, "cwd": "/tmp", "toolName": "bash",
+                                              "toolArgs": json.dumps({"command": "ls"})})
+        self.assertEqual(allowed.returncode, 0, allowed)
+        self.assertNotEqual(json.loads(allowed.stdout or "{}").get("permissionDecision"), "deny")
 
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
