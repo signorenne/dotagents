@@ -89,6 +89,25 @@ class Install(unittest.TestCase):
         self.install()
         self.assertIn("0 change(s).", self.install().splitlines())
 
+    def test_dry_run_says_backups_would_be_saved(self):
+        (self.home / ".claude/CLAUDE.md").write_text("my old notes\n")
+        out = self.install("--dry-run", "--tools", "claude")
+        self.assertIn(" Replaced files would be saved in ", out)
+        self.assertFalse((self.home / ".agents-backup").exists())
+
+    def test_tools_list_drops_empty_items_and_duplicates(self):
+        out = self.install("--dry-run", "--tools", "claude,")
+        self.assertIn("Agents: claude", out.splitlines())
+        out = self.install("--dry-run", "--tools", "codex, claude,codex")
+        self.assertIn("Agents: codex, claude", out.splitlines())
+
+    def test_empty_tools_list_is_an_error(self):
+        for value in ("", " , "):
+            result = self.run_install("--dry-run", "--tools", value)
+            self.assertEqual(result.returncode, 2, value)
+            self.assertIn("--tools", result.stderr)
+            self.assertNotIn("Agents:", result.stdout)
+
     def test_a_replaced_file_counts_as_one_change(self):
         self.install()
         (self.home / ".agents/AGENTS.md").write_text("edited by hand\n")
