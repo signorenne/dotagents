@@ -87,7 +87,15 @@ class Install(unittest.TestCase):
 
     def test_second_run_changes_nothing(self):
         self.install()
-        self.assertIn("0 change(s).", self.install())
+        self.assertIn("0 change(s).", self.install().splitlines())
+
+    def test_a_replaced_file_counts_as_one_change(self):
+        self.install()
+        (self.home / ".agents/AGENTS.md").write_text("edited by hand\n")
+        out = self.install()
+        summary = [line for line in out.splitlines() if "change(s)." in line]
+        self.assertEqual(len(summary), 1, out)
+        self.assertTrue(summary[0].startswith("1 change(s). "), summary[0])
 
     def test_shared_source_and_claude_links(self):
         self.install()

@@ -216,11 +216,13 @@ class Installer:
         self.backups = 0
         self.notes = []
 
-    def say(self, action: str, text: str) -> None:
-        self.changes += action != "unchanged"
+    def say(self, action: str, text: str, change: bool = True) -> None:
+        self.changes += change
         print(f"{'(dry) ' if self.dry else ''}{action:10} {text}")
 
-    def backup(self, path: Path) -> None:
+    def backup(self, path: Path, replacing: bool = False) -> None:
+        """Move path to the backup folder; replacing: the caller writes path again and
+        counts the change."""
         try:
             rel = path.relative_to(self.home)
         except ValueError:
@@ -230,18 +232,18 @@ class Installer:
             target.parent.mkdir(parents=True, exist_ok=True)
             shutil.move(str(path), str(target))
         self.backups += 1
-        self.say("backed up", f"{path} -> {target}")
+        self.say("backed up", f"{path} -> {target}", change=not replacing)
 
     def write(self, path: Path, data, executable: bool = False) -> None:
         data = data.encode("utf-8") if isinstance(data, str) else data
         if path.is_symlink():
-            self.backup(path)
+            self.backup(path, replacing=True)
         elif path.exists():
             if path.read_bytes() == data:
                 if executable and not self.dry:
                     path.chmod(0o755)
                 return
-            self.backup(path)
+            self.backup(path, replacing=True)
         if not self.dry:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
@@ -258,7 +260,7 @@ class Installer:
             self.notes.append(f"{path} resolves to {target}; left as it is.")
             return
         if path.exists() or path.is_symlink():
-            self.backup(path)
+            self.backup(path, replacing=True)
         if not self.dry:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.symlink_to(target)
