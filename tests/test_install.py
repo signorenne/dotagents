@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """Tests for install.py, run against a temporary HOME."""
 
+import importlib.util
 import json
 import os
 import re
@@ -22,6 +23,40 @@ try:
     import tomllib
 except ModuleNotFoundError:  # Python < 3.11
     tomllib = None
+
+_spec = importlib.util.spec_from_file_location("install", INSTALL)
+install = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(install)
+OUR_GUARD = {"type": "command", "command": 'python3 "$HOME/.agents/hooks/guard_bash.py" --tool claude'}
+USER_HOOK = {"type": "command", "command": 'python3 "$HOME/.agents/hooks/my_own.py"'}
+
+
+class MergeEventHooks(unittest.TestCase):
+    def test_user_scripts_in_the_agents_hooks_folder_are_kept(self):
+        existing = {"PreToolUse": [{"matcher": "Bash", "hooks": [USER_HOOK, OUR_GUARD]},
+                                   {"matcher": "Bash", "hooks": [
+                                       {"type": "command", "command": "python3 ~/.claude/hooks/guard_bash.py"}]}]}
+        merged = install.merge_event_hooks(existing, {"PreToolUse": [{"matcher": "Bash", "hooks": [OUR_GUARD]}]})
+        self.assertEqual(merged, {"PreToolUse": [{"matcher": "Bash", "hooks": [USER_HOOK]},
+                                                 {"matcher": "Bash", "hooks": [OUR_GUARD]}]})
+
+    def test_unexpected_items_and_values_are_kept_unchanged(self):
+        existing = {"PreToolUse": [{"matcher": "Bash", "hooks": ["text", 3, OUR_GUARD]}, "loose",
+                                   {"matcher": "Edit", "hooks": []}],
+                    "Stop": {"not": "a list"}, "Custom": "text"}
+        merged = install.merge_event_hooks(existing, {"PreToolUse": [{"matcher": "Bash", "hooks": [OUR_GUARD]}]})
+        self.assertEqual(merged, {"PreToolUse": [{"matcher": "Bash", "hooks": ["text", 3]}, "loose",
+                                                 {"matcher": "Edit", "hooks": []},
+                                                 {"matcher": "Bash", "hooks": [OUR_GUARD]}],
+                                  "Stop": {"not": "a list"}, "Custom": "text"})
+
+    def test_hooks_that_cannot_take_our_entries_are_refused(self):
+        ours = {"PreToolUse": [{"matcher": "Bash", "hooks": [OUR_GUARD]}]}
+        for existing in (["an entry"], {"PreToolUse": {"matcher": "Bash"}}, "text"):
+            with self.assertRaises(ValueError, msg=existing):
+                install.merge_event_hooks(existing, ours)
+        for empty in (None, {}, []):
+            self.assertEqual(install.merge_event_hooks(empty, ours), ours)
 
 
 class Install(unittest.TestCase):
@@ -133,6 +168,19 @@ class Install(unittest.TestCase):
         self.install()
         again = json.loads(settings.read_text())
         self.assertEqual(len(again["hooks"]["PreToolUse"]), 1, "hook entries must not duplicate")
+
+    def test_settings_that_cannot_be_merged_are_left_unchanged(self):
+        claude = self.home / ".claude/settings.json"
+        claude.write_text(json.dumps({"model": "opus", "hooks": ["an entry"]}))
+        codex = self.home / ".codex/hooks.json"
+        codex.write_text("[]\n")
+        gemini = self.home / ".gemini/settings.json"
+        gemini.write_text(json.dumps({"context": "AGENTS.md"}))
+        before = (claude.read_text(), codex.read_text(), gemini.read_text())
+        out = self.install("--tools", "claude,codex,gemini")
+        self.assertEqual((claude.read_text(), codex.read_text(), gemini.read_text()), before)
+        for path in (claude, codex, gemini):
+            self.assertIn(f"Could not merge {path}", out)
 
     def test_other_agents_get_instructions_agents_and_hooks(self):
         self.install()
