@@ -108,6 +108,20 @@ class Install(unittest.TestCase):
             self.assertIn("--tools", result.stderr)
             self.assertNotIn("Agents:", result.stdout)
 
+    def test_install_stops_before_writing_when_a_subagent_cannot_be_converted(self):
+        pack = Path(tempfile.mkdtemp()) / "pack"
+        self.addCleanup(shutil.rmtree, pack.parent)
+        shutil.copytree(ROOT, pack, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__"))
+        scout = pack / "home/.agents/agents/scout.md"
+        scout.write_text(scout.read_text() + "\nA TOML end marker: '''\n")
+        before = self.snapshot()
+        result = self.run_install(installer=pack / "install.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("home/.agents/agents/scout.md", result.stderr)
+        self.assertNotIn("Traceback", result.stderr)
+        self.assertEqual(self.snapshot(), before)
+        self.assertFalse((self.home / ".agents").exists())
+
     def test_a_replaced_file_counts_as_one_change(self):
         self.install()
         (self.home / ".agents/AGENTS.md").write_text("edited by hand\n")
