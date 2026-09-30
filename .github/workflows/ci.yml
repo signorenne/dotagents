@@ -11,13 +11,16 @@ jobs:
       matrix:
         include:
           - { os: ubuntu-latest, python: "3.9" }
-          - { os: ubuntu-latest, python: "3.12" }
+          - { os: ubuntu-latest, python: "3.12", pillow: true }
           - { os: macos-latest, python: "3.12" }
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
+      - name: Install Pillow (only here, so the other jobs prove the tests run without it)
+        if: matrix.pillow
+        run: python3 -m pip install pillow
       - name: Validate
         run: python3 tools/validate.py
       - name: Test
