@@ -46,6 +46,13 @@ python3 install.py --audit     # what in the agents' folders is not from here; c
 
 Then, only for what the update touched: paste home/.agents/AGENTS.md into claude.ai
 again, and upload the changed claude.ai skills (claude-ai/README.md, "Update a skill").
+
+The installer adds and replaces what the repository has; it does not remove what the
+repository no longer has. A skill, subagent, hook script or settings entry removed from
+the repository stays on every machine where it was installed: python3 install.py
+--audit lists the leftover skills, subagents and hook scripts; remove settings entries
+by hand from each tool's settings file.
+
 To change the setup itself, run Claude Code (or any agent) in this repository: its
 AGENTS.md says where each change goes and which checks to run.
 
@@ -57,9 +64,9 @@ AGENTS.md says where each change goes and which checks to run.
 | Codex | ~/.codex/AGENTS.md link | reads ~/.agents/skills | ~/.codex/agents/*.toml | ~/.codex/hooks.json (approve in Codex) |
 | Gemini CLI | ~/.gemini/GEMINI.md link; context.fileName adds AGENTS.md | reads ~/.agents/skills | ~/.gemini/agents/*.md | ~/.gemini/settings.json |
 | Copilot CLI | ~/.copilot/copilot-instructions.md link | reads ~/.agents/skills | ~/.copilot/agents/*.agent.md | ~/.copilot/hooks/agents-global.json |
-| Cursor | paste AGENTS.md into User Rules | reads ~/.agents/skills | reads ~/.claude/agents | reads the Claude Code hooks |
+| Cursor | paste AGENTS.md into User Rules | reads ~/.agents/skills | reads ~/.claude/agents (installed with Claude Code) | reads the Claude Code hooks (installed with Claude Code) |
 
-Claude Code is tested end to end; the other agents' files follow their official documentation and are covered by the installer tests.
+Claude Code is tested end to end. The other agents' files follow their official documentation, and tests/test_install.py checks each generated hook file against it (events, matchers, tool names, timeouts).
 
 ## Repository layout
 
@@ -70,7 +77,7 @@ adapters/claude/    Claude Code settings: permissions, hooks, no AI attribution
 install.py          cross-agent installer
 tools/              validate.py (format and text rules), build.py (zips into dist/)
 tests/              unittest suites for hooks, installer and tools
-docs/               workflow guide and decision log
+docs/               workflow guide, skill authoring guide and decision log
 ```
 
 ## Development
