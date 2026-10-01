@@ -15,12 +15,16 @@ from pathlib import Path
 HOOKS = Path(__file__).resolve().parent.parent / "home" / ".agents" / "hooks"
 EM, EN = "\u2014", "\u2013"
 DEEP_JSON = "[" * 100000
+# Variables that change a hook's behavior; tests set them explicitly when they need them.
+HOOK_ENV = ("CURSOR_VERSION",)
 
 
-def run(script: str, payload, tool: str = "claude") -> subprocess.CompletedProcess:
+def run(script: str, payload, tool: str = "claude", env: dict = None) -> subprocess.CompletedProcess:
     data = payload if isinstance(payload, str) else json.dumps(payload)
+    base = {k: v for k, v in os.environ.items() if k not in HOOK_ENV}
     return subprocess.run([sys.executable, str(HOOKS / script), "--tool", tool],
-                          input=data, capture_output=True, text=True, check=False)
+                          input=data, capture_output=True, text=True, check=False,
+                          env={**base, **(env or {})})
 
 
 def bash(command: str) -> dict:
@@ -71,10 +75,10 @@ class GuardBash(unittest.TestCase):
         "git commit -F msg.txt -a",
     ]
 
-    def assert_blocked(self, commands, tool: str = "claude"):
+    def assert_blocked(self, commands, tool: str = "claude", env: dict = None):
         for command in commands:
             with self.subTest(command=command, tool=tool):
-                result = run("guard_bash.py", bash(command), tool)
+                result = run("guard_bash.py", bash(command), tool, env)
                 self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("Blocked:", result.stderr)
 
@@ -155,6 +159,43 @@ class GuardBash(unittest.TestCase):
             "nohup git push -f",
             "timeout 60 git push -f",
         ])
+
+    def test_remote_deletion_mirror_and_prune(self):
+        self.assert_blocked([
+            "git push --delete origin main",
+            "git push origin --delete main",
+            "git push origin :main",
+            "git push -d origin main",
+            "git push --mirror",
+            "git push --mirror origin",
+            "git push --prune origin",
+            "git push --de origin x",
+            "git push --m",
+            "git push --pru origin",
+            "git push origin +HEAD:main",
+            "git push origin --force-with-lease=main main",
+            "git push --force-if-includes",
+            "git push --forc origin main",
+        ])
+        self.assert_allowed([
+            "git push origin HEAD:refs/heads/feat/x",
+            "git push -o ci.skip origin feat/x",
+            "git push --follow-tags origin feat/x",
+            "git push --dry-run origin feat/x",
+        ])
+
+    def test_plain_push_only_in_claude_code(self):
+        pushes = ["git push", "git push origin feat/x", "git push -u origin feat/x",
+                  "cd a && git push origin x"]
+        self.assert_allowed(pushes)
+        for tool in ("codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(pushes, tool)
+        # Cursor runs the Claude Code hook command with --tool claude.
+        self.assert_blocked(pushes, env={"CURSOR_VERSION": "1.7.2"})
+        for command in pushes:
+            with self.subTest(command=command, payload="cursor_version"):
+                payload = {**bash(command), "cursor_version": "1.7.2"}
+                self.assertEqual(run("guard_bash.py", payload).returncode, 2)
 
     def test_other_ways_to_skip_hooks(self):
         self.assert_blocked([
