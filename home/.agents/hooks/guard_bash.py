@@ -24,8 +24,8 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - gh pr merge --admin (merges without the required checks).
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
-; & | ( ), redirections, command substitutions and here-documents, whose body is text,
-not commands. So a commit message that mentions -n or --no-verify is not mistaken for a
+; & | ( ), redirections, command substitutions, arithmetic ($((...)), ((...)), whose <<
+is a shift) and here-documents, whose body is text, not commands. So a commit message that mentions -n or --no-verify is not mistaken for a
 flag. Text that does not parse (an unbalanced quote) is checked by a rough split that
 ignores quoting, so a parse error never lets a forbidden command through. This guards
 the usual forms; it is not a security boundary (bash -c "...", eval, aliases and
@@ -101,8 +101,8 @@ class Parser:
     """Split shell text into simple commands, each a list of words without quotes.
 
     Commands inside $(...), backticks and <(...) are listed too. Redirections are
-    dropped; here-document bodies are skipped, except the substitutions an unquoted
-    delimiter lets the shell run."""
+    dropped; here-document bodies and arithmetic are skipped, except the substitutions
+    in them that the shell runs."""
 
     def __init__(self, text: str, commands: list):
         self.text = text
@@ -129,6 +129,9 @@ class Parser:
                 self.pos = len(self.text) if end < 0 else end
             elif char == "&" and self.peek(1) == ">":
                 self.redirection()
+            elif char == "(" and self.peek(1) == "(" and (
+                    end := self.arithmetic_end(self.pos + 2, "(", "))")) > 0:
+                self.skip_arithmetic(self.pos + 2, end, "))")  # a command such as (( x = 1 << 2 ))
             elif char in OPERATOR_CHARS:
                 self.pos += 1
                 if words:
@@ -190,7 +193,7 @@ class Parser:
             elif char == "$" and self.peek(1) == "'":
                 parts.append(self.ansi_c_quoted())
                 quoted = True
-            elif char == "$" and self.peek(1) == "(":
+            elif char == "$" and self.peek(1) in ("(", "["):
                 parts.append(self.substitution())
             elif char == "`":
                 parts.append(self.backticks())
@@ -216,7 +219,7 @@ class Parser:
                 self.pos += 2
                 if escaped != "\n":
                     parts.append(escaped if escaped in '$`"\\' else "\\" + escaped)
-            elif char == "$" and self.peek(1) == "(":
+            elif char == "$" and self.peek(1) in ("(", "["):
                 parts.append(self.substitution())
             elif char == "`":
                 parts.append(self.backticks())
@@ -234,10 +237,47 @@ class Parser:
         return re.sub(r"\\(.)", r"\1", self.text[start:index], flags=re.DOTALL)
 
     def substitution(self) -> str:
+        """Read $(...), or the arithmetic $((...)) or $[...], at pos; return its text."""
         start = self.pos
+        if self.peek(1) == "[":
+            end = self.arithmetic_end(start + 2, "[", "]")
+            if end < 0:
+                raise ParseError("unterminated $[")
+            return self.skip_arithmetic(start + 2, end, "]")
+        if self.peek(2) == "(":
+            end = self.arithmetic_end(start + 3, "(", "))")
+            if end > 0:
+                return self.skip_arithmetic(start + 3, end, "))")
         self.pos += 2
         self.parse(nested=True)
         return self.text[start:self.pos]
+
+    def arithmetic_end(self, start: int, opening: str, closing: str) -> int:
+        """Index just past the closing ("))" or "]") of arithmetic whose expression starts
+        at start, or -1. A ")" that is not followed by another closes a subshell instead,
+        as in ((cd a) ) or $((cd a) )."""
+        depth = 0
+        for index in range(start, len(self.text)):
+            char = self.text[index]
+            if char == opening:
+                depth += 1
+            elif char == closing[0]:
+                if depth:
+                    depth -= 1
+                elif self.text.startswith(closing, index):
+                    return index + len(closing)
+                else:
+                    return -1
+        return -1
+
+    def skip_arithmetic(self, start: int, end: int, closing: str) -> str:
+        """Move from pos to end, past arithmetic whose < and << are operators, not
+        redirections; list the commands of any $(...) or backticks in its expression
+        text[start:end - len(closing)]. Return the text skipped."""
+        Parser(self.text[start:end - len(closing)], self.commands).expansions("")
+        skipped = self.text[self.pos:end]
+        self.pos = end
+        return skipped
 
     def backticks(self) -> str:
         start = index = self.pos + 1
