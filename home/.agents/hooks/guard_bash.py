@@ -31,9 +31,11 @@ ignores quoting, so a parse error never lets a forbidden command through. This g
 the usual forms; it is not a security boundary (bash -c "...", eval, aliases and
 scripts are not inspected).
 
-Blocking: exit 2 with the reason on stderr (Claude Code, Codex, Gemini CLI, Cursor;
-Copilot denies on any non-zero exit). Unreadable input exits 0 so a broken payload
-never stops normal work. Gemini CLI needs JSON on stdout when the hook succeeds.
+Blocking: exit 2 with the reason on stderr (Claude Code, Codex, Gemini CLI, Cursor).
+Copilot denies on exit 2 but shows stderr only to the user, so it also gets
+{"permissionDecision": "deny", "permissionDecisionReason": ...} on stdout, the reason
+it shows to the agent. Unreadable input exits 0 so a broken payload never stops normal
+work. Gemini CLI needs JSON on stdout when the hook succeeds.
 """
 
 import argparse
@@ -548,12 +550,12 @@ def main() -> int:
     reasons = command_reasons(commands, plain_push_allowed)
     if not reasons:
         return allow(tool)
-    print(
-        "Blocked: " + "; ".join(reasons) + ". "
-        "Gates and published history are the maintainer's call. Fix the failing "
-        "check, or stop and ask the user to run this command themselves.",
-        file=sys.stderr,
-    )
+    message = ("Blocked: " + "; ".join(reasons) + ". "
+               "Gates and published history are the maintainer's call. Fix the failing "
+               "check, or stop and ask the user to run this command themselves.")
+    print(message, file=sys.stderr)
+    if tool == "copilot":
+        print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": message}))
     return 2
 
 
