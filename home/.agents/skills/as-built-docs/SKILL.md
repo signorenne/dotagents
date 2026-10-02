@@ -11,7 +11,7 @@ Goal: three documents that a person reads easily and can trust. They say how the
 ## Working rules
 
 - Keep facts in a notes file (.private/as-built/notes.md when .private/ is git-ignored, otherwise a scratch folder), one line each: id, area tag, statement, file:line. Write from the notes: they survive compaction and spare rereading the code.
-- Delegate code reading, one area per read-only subagent, returning facts in that line format (in Claude Code the general-purpose subagent told not to edit; elsewhere scout, told to return facts in that format instead of its brief). Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
+- Delegate code reading, one area per subagent that runs on the session's model, told to stay read-only and to return facts in that line format: in Claude Code the general-purpose subagent, elsewhere the tool's default general agent. Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
 - External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition.
 - Describe the software as built, without judging it: no bugs, suspicions, unused code or contract anomalies in the docs. Note each one in the notes file under "for the audit", with file:line, and hand the list over at the end.
 - Write one document and one section at a time.
