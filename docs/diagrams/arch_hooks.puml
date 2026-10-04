@@ -1,0 +1,42 @@
+@startuml arch_hooks
+!include palette.iuml
+title What do the hooks do around the agent's work?
+
+participant "Agent tool" as tool
+participant "session_refresh.py" as refresh
+participant "guard_bash.py" as guard
+participant "after_edit.py" as edit
+participant "git" as git
+participant "clang-format" as format
+
+== Claude Code: after a compaction or resume ==
+tool -> refresh : payload (cwd, source)
+refresh -> git : branch, status,\nlast 5 commits
+refresh --> tool : stale-memory reminder\nand git state
+
+== Before a shell command ==
+tool -> guard : payload with the command
+guard -> guard : split into\nsimple commands
+alt a gate bypass or a history rewrite (every tool),\nor any git push outside Claude Code
+  guard --> tool : exit 2, reason on stderr
+else nothing to block
+  guard --> tool : exit 0
+end
+
+== After an edit ==
+tool -> edit : payload with the file\nand the new text
+edit -> edit : find em and\nen dashes
+opt C or C++ file with a .clang-format
+  edit -> format : format in place
+end
+alt a dash, or clang-format failed
+  edit --> tool : exit 2, report on stderr
+else nothing wrong
+  edit --> tool : exit 0, notice if reformatted
+end
+
+legend right
+  Solid arrow: a call
+  Dashed arrow: the reply
+endlegend
+@enduml

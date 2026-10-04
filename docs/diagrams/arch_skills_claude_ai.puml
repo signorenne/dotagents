@@ -1,0 +1,41 @@
+@startuml arch_skills_claude_ai
+!include palette.iuml
+title Where do the skills of the claude.ai set hand work on?
+
+package "claude.ai set" {
+  component "scoping-before-building" as scoping
+  component "decide" as decide
+  component "decision-analysis" as analysis
+  component "efficient-research" as research
+  component "prompt-optimizer" as prompt
+  component "minimal-editing" as editing
+  component "systematic-debugging" as debug
+  component "trustworthy-tests" as tests
+  component "verifying-before-claiming-done" as verify
+  component "context-handoff" as handoff
+  component "tutor" as tutor
+}
+
+component "Local skills\n(other maps)" as local
+
+scoping --> decide : user's choice
+decide -- analysis : products
+analysis -- research : facts
+research --> verify : before settled
+prompt --> editing : one change
+debug -- editing : the fix
+debug -- tests : failing test
+debug --> verify : before fixed
+tests --> verify : before done
+
+scoping --> local : spec,\narchitecture-doc
+decide --> local : spec
+prompt --> local : project-setup
+handoff --> local : session-close
+
+legend right
+  Solid arrow: hands work to
+  Plain line: each names the other
+  Outside the package: skills of the other maps
+endlegend
+@enduml

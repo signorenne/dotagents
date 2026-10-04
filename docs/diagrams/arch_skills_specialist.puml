@@ -1,0 +1,51 @@
+@startuml arch_skills_specialist
+!include palette.iuml
+title Where do the specialist skills hand work on?
+
+package "Application design" {
+  component "clean-architecture" as clean
+  component "qt-quick" as qt
+  component "event-driven-ui" as events
+}
+
+package "Documents and audits" {
+  component "architecture-doc" as archdoc
+  component "as-built-docs" as asbuilt
+  component "plantuml-diagrams" as puml
+  component "precise-ui-changes" as preciseui
+  component "code-audit" as audit
+}
+
+package "Changes across files" {
+  component "mechanical-changes" as mech
+  component "parallel-agents" as parallel
+}
+
+component "systematic-debugging" as debug
+component "spec" as spec
+component "trustworthy-tests" as tests
+component "implement" as implement
+
+archdoc --> puml : diagrams
+asbuilt --> puml : diagrams
+asbuilt --> preciseui : pictures
+asbuilt --> audit : list for the audit
+archdoc --> spec : build order
+audit --> implement : fixes
+preciseui --> tests : behavior test
+
+parallel -- mech : split
+mech --> implement : as a task
+parallel --> implement : from step 5
+
+clean -- qt : in Qt
+clean --> events : threads
+qt -- events : threads
+events -- debug : freezes
+
+legend right
+  Solid arrow: hands work to
+  Plain line: each names the other
+  Outside the packages: skills of the other maps
+endlegend
+@enduml

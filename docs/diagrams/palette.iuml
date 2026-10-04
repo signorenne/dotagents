@@ -1,0 +1,30 @@
+' Palette for PlantUML diagrams: day colours, and night colours in the dark block,
+' which PlantUML applies when the diagram is drawn with -darkmode (as an editor
+' preview on a dark theme does). Change both blocks together and give every fill
+' its matching text colour. Check a night render with plantuml -tpng -darkmode <file>:
+' -darkmode must come after the -t option, because a -t option after it resets the
+' render to day colours.
+<style>
+root { FontColor #37342d; BackgroundColor #eae6dd }
+document { BackgroundColor #f5f1e8 }
+title { FontColor #24211b }
+element { BackgroundColor #eae6dd; LineColor #216183; FontColor #37342d }
+arrow { LineColor #78746d; FontColor #5e5a52 }
+package { BackgroundColor #f5f1e8; LineColor #9c9890; FontColor #24211b }
+database { LineColor #006f5c }
+queue { LineColor #006f5c }
+note { BackgroundColor #f1e3c7; LineColor #775600 }
+legend { BackgroundColor #ede9e1; LineColor #9c9890 }
+@media (prefers-color-scheme:dark) {
+  root { FontColor #ece5de; BackgroundColor #26221e }
+  document { BackgroundColor #1c1915 }
+  title { FontColor #f6f1eb }
+  element { BackgroundColor #26221e; LineColor #a6d7f7; FontColor #ece5de }
+  arrow { LineColor #b1aba4; FontColor #c4bcb4 }
+  package { BackgroundColor #1c1915; LineColor #6d6863; FontColor #f6f1eb }
+  database { LineColor #9fdfcf }
+  queue { LineColor #9fdfcf }
+  note { BackgroundColor #372c15; LineColor #e4cd9d }
+  legend { BackgroundColor #24201b; LineColor #6d6863 }
+}
+</style>

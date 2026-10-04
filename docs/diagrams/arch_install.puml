@@ -1,0 +1,55 @@
+@startuml arch_install
+!include palette.iuml
+title How does an install reach each tool?
+
+actor Maintainer as user
+participant "install.py" as install
+collections "&#126;/.agents-backup/<time>" as backup
+collections "&#126;/.agents" as agents
+collections "&#126;/.claude" as claude
+collections "&#126;/.codex" as codex
+collections "&#126;/.gemini" as gemini
+collections "&#126;/.copilot" as copilot
+
+user -> install : python3 install.py
+install -> install : check the source\n(stop if broken)
+install -> install : detect the tools\n(or --tools)
+
+loop every file or link it replaces
+  install -> backup : move it first
+end
+
+== Shared source ==
+install -> agents : copy home/.agents\nand claude-ai/skills
+
+== Claude Code ==
+install -> claude : CLAUDE.md imports AGENTS.md
+install -> claude : link skills/<name>
+install -> claude : copy agents/*.md
+install -> claude : merge settings.json\n(hooks, skillOverrides)
+
+== Codex ==
+install -> codex : link AGENTS.md
+install -> codex : write agents/*.toml
+install -> codex : merge hooks.json
+
+== Gemini CLI ==
+install -> gemini : link GEMINI.md
+install -> gemini : write agents/*.md
+install -> gemini : merge settings.json\n(hooks, context.fileName)
+
+== Copilot CLI ==
+install -> copilot : link copilot-instructions.md
+install -> copilot : write agents/*.agent.md
+install -> copilot : write hooks/agents-global.json
+
+== Cursor ==
+note over agents, claude : Cursor reads the skills of &#126;/.agents,\nand the agents and hooks of &#126;/.claude
+install -> user : note: paste AGENTS.md\ninto User Rules
+
+install -> user : changes, backup folder, notes
+
+legend right
+  Solid arrow: a call or a write
+endlegend
+@enduml
