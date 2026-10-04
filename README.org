@@ -1,0 +1,216 @@
+#+TITLE: dotagents
+#+SUBTITLE: one set of rules, skills, subagents and hooks for every coding agent and claude.ai
+#+AUTHOR: signorenne
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the project overview and the quick start.
+[[file:docs/README.org][docs/README.org]] maps every other document, and [[file:AGENTS.md][AGENTS.md]] is the
+working-memory floor for agents changing this repository.
+
+* What it is
+
+One setup for every coding agent and for claude.ai: global working
+instructions, skills, subagents and safety hooks, installed for Claude Code,
+Codex, Gemini CLI, GitHub Copilot CLI and Cursor from a single source.
+
+What it gives every session, in chat or in a repository:
+
+- The same global instructions everywhere (priorities, sufficiency, evidence,
+  output rules, no em dashes), including a Socratic method: you question the
+  agent, the agent settles your decisions with you one question at a time, and
+  it tries to refute its own assumptions with checks that could fail.
+- A repository workflow as skills (spec, implement, review, gates,
+  session-close, decide, project-setup), and skills for documentation, design,
+  code quality, coordination and Qt; the full list is under [[*Skills][Skills]].
+- Three subagents that keep the main context small: =scout= (read-only
+  mapping), =gate-runner= (builds and tests, returns only verdicts) and
+  =reviewer= (independent review).
+- Hooks that block git gate bypasses, force pushes and remote deletions (and
+  every push outside Claude Code), flag em and en dashes, run clang-format, and
+  remind the agent after a compaction that its memory of the code may be stale.
+- A claude.ai skill set (decide, tutor, debugging, verification, tests,
+  scoping, editing, research, decisions, handoffs, prompts), installed locally
+  from this repository for every agent too.
+
+* Documentation
+
+- [[file:docs/README.org][docs/README.org]] : the docs map, with the role matrix and the registry of
+  every doc; start here.
+- [[file:AGENTS.md][AGENTS.md]] : rules for changing this repository, where each change goes,
+  the validation commands and the review checklist. The bridges
+  [[file:CLAUDE.md][CLAUDE.md]], [[file:GEMINI.md][GEMINI.md]] and [[file:.github/copilot-instructions.md][.github/copilot-instructions.md]] point back to it.
+- [[file:VISION.org][VISION.org]] and [[file:DESIGN.org][DESIGN.org]] : why the setup exists, how its pieces
+  compose and install, and the rules that bind every change.
+- [[file:docs/workflow.org][docs/workflow.org]] : how the pieces work together once installed: the
+  maieutic method, the daily loop, context hygiene and the setup steps.
+- [[file:docs/architecture.org][docs/architecture.org]] : the system structure, the install flow, a
+  session's runtime view, the skill map and the hooks, with diagrams.
+- [[file:docs/skill-authoring.org][docs/skill-authoring.org]] : how a skill is written, checked and tested.
+- [[file:docs/glossary.org][docs/glossary.org]] : the terms.
+- [[file:CONTRIBUTING.org][CONTRIBUTING.org]] and [[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]] : the workflow, gates and
+  commit convention, and accountability for AI-assisted work.
+- [[file:claude-ai/README.md][claude-ai/README.md]] : uploading and updating the claude.ai skill set.
+- [[file:home/.agents/AGENTS.md][home/.agents/AGENTS.md]] : the global rules themselves.
+
+* Install
+
+#+BEGIN_SRC sh
+git clone https://github.com/signorenne/dotagents.git ~/dotagents
+cd ~/dotagents
+python3 install.py --dry-run   # shows every change, touches nothing
+python3 install.py             # installs for the agents found on this machine
+#+END_SRC
+
+The installer detects the agents present (=~/.claude=, =~/.codex=, =~/.gemini=,
+=~/.copilot=, =~/.cursor= or their commands on =PATH=), moves every file it
+replaces to =~/.agents-backup/<timestamp>/=, and is safe to run again: a second
+run changes nothing. =--tools claude,codex= picks the agents explicitly. It
+needs only =python3= (3.9 or later) and runs on Linux and macOS (on macOS,
+=xcode-select --install= provides =python3= and =git=). [[file:DESIGN.org][DESIGN.org]] lists
+what each agent gets.
+
+Then:
+
+1. claude.ai: paste [[file:home/.agents/AGENTS.md][home/.agents/AGENTS.md]] into Settings > General >
+   Instructions for Claude, and upload the skill set as described in
+   [[file:claude-ai/README.md][claude-ai/README.md]].
+2. In any repository, run =project-setup= once to give it its =AGENTS.md=,
+   decision log and agent workflows.
+
+The full guide, including the daily loop and the maieutic method, is
+[[file:docs/workflow.org][docs/workflow.org]].
+
+* Update
+
+#+BEGIN_SRC sh
+cd ~/dotagents
+git pull                       # or: git am <file>.patch
+python3 install.py --dry-run
+python3 install.py
+python3 install.py --audit     # what in the agents' folders is not from here; changes nothing
+#+END_SRC
+
+Then, only for what the update touched: paste =home/.agents/AGENTS.md= into
+claude.ai again, and upload the changed claude.ai skills
+([[file:claude-ai/README.md][claude-ai/README.md]], "Update a skill").
+
+The installer adds and replaces what the repository has; it does not remove
+what the repository no longer has. A skill, subagent, hook script or settings
+entry removed from the repository stays on every machine where it was
+installed: =python3 install.py --audit= lists the leftover skills, subagents
+and hook scripts; remove settings entries by hand from each tool's settings
+file.
+
+To change the setup itself, run Claude Code (or any agent) in this repository:
+[[file:AGENTS.md][AGENTS.md]] says where each change goes and which checks to run, and
+[[file:CONTRIBUTING.org][CONTRIBUTING.org]] holds the full workflow.
+
+* Layout
+
+#+BEGIN_SRC text
+dotagents/
+|-- README.org          overview and quick start (this file)
+|-- VISION.org          problem, mission, principles, non-goals
+|-- DESIGN.org          how the pieces compose and install, the rules that bind
+|-- CONTRIBUTING.org    workflow, where changes go, gates, commit convention
+|-- AI_DISCLAIMER.org   accountability for AI-assisted work
+|-- AGENTS.md           working-memory floor for agents changing this repository
+|-- CLAUDE.md           Claude Code bridge that imports AGENTS.md
+|-- GEMINI.md           Gemini CLI bridge that imports AGENTS.md
+|-- .github/            CI workflow and the Copilot bridge
+|-- home/.agents/       the installed source: AGENTS.md, skills/, agents/, hooks/
+|-- claude-ai/          skills uploaded to claude.ai, and overrides for local skills uploaded too
+|-- adapters/claude/    Claude Code settings: permissions, hooks, no AI attribution
+|-- install.py          cross-agent installer
+|-- tools/              validate.py (format and text rules), build.py (zips into dist/)
+|-- tests/              unittest suites for hooks, installer, tools and skill scripts
+`-- docs/               docs map, architecture, workflow, skill authoring, glossary
+#+END_SRC
+
+* Skills
+
+Every agent gets every skill. In Claude Code, Copilot and Cursor a skill runs
+as =/name=, in Codex as =$name=; Gemini CLI activates one when asked in words.
+
+** Repository workflow
+
+- [[file:home/.agents/skills/decide/SKILL.md][decide]] : settles a choice that belongs to you, one Socratic question at
+  a time, then records it.
+- [[file:home/.agents/skills/spec/SKILL.md][spec]] : turns a feature idea into a self-contained implementation spec
+  through scouting and a maieutic interview, without writing code.
+- [[file:home/.agents/skills/implement/SKILL.md][implement]] : carries out a spec or a scoped task in small verified
+  commits, with a progress log, the full gates and an independent review.
+- [[file:home/.agents/skills/review/SKILL.md][review]] : reviews the current branch through the =reviewer= subagent and
+  returns findings ranked by severity.
+- [[file:home/.agents/skills/gates/SKILL.md][gates]] : runs the project's documented gates through =gate-runner= and
+  reports only verdicts and the first errors.
+- [[file:home/.agents/skills/session-close/SKILL.md][session-close]] : records the real state of the work in a handoff the next
+  fresh session resumes from.
+- [[file:home/.agents/skills/project-setup/SKILL.md][project-setup]] : sets up or audits a repository's =AGENTS.md=, decision
+  log and agent workflows.
+
+** Documentation and design
+
+- [[file:home/.agents/skills/as-built-docs/SKILL.md][as-built-docs]] : writes a knowledge base, a manual test guide and a
+  developer guide from the code, fact-checked and synced when the code changes.
+- [[file:home/.agents/skills/architecture-doc/SKILL.md][architecture-doc]] : builds the requirements and the architecture of a new
+  system or major component (EARS, arc42, C4, ADRs, an ATAM-style evaluation).
+- [[file:home/.agents/skills/plantuml-diagrams/SKILL.md][plantuml-diagrams]] : draws PlantUML diagrams that read at a glance, in the
+  bundled day and night palette, checked by rendering.
+- [[file:home/.agents/skills/clean-architecture/SKILL.md][clean-architecture]] : keeps an application in clean architecture with
+  MVVM, with dependencies that point inward and are checked by the build.
+
+** Code quality
+
+- [[file:home/.agents/skills/code-audit/SKILL.md][code-audit]] : writes a local report of confirmed security issues, likely
+  bugs and smells, with every doubt kept apart as a question.
+- [[file:home/.agents/skills/mechanical-changes/SKILL.md][mechanical-changes]] : carries out one behavior-preserving change across
+  many files (a rename, a migration, a codemod) in shards that build alone.
+
+** Coordination
+
+- [[file:home/.agents/skills/parallel-agents/SKILL.md][parallel-agents]] : runs several agents writing at once in one
+  repository, each in its own worktree, and lands each branch on a commit
+  that passed the gates.
+
+** Qt and UI
+
+- [[file:home/.agents/skills/qt-quick/SKILL.md][qt-quick]] : Qt 6 Quick and QML facts agents get wrong, and the Qt way to
+  apply clean MVVM.
+- [[file:home/.agents/skills/precise-ui-changes/SKILL.md][precise-ui-changes]] : makes visual UI fixes rendered and measured at
+  device pixels, and proves with a diff check that nothing else moved.
+- [[file:home/.agents/skills/event-driven-ui/SKILL.md][event-driven-ui]] : designs and fixes event-based concurrency so a UI or
+  render thread never blocks.
+
+** The claude.ai set
+
+Uploaded to claude.ai and installed locally for every agent too. decide joins
+the set through [[file:claude-ai/overrides.json][claude-ai/overrides.json]], with a shorter description.
+
+- [[file:claude-ai/skills/tutor/SKILL.md][tutor]] : tutors toward real understanding: diagnosis first, graded help,
+  one step per turn.
+- [[file:claude-ai/skills/scoping-before-building/SKILL.md][scoping-before-building]] : asks only the question that changes the
+  result before building.
+- [[file:claude-ai/skills/systematic-debugging/SKILL.md][systematic-debugging]] : diagnoses a failure from evidence before any fix.
+- [[file:claude-ai/skills/verifying-before-claiming-done/SKILL.md][verifying-before-claiming-done]] : checks the evidence before a completion
+  claim and reports what was and was not verified.
+- [[file:claude-ai/skills/trustworthy-tests/SKILL.md][trustworthy-tests]] : writes and reviews tests that can fail, never
+  weakened to pass.
+- [[file:claude-ai/skills/minimal-editing/SKILL.md][minimal-editing]] : makes the smallest complete change and shows only what
+  changed.
+- [[file:claude-ai/skills/efficient-research/SKILL.md][efficient-research]] : decides when and how much to search, primary
+  sources first, and labels what is sourced, inferred or unknown.
+- [[file:claude-ai/skills/decision-analysis/SKILL.md][decision-analysis]] : compares products, tools or vendors on your criteria
+  and commits to a recommendation.
+- [[file:claude-ai/skills/context-handoff/SKILL.md][context-handoff]] : writes a self-contained brief to continue in another
+  chat, session or model.
+- [[file:claude-ai/skills/prompt-optimizer/SKILL.md][prompt-optimizer]] : rewrites prompts and agent instructions to be
+  specific, checkable and free of filler.
+
+* License
+
+MIT, Copyright (c) 2026 Nicolò Plebani (nexenne), see [[file:LICENSE][LICENSE]]. Every
+skill folder carries its own =LICENSE.txt=. The tutor skill is adapted from
+Anthropic's learn skill and keeps its Apache License 2.0; see
+[[file:claude-ai/skills/tutor/NOTICE.txt][claude-ai/skills/tutor/NOTICE.txt]].

@@ -20,7 +20,8 @@ adapters/claude/           Claude Code settings merged by the installer
 install.py                 installer: copies the source and generates each tool's files
 tools/                     validate.py and build.py
 tests/                     unittest suites for hooks, installer, tools and skill scripts
-docs/                      workflow guide, skill authoring guide and decision log
+docs/                      Org docs: docs map, architecture, workflow guide, skill authoring guide and glossary
+*.org at the root          README, VISION, DESIGN (with the rules that bind), CONTRIBUTING, AI_DISCLAIMER; the bridges CLAUDE.md, GEMINI.md and .github/copilot-instructions.md point here
 ```
 
 ## Where changes go
@@ -38,7 +39,7 @@ docs/                      workflow guide, skill authoring guide and decision lo
 - Every skill folder has a LICENSE.txt. New work is MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). Adapted third-party work keeps its license and records the changes (see claude-ai/skills/tutor/NOTICE.txt).
 - No em dash or en dash characters anywhere, and no inline backticks in skill prose.
 - Instructions are written for models: a positive instruction, a reason only where the rule is not obvious, an example where it shows the expected output, no capitalized emphasis.
-- Change a skill's behavior only on purpose. Skills are concise and complete (every step and rule a model would otherwise get wrong, stated once) and follow docs/skill-authoring.md.
+- Change a skill's behavior only on purpose. Skills are concise and complete (every step and rule a model would otherwise get wrong, stated once) and follow docs/skill-authoring.org.
 - Hooks never block on unreadable input and never print anything but JSON on Gemini CLI's stdout.
 - Commit subjects: type(scope): description, lower case, imperative, one line, no body, no AI attribution trailers.
 
@@ -56,6 +57,6 @@ Run all three before every commit. CI runs the same commands.
 
 - Does the change sit in its owning place (table above), without a second copy?
 - Do validate, tests and build pass?
-- Does a changed instruction still agree with home/.agents/AGENTS.md and the decision log (docs/decisions.md)?
-- Does a new or changed skill pass the checklist in docs/skill-authoring.md?
+- Does a changed instruction still agree with home/.agents/AGENTS.md and the rules in DESIGN.org?
+- Does a new or changed skill pass the checklist in docs/skill-authoring.org?
 - Was a behavior change tested with a real agent session, and is that noted in the commit or PR?
