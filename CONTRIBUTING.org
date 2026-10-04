@@ -1,0 +1,142 @@
+#+TITLE: Contributing to dotagents
+#+SUBTITLE: workflow, where each change goes, gates and commits
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the workflow for changing dotagents: the steps, where each kind
+of change goes, the local gates, CI, commit messages and the docs format.
+[[file:AGENTS.md][AGENTS.md]] carries the one-screen floor for agents; [[file:DESIGN.org][DESIGN.org]] owns the
+design and the rules that bind; [[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is
+written and tested; [[file:docs/README.org][docs/README.org]] maps every doc.
+
+* Workflow
+
+1. Start from [[file:AGENTS.md][AGENTS.md]], then load the docs [[file:docs/README.org][docs/README.org]] assigns to
+   your role.
+2. Work on a topic branch off =main=; agents never commit to =main= directly
+   (global rules). One topic per branch.
+3. Put the change in its owning place (next section), never as a second copy,
+   and check it against the rules in [[file:DESIGN.org][DESIGN.org]]. A change that conflicts
+   with one stops and states the conflict.
+4. Run the three local gates, then =python3 install.py --dry-run= and
+   =python3 install.py=, and try a behavior change in a real agent session.
+   The commit or PR says whether it was tested that way.
+5. Land the work as small commits, each one logical change that passes the
+   gates on its own.
+6. After the change lands: paste =home/.agents/AGENTS.md= into claude.ai again
+   when the global rules changed, and upload the changed claude.ai skills
+   ([[file:claude-ai/README.md][claude-ai/README.md]], "Update a skill").
+
+A new rule, or a change to one, is the maintainer's call: propose it, and
+move it into [[file:DESIGN.org][DESIGN.org]] only after the maintainer
+accepts it.
+
+* Where changes go
+
+- /A rule for every agent and every chat/ : =home/.agents/AGENTS.md=. Keep it
+  under 200 lines; the same text is pasted into claude.ai.
+- /A repository workflow/ (spec, implement, review...) : a skill in
+  =home/.agents/skills/<name>/=.
+- /A general skill also wanted in claude.ai chat/ : =claude-ai/skills/<name>/=,
+  with a description of at most 200 characters.
+- /A local skill wanted on claude.ai too/ : an entry in
+  =claude-ai/overrides.json= with its short description, never a copy.
+- /A script a skill runs/ : =home/.agents/skills/<name>/scripts/=. It uses only
+  the standard library plus at most one common package, and has tests in
+  =tests/test_skill_scripts.py= that run in CI without that package.
+- /A subagent/ : =home/.agents/agents/<name>.md= in Claude Code format; the
+  per-tool formats come from =install.py=, never by hand.
+- /A hook/ : a script in =home/.agents/hooks/= with tests in
+  =tests/test_hooks.py=, registered for each tool in =install.py= and, for
+  Claude Code, in =adapters/claude/settings.json=. It never blocks on
+  unreadable input and prints nothing but JSON on Gemini CLI's stdout.
+- /A new tool or a format change/ : =install.py=, with a test in
+  =tests/test_install.py=.
+- /A new check/ : =tools/validate.py=, with a test in =tests/test_tools.py=.
+
+Every skill folder has a =LICENSE.txt=. New work is MIT, Copyright (c) 2026
+Nicolò Plebani (nexenne); adapted third-party work keeps its license and
+records the changes, as =claude-ai/skills/tutor/NOTICE.txt= does.
+
+* Local gates
+
+Run all three before every commit:
+
+#+BEGIN_SRC sh
+python3 tools/validate.py              # skill and subagent format, text rules, script syntax
+python3 -m unittest discover -s tests  # hooks, installer, tools and skill scripts
+python3 tools/build.py                 # claude.ai zips and the project kit into dist/
+#+END_SRC
+
+When a gate fails because the change is wrong, fix the change: no skipped,
+deleted or loosened tests and no hook bypass without the maintainer's
+approval.
+
+* CI
+
+GitHub Actions ([[file:.github/workflows/ci.yml][.github/workflows/ci.yml]]) runs the =check= job on every
+push and pull request, in three configurations:
+
+| Runner          | Python | Notes                                            |
+|-----------------+--------+--------------------------------------------------|
+| =ubuntu-latest= |    3.9 | the oldest Python the installer supports         |
+| =ubuntu-latest= |   3.12 | with Pillow, which the skills' image scripts use |
+| =macos-latest=  |   3.12 | the other platform the installer supports        |
+
+Each runs the three local gates in order (validate, test with =-v=, build).
+Pillow is installed in one job only, so the other two prove the tests run
+without it.
+
+* Commit messages
+
+The subject line is =type(scope): description=, and it is the whole message:
+
+- =type= is the kind of change (table below).
+- =scope= names the area: =skills=, =agents=, =hooks=, =install=, =validate=,
+  =docs=, =design=, =workflow=, =github=, or =repo= for a repository-wide
+  change.
+- =description= is one sentence: lower case, imperative, no trailing period,
+  no em or en dash.
+- No body. If a change cannot be described in one sentence, split it into
+  smaller commits.
+- No =Co-Authored-By= and no other AI trailer: the committer signs the change
+  ([[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]]).
+
+| type     | for                                     |
+|----------+-----------------------------------------|
+| feat     | a new skill, subagent, hook or behavior |
+| fix      | a bug fix                               |
+| refactor | restructuring, no behavior change       |
+| test     | tests only                              |
+| docs     | documentation only                      |
+| ci       | CI configuration                        |
+| chore    | tooling and housekeeping                |
+
+#+BEGIN_SRC text
+feat(skills): add the code-audit skill
+fix(hooks): block remote ref deletion and any push outside claude code
+docs(design): record that agents outside claude code never push
+#+END_SRC
+
+* AI code assistants
+
+Allowed, with full accountability for every line submitted. Agent and human
+work starts from [[file:AGENTS.md][AGENTS.md]], then the role matrix in [[file:docs/README.org][docs/README.org]].
+Agents keep specs, progress logs and handoffs under the git-ignored =.private/=.
+Commits carry no AI trailer. The policy is [[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]].
+
+* Docs
+
+Prose docs are Org mode (=.org=). Markdown stays where a tool reads the file:
+=AGENTS.md=, the bridges =CLAUDE.md=, =GEMINI.md= and
+=.github/copilot-instructions.md= (which point to =AGENTS.md= and duplicate no
+rule), the global rules in =home/.agents/AGENTS.md=, every skill file, and
+=claude-ai/README.md=, which =tools/build.py= ships in the claude.ai bundle.
+
+An Org doc opens with its header (=#+TITLE=, =#+SUBTITLE=, =#+OPTIONS=,
+=#+STARTUP=) and a paragraph that says what it owns. Use sentence-case
+headings, =code= markup for identifiers, commands and paths, =[[file:...]]=
+links, prose wrapped near 80 columns and aligned tables. No em or en dash
+anywhere (=tools/validate.py= fails on one), no backticks in Org prose, no
+marketing words and no minimizers. Register a new doc in
+[[file:docs/README.org][docs/README.org]] and a new term in [[file:docs/glossary.org][docs/glossary.org]].
