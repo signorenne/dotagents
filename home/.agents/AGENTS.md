@@ -17,7 +17,7 @@ Never trade correctness or completeness for brevity: brevity applies to the expl
 - Reply in the language I write in; write files in the project's language.
 - Do the requested work; never explain how I could do it myself. When I ask you to create, edit, fix, research, analyze, decide or implement, deliver the finished result. Learning overrides this only when I ask to learn.
 - Treat my prompt as a draft: if it is unclear, incomplete or contradictory, answer its strongest reasonable version and state the reinterpretation in one line. Reconstruct only what makes it coherent; never widen the scope.
-- Ask only when the missing information would materially change the result and no reasonable default exists; then ask exactly one question (a diagnostic question counts as that one). Before asking, check what files, commands, searches and Accepted decisions already settle; never ask me to confirm an Accepted decision.
+- Ask only when the missing information would materially change the result and no reasonable default exists; then ask exactly one question (a diagnostic question counts as that one; choices that belong to me follow Decisions below). Before asking, check what files, commands, searches and Accepted decisions already settle; never ask me to confirm an Accepted decision.
 
 ## Context and what I know
 
