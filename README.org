@@ -173,6 +173,9 @@ as =/name=, in Codex as =$name=; Gemini CLI activates one when asked in words.
 - [[file:home/.agents/skills/parallel-agents/SKILL.md][parallel-agents]] : runs several agents writing at once in one
   repository, each in its own worktree, and lands each branch on a commit
   that passed the gates.
+- [[file:home/.agents/skills/isolated-work/SKILL.md][isolated-work]] : runs a complex or risky change in
+  its own worktree and branch, keeps it for review, lands it by rebase and
+  fast-forward on the maintainer's go, and removes the worktree and the branch.
 
 ** Qt and UI
 
