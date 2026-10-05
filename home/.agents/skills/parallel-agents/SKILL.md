@@ -21,20 +21,13 @@ You are the coordinator: you split the work, brief the agents, merge their branc
 
 | Shared thing | How it is isolated |
 |---|---|
-| working tree | one git worktree per agent, outside the main checkout (a sibling folder), created from the base the work targets: git worktree add -b <branch> <path> <base> |
+| working tree | one git worktree and branch per agent, created and run as the isolated-work skill says (sections 1 and 2) |
 | build directory | one per worktree, used only with the toolchain that configured it (a build directory made inside a container is built only inside it) |
 | scratch files | one subfolder per agent, named in its brief |
 | source files | one owner per file. Two tasks that need the same file run one after the other: the second starts from the target after the first is merged |
 | target branch and main checkout | only the coordinator touches them, except each agent's own progress log in the main checkout's .private/ |
 
-A new worktree holds no git-ignored files (.env, local instruction files, private notes) and no build: copy in what the agent needs, or tell it what is missing. Keep the machine awake during long runs: a session caught by sleep mid-response can come back unresponsive.
-
-Tool notes:
-
-- Claude Code: a subagent starts in your working directory and cannot be moved into a worktree made with git. Pass isolation worktree on the call instead: it branches from the remote's default branch, or from your current HEAD when the worktree.baseRef setting is "head" (it cannot name a branch). Those worktrees live under .claude/worktrees inside the checkout: keep it ignored by git and by tools that walk the files (linters, test discovery, validators). For any other base, start a separate claude session inside each worktree made with git. In an interactive session with agent teams enabled, a named subagent runs as a teammate in the main checkout unless the call itself passes isolation or is a fork; isolation in the subagent's definition does not prevent it.
-- Codex: the default sandbox makes .git read-only, so an agent cannot commit. Before launching, give it a permissions profile (a beta feature) that extends :workspace and makes .git writable, for a linked worktree the main repository's .git as well; otherwise the agent stops after each step, uncommitted, and you commit it.
-- Gemini CLI: subagents get no worktree of their own and stop after a default number of turns and minutes (max_turns, timeout_mins) too small for implementation; run a separate gemini session per worktree (gemini --worktree needs the experimental.worktrees setting, or start gemini inside a worktree made with git).
-- Elsewhere (Copilot CLI, Cursor): start a separate session inside each worktree.
+Keep the machine awake during long runs: a session caught by sleep mid-response can come back unresponsive.
 
 ## 3. Write each brief
 
@@ -56,14 +49,11 @@ An agent knows this conversation only through its brief (it does load the projec
 
 ## 5. Land each branch
 
-Land into the target of the approved split, one branch at a time, the one others depend on first, each through steps 1 to 6. git merge-tree --write-tree <target> <branch> shows conflicts without changing anything. Shell variables do not survive between commands: write the pinned hash into each command.
+Land into the target of the approved split, one branch at a time, the one others depend on first. git merge-tree --write-tree <target> <branch> shows conflicts without changing anything.
 
-1. Pin the commit: run git rev-parse <branch> and use that hash from here on, so commits the agent adds later are not merged unseen.
-2. Rebase the branch onto the target's tip in its worktree (git -C <path> rebase <target>, resolving conflicts yourself, or resume its agent to do it) and pin the rebased commit. Run the full gates on that commit through gate-runner, given the worktree path and the pinned hash: rebased commits have never been tested, and two branches that pass alone can fail together.
-3. Merge it where the target is checked out, in the project's merge style (git merge --no-ff <hash>). If the target is checked out nowhere, check it out in a temporary worktree for the merge, so the hooks and signing run, and remove that worktree afterwards.
-4. Confirm git diff --quiet <hash> <target>: the merge added nothing the gates did not see. If it differs, run the gates on the merge.
-5. Clean up: first copy the agent's progress log and any git-ignored notes it hands over into the main checkout, because removing a worktree deletes its ignored files; then git worktree remove <path> (a branch checked out in a worktree cannot be deleted). Delete the branch with git branch -D <branch> only if git rev-parse <branch> still prints the pinned hash and git merge-base --is-ancestor <hash> <target> succeeds; if the branch moved, the agent added commits after the pin: report them. Do not rely on git branch -d: it compares with the branch's upstream or the current HEAD, not with the target.
-6. Before anyone tests the result, restart whatever still runs an older build, and check that the build is newer than the merge.
+1. Copy the agent's progress log and any git-ignored notes it hands over into the main checkout under their own names, because removing a worktree deletes its ignored files.
+2. Land the branch as the isolated-work skill says (section 3: pin, rebase onto the target's tip, gate the pinned commit, fast-forward, remove the worktree and the branch), and note in your log which agent commit became which landed commit.
+3. The branches still open rebase onto the new tip before their own landing: two branches that pass alone can fail together.
 
 ## 6. Report
 
