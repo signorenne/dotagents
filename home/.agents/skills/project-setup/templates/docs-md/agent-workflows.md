@@ -65,12 +65,13 @@ the exit criteria.>
 ## Bug fix workflow
 
 1. Reproduce the bug with the narrowest test or example.
-2. Add a failing test when the bug affects public behavior.
+2. For every bug, turn the reproduction into a test and see it fail on the
+   unfixed code for the bug's reason.
 3. Fix the implementation without weakening the test.
 4. Update docs only when the documented behavior changes or the docs made the
    bug likely.
-5. Run the fixed test, then the module suite, then the wider gates the risk
-   calls for.
+5. Run the fixed test, then the module suite, then the full gates before
+   calling the fix done.
 
 ## Review workflow
 
