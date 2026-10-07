@@ -451,6 +451,11 @@ class AfterEdit(unittest.TestCase):
             {"tool_input": {"file_path": target, "new_string": 5}},
             {"file_path": target, "edits": [{"new_string": 5}]},
             {"tool_input": {"command": "*** Begin Patch\n*** Add File: x\n+a\n*** End Patch"}, "cwd": 5},
+            {"tool_input": {"file_path": target, "new_string": "x"}, "tool_response": "[1]"},
+            {"tool_input": {"file_path": target, "new_string": "x"},
+             "tool_response": {"structuredPatch": [5, {"newStart": True, "lines": [1]}]}},
+            {"tool_input": {"file_path": target, "new_string": "x"},
+             "tool_response": {"structuredPatch": [{"newStart": 1, "lines": "+x"}]}},
             {"toolArgs": "[1]"},
             [1],
             DEEP_JSON,
@@ -510,6 +515,94 @@ class AfterEdit(unittest.TestCase):
         self.assertEqual(code, 2)
         self.assertIn("Formatting not applied", stderr.getvalue())
         self.assertIn("d.cpp", stderr.getvalue())
+
+    def test_formats_only_the_lines_each_edit_changed(self):
+        # The fake formatter records its arguments. An edit formats only the lines it changed:
+        # from the line numbers in the payload when it has them (Claude Code's tool_response
+        # carries a structuredPatch), else where its new text stands, when that is only
+        # once in the file or the edit replaced every occurrence. A file written in full is
+        # formatted whole.
+        log = self.tmp / "args.txt"
+        env = self.fake_clang_format(f'printf "%s\\n" "$@" > "{log}"\n')
+        source = self.tmp / "a.cpp"
+        path = str(source)
+        whole = ["-i", "--style=file", path]
+
+        def lines(*ranges):
+            return ["-i", "--style=file", *[f"--lines={r}" for r in ranges], path]
+
+        def edit(new, **extra):
+            return {"tool_name": "Edit", "tool_input": {"file_path": path, "old_string": "x", "new_string": new,
+                                                        **extra.pop("tool_input", {})}, **extra}
+
+        def patch_response(new_start, *hunk_lines):
+            return {"structuredPatch": [{"oldStart": new_start, "oldLines": 1, "newStart": new_start,
+                                         "newLines": 1, "lines": list(hunk_lines)}]}
+
+        def codex(body):
+            return {"tool_name": "apply_patch", "cwd": str(self.tmp),
+                    "tool_input": {"command": f"*** Begin Patch\n{body}*** End Patch\n"}}
+
+        write = {"tool_name": "Write", "tool_input": {"file_path": path, "content": "int   a( );\n"}}
+        cases = [
+            ("one line", "claude", edit("int   b( );"), lines("2:2")),
+            ("part of a line", "claude", edit("b( )"), lines("2:2")),
+            ("several lines", "claude", edit("int   c( );\nint   d( );\n"), lines("3:4")),
+            ("text found twice", "claude", edit("int   a( );"), None),
+            ("deletion", "claude", edit(""), None),
+            ("replace all", "claude", edit("int   a( );", tool_input={"replace_all": True}), lines("1:1", "5:5")),
+            ("patch line numbers", "claude",
+             edit("int   a( );", tool_response=patch_response(4, " int   d( );", "-int x;", "+int   a( );")),
+             lines("5:5")),
+            ("patch without added lines", "claude", edit("", tool_response=patch_response(2, "-int x;")), None),
+            ("write", "claude", write, whole),
+            ("write of a new file", "claude", {**write, "tool_response": {"type": "create", "structuredPatch": []}},
+             whole),
+            ("write over a file", "claude",
+             {**write, "tool_response": {"type": "update", "structuredPatch": [
+                 {"oldStart": 2, "oldLines": 2, "newStart": 2, "newLines": 2,
+                  "lines": ["-x", "-y", "+int   b( );", "+int   c( );"]}]}},
+             lines("2:3")),
+            ("gemini replace", "gemini",
+             {"tool_name": "replace", "tool_input": {"file_path": path, "old_string": "x", "new_string": "int   d( );"}},
+             lines("4:4")),
+            ("copilot edit", "copilot",
+             {"toolName": "edit", "toolArgs": json.dumps({"path": path, "old_str": "x", "new_str": "int   c( );"})},
+             lines("3:3")),
+            ("cursor edits", "cursor",
+             {"file_path": path, "edits": [{"old_string": "x", "new_string": "int   b( );"},
+                                           {"old_string": "y", "new_string": "int   d( );"}]},
+             lines("2:2", "4:4")),
+            ("codex update", "codex",
+             codex("*** Update File: a.cpp\n@@\n int   b( );\n-int x;\n+int   c( );\n int   d( );\n"), lines("3:3")),
+            # apply_patch tolerates whitespace changes in context lines; the added lines still locate.
+            ("codex update, loose context", "codex",
+             codex("*** Update File: a.cpp\n@@\n int b( );\n-int x;\n+int   c( );\n int d( );\n"), lines("3:3")),
+            ("codex move", "codex",
+             codex("*** Update File: old.cpp\n*** Move to: a.cpp\n@@\n-int x;\n+int   b( );\n"), lines("2:2")),
+            ("codex add", "codex", codex("*** Add File: a.cpp\n+int   a( );\n"), whole),
+        ]
+        for name, tool, payload, expected in cases:
+            with self.subTest(case=name):
+                source.write_text("int   a( );\nint   b( );\nint   c( );\nint   d( );\nint   a( );\n")
+                if log.exists():
+                    log.unlink()
+                result = run("after_edit.py", payload, tool, env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                called = log.read_text().splitlines() if log.exists() else None
+                self.assertEqual(called, expected)
+
+    @unittest.skipUnless(shutil.which("clang-format"), "clang-format not installed")
+    def test_edit_leaves_lines_it_did_not_change_alone(self):
+        (self.tmp / ".clang-format").write_text("BasedOnStyle: LLVM\n")
+        source = self.tmp / "a.cpp"
+        source.write_text("int   a( );\nint   b( );\nint   c( );\n")
+        payload = {"tool_name": "Edit", "tool_input": {"file_path": str(source), "old_string": "int x;",
+                                                       "new_string": "int   b( );"}}
+        result = run("after_edit.py", payload)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("reformatted", json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
+        self.assertEqual(source.read_text(), "int   a( );\nint b();\nint   c( );\n")
 
     @unittest.skipUnless(shutil.which("clang-format"), "clang-format not installed")
     def test_formats_cpp_when_project_has_clang_format(self):
