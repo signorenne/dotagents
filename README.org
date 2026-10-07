@@ -10,13 +10,13 @@ working-memory floor for agents changing this repository.
 
 * What it is
 
-One setup for every coding agent and for claude.ai: global working
-instructions, skills, subagents and safety hooks, installed for Claude Code,
-Codex, Gemini CLI, GitHub Copilot CLI and Cursor from a single source.
+One setup for every coding agent and for claude.ai: global rules, skills,
+subagents and safety hooks, installed for Claude Code, Codex, Gemini CLI,
+GitHub Copilot CLI and Cursor from a single source.
 
 What it gives every session, in chat or in a repository:
 
-- The same global instructions everywhere (priorities, sufficiency, evidence,
+- The same global rules everywhere (priorities, sufficiency, evidence,
   output rules, no em dashes), including a Socratic method: you question the
   agent, the agent settles your decisions with you one question at a time, and
   it tries to refute its own assumptions with checks that could fail.
@@ -26,9 +26,11 @@ What it gives every session, in chat or in a repository:
 - Three subagents that keep the main context small: =scout= (read-only
   mapping), =gate-runner= (builds and tests, returns only verdicts) and
   =reviewer= (independent review).
-- Hooks that block git gate bypasses, force pushes and remote deletions (and
-  every push outside Claude Code), flag em and en dashes, run clang-format, and
-  remind the agent after a compaction that its memory of the code may be stale.
+- Hooks that block git gate bypasses and every push or publish (no agent
+  pushes: the maintainer reviews and pushes), flag em and en dashes, run
+  clang-format on the C and C++ lines an edit changed, and, in Claude Code,
+  remind the agent after a compaction that its memory of the code may be
+  stale and point it to the task's progress log and handoff.
 - A claude.ai skill set (decide, tutor, debugging, verification, tests,
   scoping, editing, research, decisions, handoffs, prompts), installed locally
   from this repository for every agent too.
@@ -44,6 +46,9 @@ What it gives every session, in chat or in a repository:
   compose and install, and the rules that bind every change.
 - [[file:docs/workflow.org][docs/workflow.org]] : how the pieces work together once installed: the
   maieutic method, the daily loop, context hygiene and the setup steps.
+- [[file:docs/pipeline.org][docs/pipeline.org]] : how a change goes from idea to merge: each stage, its
+  skill and what it leaves, who lands and pushes, and what to do when a stage
+  fails.
 - [[file:docs/architecture.org][docs/architecture.org]] : the system structure, the install flow, a
   session's runtime view, the skill map and the hooks, with diagrams.
 - [[file:docs/skill-authoring.org][docs/skill-authoring.org]] : how a skill is written, checked and tested.
@@ -95,12 +100,12 @@ Then, only for what the update touched: paste =home/.agents/AGENTS.md= into
 claude.ai again, and upload the changed claude.ai skills
 ([[file:claude-ai/README.md][claude-ai/README.md]], "Update a skill").
 
-The installer adds and replaces what the repository has; it does not remove
-what the repository no longer has. A skill, subagent, hook script or settings
-entry removed from the repository stays on every machine where it was
-installed: =python3 install.py --audit= lists the leftover skills, subagents
-and hook scripts; remove settings entries by hand from each tool's settings
-file.
+The installer adds and replaces what the repository has. A whole skill,
+subagent, hook script or settings entry removed from the repository stays on
+every machine where it was installed ([[file:DESIGN.org::*Install model][DESIGN.org, Install model]] says what it
+does remove): =python3 install.py --audit= lists the leftover skills,
+subagents and hook scripts; remove settings entries by hand from each tool's
+settings file.
 
 To change the setup itself, run Claude Code (or any agent) in this repository:
 [[file:AGENTS.md][AGENTS.md]] says where each change goes and which checks to run, and
@@ -125,7 +130,7 @@ dotagents/
 |-- install.py          cross-agent installer
 |-- tools/              validate.py (format and text rules), build.py (zips into dist/)
 |-- tests/              unittest suites for hooks, installer, tools and skill scripts
-`-- docs/               docs map, architecture, workflow, skill authoring, glossary
+`-- docs/               docs map, architecture, pipeline, workflow, skill authoring, glossary
 #+END_SRC
 
 * Skills
@@ -134,6 +139,8 @@ Every agent gets every skill. In Claude Code, Copilot and Cursor a skill runs
 as =/name=, in Codex as =$name=; Gemini CLI activates one when asked in words.
 
 ** Repository workflow
+
+[[file:docs/pipeline.org][docs/pipeline.org]] shows how these skills chain from idea to merge.
 
 - [[file:home/.agents/skills/decide/SKILL.md][decide]] : settles a choice that belongs to you, one Socratic question at
   a time, then records it.

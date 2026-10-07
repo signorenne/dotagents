@@ -1,7 +1,7 @@
 # dotagents agent guide
 
 Guide for AI agents and contributors changing this repository. dotagents is the
-source of a personal, cross-agent setup: global instructions, skills, subagents and
+source of a personal, cross-agent setup: global rules, skills, subagents and
 hooks for Claude Code, Codex, Gemini CLI, GitHub Copilot and Cursor, an installer
 that wires them into each tool, and a skill set for claude.ai. The global rules for
 how agents work live in home/.agents/AGENTS.md; this file covers only how to change
@@ -10,7 +10,7 @@ the repository itself.
 ## Layout
 
 ```text
-home/.agents/AGENTS.md     global instructions, installed as ~/.agents/AGENTS.md
+home/.agents/AGENTS.md     global rules, installed as ~/.agents/AGENTS.md
 home/.agents/skills/       local skills (decide, spec, implement, review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, isolated-work, mechanical-changes, precise-ui-changes, qt-quick, clean-architecture, event-driven-ui, code-audit)
 home/.agents/agents/       subagents in Claude Code format, the source for every tool's copy
 home/.agents/hooks/        hook scripts shared by every agent
@@ -20,7 +20,7 @@ adapters/claude/           Claude Code settings merged by the installer
 install.py                 installer: copies the source and generates each tool's files
 tools/                     validate.py and build.py
 tests/                     unittest suites for hooks, installer, tools and skill scripts
-docs/                      Org docs: docs map, architecture, workflow guide, skill authoring guide and glossary
+docs/                      Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide and glossary
 *.org at the root          README, VISION, DESIGN (with the rules that bind), CONTRIBUTING, AI_DISCLAIMER; the bridges CLAUDE.md, GEMINI.md and .github/copilot-instructions.md point here
 ```
 
@@ -31,7 +31,9 @@ docs/                      Org docs: docs map, architecture, workflow guide, ski
 - A general skill also wanted in claude.ai chat: claude-ai/skills/<name>/. A local skill wanted there too: an entry in claude-ai/overrides.json, never a copy.
 - A script a skill runs: home/.agents/skills/<name>/scripts/. It uses only the standard library plus at most one common package, and has tests in tests/test_skill_scripts.py that run in CI without that package.
 - A subagent: home/.agents/agents/<name>.md; per-tool formats come from install.py, never by hand.
+- A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: install.py, with a test in tests/test_install.py.
+- A new check: tools/validate.py, with a test in tests/test_tools.py.
 
 ## Hard rules
 
@@ -55,8 +57,8 @@ Run all three before every commit. CI runs the same commands.
 
 ## Review checklist
 
-- Does the change sit in its owning place (table above), without a second copy?
+- Does the change sit in its owning place (Where changes go), without a second copy?
 - Do validate, tests and build pass?
 - Does a changed instruction still agree with home/.agents/AGENTS.md and the rules in DESIGN.org?
 - Does a new or changed skill pass the checklist in docs/skill-authoring.org?
-- Was a behavior change tested with a real agent session, and is that noted in the commit or PR?
+- If the maintainer asked for a real agent session test of a behavior change, was it run, and do the progress log or the PR say whether it was?
