@@ -343,6 +343,31 @@ class Install(unittest.TestCase):
         self.assert_hook_group(after, "after_edit.py", "gemini", ["write_file", "replace"],
                                ["run_shell_command", "read_file"], range(1000, 600001))
 
+    def test_gemini_subagents_outlast_the_default_limits(self):
+        # Gemini CLI stops a subagent at max_turns (default 30) and timeout_mins (default 10),
+        # positive integers in a strict frontmatter schema that rejects unknown fields
+        # (google-gemini/gemini-cli docs/core/subagents.md, packages/core/src/agents/agentLoader.ts).
+        self.install("--tools", "gemini")
+        schema = {"kind", "name", "description", "display_name", "tools", "mcp_servers", "model",
+                  "temperature", "max_turns", "timeout_mins"}
+        minutes = {}
+        for name in AGENTS:
+            with self.subTest(agent=name):
+                text = (self.home / ".gemini/agents" / f"{name}.md").read_text()
+                head = text[len("---\n"):].split("\n---\n", 1)[0]
+                fields = dict(line.split(":", 1) for line in head.splitlines() if not line.startswith(" "))
+                self.assertLessEqual(set(fields), schema)
+                self.assertIn("max_turns", fields)
+                self.assertIn("timeout_mins", fields)
+                self.assertRegex(fields["max_turns"], r"^ [1-9][0-9]*$")
+                self.assertRegex(fields["timeout_mins"], r"^ [1-9][0-9]*$")
+                self.assertGreater(int(fields["max_turns"]), 30)
+                self.assertGreater(int(fields["timeout_mins"]), 10)
+                minutes[name] = int(fields["timeout_mins"])
+        self.assertIn("gate-runner", minutes)
+        self.assertEqual(sorted(minutes, key=minutes.get)[-1], "gate-runner")
+        self.assertEqual(list(minutes.values()).count(minutes["gate-runner"]), 1, "gate-runner runs longest")
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")

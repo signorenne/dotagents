@@ -60,6 +60,11 @@ GEMINI_TOOLS = {"Read": ["read_file"], "Grep": ["grep_search"],
 COPILOT_TOOLS = {"Read": "read", "Grep": "search", "Glob": "search",
                  "Bash": "execute", "Edit": "edit", "Write": "edit"}
 CODEX_SANDBOX = {"scout": "read-only"}
+# Gemini CLI stops a subagent after 30 turns or 10 minutes unless its file sets max_turns
+# and timeout_mins (docs/core/subagents.md): (max_turns, timeout_mins) per subagent. Builds
+# and test suites make the gate-runner the longest.
+GEMINI_LIMITS = {"gate-runner": (100, 120), "reviewer": (100, 60), "scout": (100, 30)}
+GEMINI_DEFAULT_LIMITS = (80, 30)
 
 
 def hook(cmd: str, **extra) -> dict:
@@ -124,6 +129,8 @@ def gemini_agent(meta: dict, body: str) -> str:
     if tools:
         lines.append("tools:")
         lines += [f"  - {t}" for t in tools]
+    turns, minutes = GEMINI_LIMITS.get(meta["name"], GEMINI_DEFAULT_LIMITS)
+    lines += [f"max_turns: {turns}", f"timeout_mins: {minutes}"]
     return "\n".join(lines + ["---", "", body])
 
 
