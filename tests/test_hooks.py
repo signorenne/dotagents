@@ -228,12 +228,21 @@ class GuardBash(unittest.TestCase):
         payload = {**bash("git push"), "cursor_version": "1.7.2"}
         self.assertEqual(run("guard_bash.py", payload).returncode, 2)
 
+    def test_releases_and_repository_syncs_are_blocked(self):
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(["gh release create v1.0 --notes x", "gh repo sync",
+                                 "gh repo sync owner/fork --source owner/repo",
+                                 "gh -R owner/repo release create v2"], tool)
+        self.assertIn("Pushing and publishing are the maintainer's",
+                      run("guard_bash.py", bash("gh release create v1.0")).stderr)
+
     def test_commands_that_do_not_publish_are_allowed(self):
         self.assert_allowed([
             "git fetch origin", "git pull origin main", "git remote -v", "git log --grep push",
             "echo git push", "grep -rn 'git push' docs", "git subtree split -P lib -b split",
             "git subtree add --prefix push origin main", "git subtree pull --prefix=lib origin main",
             "gh pr view 12", "gh pr list", "gh pr checkout 12", "gh pr diff 12",
+            "gh release list", "gh release view v1.0", "gh repo view", "gh repo clone owner/repo",
         ])
 
     def test_other_ways_to_skip_hooks(self):
