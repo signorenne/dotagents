@@ -695,6 +695,62 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Current branch: work", result.stdout)
         self.assertIn("Uncommitted changes not shown: git status failed", result.stdout)
 
+    REREAD = "Re-read the task's progress log before the next step."
+
+    def write_notes(self, repo: Path, notes: dict) -> None:
+        """Create .private files {relative path: modification time in epoch seconds},
+        git-ignored as in a real project."""
+        exclude = repo / ".git" / "info" / "exclude"
+        exclude.parent.mkdir(parents=True, exist_ok=True)
+        exclude.write_text(".private/\n")
+        for name, mtime in notes.items():
+            path = repo / ".private" / name
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text("notes\n")
+            os.utime(path, (mtime, mtime))
+
+    def test_points_to_the_most_recent_task_notes(self):
+        repo, env = self.committed_repo()
+        day = 1_790_000_000
+        self.write_notes(repo, {"progress/old.org": day, "progress/a.org": day + 60,
+                                "progress/task/b.org": day + 120, "progress/c.org": day + 180,
+                                "handoff/h.org": day + 30, "specs/s.org": day + 300})
+        (repo / "src").mkdir()
+        for cwd in (repo, repo / "src"):
+            with self.subTest(cwd=cwd):
+                result = self.refresh_with({"cwd": str(cwd), "source": "compact"}, env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                listed = [f".private/{name} ({time.strftime('%Y-%m-%d %H:%M', time.localtime(mtime))})"
+                          for name, mtime in (("progress/c.org", day + 180), ("progress/task/b.org", day + 120),
+                                              ("progress/a.org", day + 60), ("handoff/h.org", day + 30))]
+                positions = [result.stdout.find(line) for line in listed]
+                self.assertNotIn(-1, positions, result.stdout)
+                self.assertEqual(positions, sorted(positions), "most recent first, progress before handoff")
+                self.assertNotIn("old.org", result.stdout)
+                self.assertNotIn("s.org", result.stdout)
+                self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
+
+    def test_no_task_notes_no_reminder(self):
+        repo, env = self.committed_repo()
+        for notes in ({}, {"specs/s.org": 1_790_000_000}):
+            with self.subTest(notes=notes):
+                self.write_notes(repo, notes)
+                result = self.refresh(repo, env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertNotIn(".private", result.stdout)
+                self.assertNotIn(self.REREAD, result.stdout)
+
+    def test_unreadable_task_notes_never_fail(self):
+        repo, env = self.committed_repo()
+        (repo / ".private").mkdir()
+        (repo / ".private/progress").write_text("a file, not a folder\n")
+        self.write_notes(repo, {"handoff/h.org": 1_790_000_000})
+        (repo / ".private/handoff/gone.org").symlink_to(repo / "missing")
+        result = self.refresh(repo, env)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        self.assertIn(".private/handoff/h.org", result.stdout)
+        self.assertNotIn("gone.org", result.stdout)
+
     def test_wrong_types_never_fail(self):
         for payload in ([1], {"cwd": 5}, {"cwd": [], "source": 5}, {"source": {"a": 1}}, DEEP_JSON):
             with self.subTest(payload=str(payload)[:40]):
@@ -706,6 +762,8 @@ class SessionRefresh(unittest.TestCase):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
         fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
+        (tmp / ".git").mkdir()
+        self.write_notes(tmp, {"progress/p.org": 1_790_000_000})
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
         start = time.monotonic()
         result = self.refresh_with({"cwd": str(tmp), "source": "resume"}, env)
@@ -715,6 +773,9 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Current branch: work", result.stdout)
         self.assertIn("Uncommitted changes not shown", result.stdout)
         self.assertIn("Last commits not shown", result.stdout)
+        # The notes are files, not git output: a slow git does not hide them.
+        self.assertIn(".private/progress/p.org", result.stdout)
+        self.assertIn(self.REREAD, result.stdout)
 
 
 if __name__ == "__main__":
