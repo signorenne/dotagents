@@ -1,0 +1,16 @@
+---
+name: <FILL: kebab-case name, same as the folder, for example add-component>
+description: "<FILL: third person, what it does and when to use it, for example: Adds a public component to an existing module with its full deliverable set (header, API docs, test, example, guide, build wiring). Use when the user asks to add or create a component in this repository.>"
+---
+
+# <FILL: title>
+
+Follow <FILL: path to the workflow section in the agent workflows doc>. This skill
+adds only what the workflow doc does not say: the exact files and commands for
+this repository.
+
+1. <FILL: step, with the exact path pattern>
+2. <FILL: step>
+3. Run <FILL: narrow test command>, then <FILL: gate command>.
+
+Exit criteria: <FILL: what must agree before the step is done>.

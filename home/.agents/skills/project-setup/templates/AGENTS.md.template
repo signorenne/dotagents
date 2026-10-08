@@ -1,0 +1,75 @@
+# <FILL: project name> agent guide
+
+This is the canonical guide for AI agents and human contributors working in this
+repository. Every coding agent reads it (Claude Code, Codex, Copilot and Cursor
+natively; Gemini CLI through its context.fileName setting or a GEMINI.md bridge).
+Keep it the single source: tool-specific files point here and never copy rules.
+Deeper explanations live in the linked docs; this file is the floor, not the full
+reference.
+
+<FILL: one paragraph: what the project is, who uses it, the main technologies.>
+
+## First load
+
+For any task, read this file, then only the docs the task needs:
+
+- <FILL: architecture or design doc> for structure and boundaries.
+- <FILL: style guide> for code style and API documentation rules.
+- <FILL: docs/agent-workflows.md or doc/agent-workflows.org> for multi-step workflows (spec, component change, bug fix, review, handoff).
+- <FILL: docs/decisions.md or doc/decisions.org> for decisions: an Accepted entry binds the work.
+
+## Working method
+
+- Establish context before changing code: goal, constraints, and how the existing
+  code already solves nearby problems. Look for reuse before writing new code.
+- Ground every change in the current code: re-read the files you will touch and
+  confirm the symbols you call exist. Specs, handoffs and summaries can be stale.
+- State the intended change and its expected outcome before editing.
+- Break work into small, verifiable steps; land each as its own commit.
+- Verify each step with the narrowest check, then widen before finishing (see
+  Validation commands).
+- The maintainer owns decisions. Propose new ones in the decision log as
+  Proposed; its authority rules say when an entry becomes Accepted.
+
+## Repo shape
+
+```text
+<FILL: top-level tree, one line of purpose per entry, generated from the real repo>
+```
+
+## Where new work goes
+
+- <FILL: kind of change>: <FILL: path pattern>
+- Decision log: <FILL: docs/decisions.md>; the rule itself stays in its owning doc.
+- Specs and handoffs: .private/specs/<slug>.<ext> and
+  .private/handoff/<date>-<slug>.<ext>, local and git-ignored.
+
+## Hard rules
+
+<FILL: only rules whose removal would cause mistakes: language standard, naming,
+error model, dependency policy, doc format, commit subject format. One line each,
+with the owning doc linked.>
+
+- No em dash or en dash characters in code, docs, comments or commits.
+
+## Validation commands
+
+Use the narrowest useful command while iterating, then widen before finishing.
+
+```sh
+<FILL: configure and build>
+<FILL: run all tests>
+<FILL: run one test or test case>
+<FILL: lint, format check, sanitizers, docs build: the pre-PR gates>
+```
+
+## Review checklist
+
+- Does the change belong to the area it touched?
+- Is every new public type or function documented and tested?
+- Do code, API docs, guides and examples agree?
+- Does the change conflict with an Accepted decision, or change a rule without
+  the maintainer's approval?
+- Were the validation commands for the touched area run?
+- Was the work landed as small, verifiable commits?
+<FILL: project-specific checks>
