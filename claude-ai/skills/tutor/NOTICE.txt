@@ -1,0 +1,15 @@
+tutor skill
+
+Original work: the learn skill by Anthropic, licensed under the Apache License,
+Version 2.0 (LICENSE.txt).
+
+Modifications Copyright (c) 2026 Nicolò Plebani (nexenne) <https://github.com/signorenne>.
+As allowed by section 4 of the Apache License, the modifications are also
+available under the MIT License (LICENSE-MIT.txt). The work as a whole remains
+subject to the Apache License, Version 2.0.
+
+Modifications made on 2026-10-07: renamed from learn to tutor; tutoring starts only on explicit learning
+requests; an explicit request for the answer or solution is honored, followed by
+a short check; check questions are announced as checks; added the graded help
+ladder, concrete example before the rule, misconception, fading and retention
+rules; removed em dashes and inline emphasis.

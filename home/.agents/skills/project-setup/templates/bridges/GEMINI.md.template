@@ -1,0 +1,4 @@
+@./AGENTS.md
+
+Gemini CLI bridge. AGENTS.md is the canonical agent guide for this repository;
+update it there and do not copy rules into this file.

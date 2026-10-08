@@ -1,0 +1,7 @@
+@AGENTS.md
+
+## Claude Code only
+
+<FILL: notes that apply only to Claude Code, or delete this file. Claude Code reads
+AGENTS.md by itself when no CLAUDE.md exists, so this bridge is needed only for
+Claude-specific additions.>
