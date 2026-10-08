@@ -73,11 +73,24 @@ class Tools(unittest.TestCase):
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("FAIL tutor: skill in both home/.agents/skills and claude-ai/skills", result.stdout)
 
-    def add_skill(self, name: str, description: str = "Does a thing. Use when testing.") -> None:
+    def add_skill(self, name: str, description: str = "Does a thing. Use when testing.", body: str = "Body.\n") -> None:
         folder = self.repo / "home/.agents/skills" / name
         folder.mkdir()
-        (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\nlicense: MIT\n---\nBody.\n")
+        (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\nlicense: MIT\n---\n{body}",
+                                         encoding="utf-8")
         shutil.copy(self.repo / "home/.agents/skills/spec/LICENSE.txt", folder / "LICENSE.txt")
+
+    def test_validate_rejects_a_skill_body_over_20000_bytes(self):
+        # After compaction Claude Code keeps about 5,000 tokens of a skill, about 20,000 bytes.
+        # The limit counts bytes, not characters: 10,001 two-byte letters are 20,002 bytes.
+        self.add_skill("at-limit", body="x" * 20000)
+        self.add_skill("over-limit", body="x" * 20001)
+        self.add_skill("wide-letters", body="è" * 10001)
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("FAIL home/.agents/skills/over-limit/SKILL.md: body of 20001 bytes (limit 20000)", result.stdout)
+        self.assertIn("FAIL home/.agents/skills/wide-letters/SKILL.md: body of 20002 bytes (limit 20000)", result.stdout)
+        self.assertNotIn("at-limit", result.stdout)
 
     def test_validate_rejects_reserved_names_and_angle_brackets(self):
         self.add_skill("ok-skill")
