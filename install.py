@@ -9,9 +9,9 @@ repository, then run this script again to regenerate the per-tool copies.
   python3 install.py              install for the agents detected on this machine
   python3 install.py --dry-run    show what would change, change nothing
   python3 install.py --tools claude,codex,gemini,copilot,cursor   choose explicitly
-  python3 install.py --claude-local-skills   also give Claude Code the claude-ai/ skill
-                                  set locally (only when it does not sync them from
-                                  a claude.ai login)
+
+Every agent gets every skill from this repository. In Claude Code, the copies that
+claude.ai syncs of the same skills are turned off, so each skill loads once, from here.
 
 Every file this script replaces is moved to ~/.agents-backup/<timestamp>/ first.
 """
@@ -28,6 +28,8 @@ PACK = Path(__file__).resolve().parent
 SRC = PACK / "home" / ".agents"
 ONLINE = PACK / "claude-ai" / "skills"
 CLAUDE_FRAGMENT = PACK / "adapters" / "claude" / "settings.json"
+UPLOADED_EXTRA = PACK / "claude-ai" / "overrides.json"
+SYNCED_PREFIX = "anthropic-skills:"
 TOOLS = ("claude", "codex", "gemini", "copilot", "cursor")
 HOOK_MARK = "/.agents/hooks/"
 OLD_HOOK_MARKS = ("/.claude/hooks/guard_bash.py", "/.claude/hooks/after_edit.py")
@@ -173,12 +175,11 @@ def merge_values(base, extra):
 
 
 class Installer:
-    def __init__(self, home: Path, dry_run: bool, claude_local_skills: bool = False):
+    def __init__(self, home: Path, dry_run: bool):
         self.home = home
         self.dry = dry_run
         self.backup_root = home / ".agents-backup" / time.strftime("%Y%m%d-%H%M%S")
         self.agents_home = home / ".agents"
-        self.claude_local_skills = claude_local_skills
         self.changes = 0
         self.backups = 0
         self.notes = []
@@ -276,6 +277,13 @@ class Installer:
             return []
         return sorted(p.name for p in ONLINE.iterdir() if (p / "SKILL.md").is_file())
 
+    def uploaded_skills(self) -> list[str]:
+        """Skills of this repository that are also uploaded to claude.ai."""
+        extra = []
+        if UPLOADED_EXTRA.is_file():
+            extra = list(json.loads(UPLOADED_EXTRA.read_text(encoding="utf-8"))["skills"])
+        return sorted(set(self.online_skills()) | set(extra))
+
     # Per tool -------------------------------------------------------------
 
     def install_claude(self) -> None:
@@ -287,15 +295,7 @@ class Installer:
             old = base / "skills" / name / "SKILL.md"
             if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
                 self.backup(old.parent)
-        # The claude-ai/ skill set reaches Claude Code through claude.ai sync; a local
-        # link would shadow the synced copy, so link it only when asked to.
-        linked = self.skills() + (self.online_skills() if self.claude_local_skills else [])
-        for name in self.online_skills():
-            stale = base / "skills" / name
-            if (name not in linked and stale.is_symlink()
-                    and os.readlink(stale) == str(self.agents_home / "skills" / name)):
-                self.backup(stale)
-        for name in linked:
+        for name in self.skills() + self.online_skills():
             self.link(base / "skills" / name, self.agents_home / "skills" / name)
         for path, meta, body in self.subagents():
             self.write(base / "agents" / path.name, path.read_text(encoding="utf-8"))
@@ -304,12 +304,19 @@ class Installer:
                 self.backup(base / "hooks" / old_hook)
         fragment = json.loads(CLAUDE_FRAGMENT.read_text(encoding="utf-8"))
         ours = fragment.pop("hooks")
+        # Claude Code lists a synced claude.ai skill next to a local one of the same
+        # name instead of replacing it; turn the synced copy off so the repository
+        # copy is the only one. A value already set by hand wins (merge_values).
+        fragment["skillOverrides"] = {SYNCED_PREFIX + name: "off" for name in self.uploaded_skills()}
 
         def mutate(settings: dict) -> dict:
             settings = merge_values(settings, fragment)
             settings["hooks"] = merge_event_hooks(settings.get("hooks"), ours)
             return settings
         self.merge_json(base / "settings.json", mutate)
+        self.notes.append(
+            "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
+            "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
 
     def install_codex(self) -> None:
         base = self.home / ".codex"
@@ -369,8 +376,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--tools", help="comma-separated subset of: " + ",".join(TOOLS))
     parser.add_argument("--dry-run", action="store_true")
-    parser.add_argument("--claude-local-skills", action="store_true",
-                        help="also link the claude-ai/ skill set into ~/.claude/skills")
     args = parser.parse_args()
 
     home = Path(os.environ.get("HOME", "~")).expanduser()
@@ -379,7 +384,7 @@ def main() -> int:
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
 
-    installer = Installer(home, args.dry_run, args.claude_local_skills)
+    installer = Installer(home, args.dry_run)
     print(f"Agents: {', '.join(tools) or 'none detected (installing ~/.agents only)'}")
     installer.install_source()
     for tool in tools:

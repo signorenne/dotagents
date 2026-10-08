@@ -14,7 +14,7 @@ home/.agents/AGENTS.md     global instructions, installed as ~/.agents/AGENTS.md
 home/.agents/skills/       local skills (decide, spec, implement, review, gates, session-close, project-setup)
 home/.agents/agents/       subagents in Claude Code format, the source for every tool's copy
 home/.agents/hooks/        hook scripts shared by every agent
-claude-ai/skills/          skills uploaded to claude.ai (and copied to ~/.agents/skills)
+claude-ai/skills/          skills uploaded to claude.ai (and installed locally for every agent)
 claude-ai/overrides.json   local skills also uploaded to claude.ai, with their short description
 adapters/claude/           Claude Code settings merged by the installer
 install.py                 installer: copies the source and generates each tool's files

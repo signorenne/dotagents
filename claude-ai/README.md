@@ -1,9 +1,11 @@
 # claude.ai skill set
 
-Skills uploaded to claude.ai so they work in chat and Cowork, and sync to Claude Code
-on every machine where you sign in with your claude.ai account (into
-~/.claude/skills/synced/). install.py also copies them into ~/.agents/skills, so
-Codex, Gemini CLI, Copilot and Cursor get them too.
+Skills uploaded to claude.ai so they work in chat and Cowork. install.py also installs
+them locally from this repository for every agent (~/.agents/skills, linked into
+~/.claude/skills). claude.ai syncs its own copies to Claude Code as
+anthropic-skills:<name>, and Claude Code would list each skill twice, so install.py
+turns those synced copies off with skillOverrides in ~/.claude/settings.json. The
+repository is the source: edit skills here, never on claude.ai.
 
 | Skill | Use |
 |---|---|
@@ -30,3 +32,10 @@ Codex, Gemini CLI, Copilot and Cursor get them too.
 
 claude.ai accepts skill descriptions of at most 200 characters; tools/validate.py
 enforces that limit for this folder and for claude-ai/overrides.json.
+
+## Update a skill
+
+1. Edit claude-ai/skills/<name>/ (for decide: home/.agents/skills/decide/, and its claude.ai description in overrides.json).
+2. Run python3 tools/validate.py, python3 -m unittest discover -s tests and python3 tools/build.py, then commit.
+3. Run python3 install.py: every local agent uses the new version.
+4. claude.ai: in Customize > Skills delete the old version of the skill, then upload dist/claude-ai/<name>.zip.
