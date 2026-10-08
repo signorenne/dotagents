@@ -23,10 +23,10 @@ end
 install -> agents : copy home/.agents\nand claude-ai/skills
 
 == Claude Code ==
-install -> claude : CLAUDE.md imports AGENTS.md
+install -> claude : CLAUDE.md that imports\nAGENTS.md, if missing
 install -> claude : link skills/<name>
 install -> claude : copy agents/*.md
-install -> claude : merge settings.json\n(hooks, skillOverrides)
+install -> claude : merge settings.json\n(permissions, hooks,\nskillOverrides)
 
 == Codex ==
 install -> codex : link AGENTS.md
@@ -35,7 +35,7 @@ install -> codex : merge hooks.json
 
 == Gemini CLI ==
 install -> gemini : link GEMINI.md
-install -> gemini : write agents/*.md
+install -> gemini : write agents/*.md\n(turn and time limits)
 install -> gemini : merge settings.json\n(hooks, context.fileName)
 
 == Copilot CLI ==

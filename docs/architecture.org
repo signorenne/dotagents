@@ -5,6 +5,7 @@
 
 This file owns how the parts of the repository relate and how they work
 together. [[file:../DESIGN.org][DESIGN.org]] owns the rules they keep;
+[[file:pipeline.org][docs/pipeline.org]] owns the stages a change goes through;
 [[file:glossary.org][docs/glossary.org]] owns the terms.
 
 Each section answers one question with a diagram, then says how it works. The
@@ -18,27 +19,32 @@ What the repository holds, and what each part produces.
 [[file:diagrams/arch_parts.svg]]
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
-  17 local skills (=skills/=), the three subagents in Claude Code format
+  18 local skills (=skills/=), the three subagents in Claude Code format
   (=agents/=) and the three hook scripts (=hooks/=). =install.py= copies all of
   it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
-  upload guide (=README.md=).
+  upload guide (=README.md=). =install.py= reads the overrides to turn off
+  Claude Code's synced copy of each uploaded skill; =tools/build.py= reads
+  them for the local skills to zip and their short descriptions.
 - =adapters/claude/settings.json= is the adapter for Claude Code: no
   attribution in commits and pull requests; permission rules that allow
-  read-only git commands and the CMake, CTest, clang-format and clang-tidy
-  commands, ask before =git push=, =git reset --hard=, =git clean=,
-  =git rebase= and =rm -rf=, and deny reading =.env= files, =~/.ssh= and
-  =~/.gnupg=; the synced =engineering= plugin turned off; the three hook
-  entries.
+  =git status=, =git diff=, =git log=, =git show=, =git merge-base=,
+  =git rev-parse= and =git branch --show-current=, the CMake (=--preset=,
+  =--build=, =-B=), CTest, clang-format and clang-tidy commands (also their
+  =-20= names) and =./build/*=; ask before =git reset --hard=, =git clean=,
+  =git rebase= and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
+  reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
+  =engineering@synced= turned off; the three hook entries.
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
-- =tools/build.py= turns the claude.ai set, the overrides and the project-setup
-  templates into zips in =dist/= (git-ignored).
-- =tools/validate.py= checks the source: skill and subagent frontmatter, name
-  and description limits, a =LICENSE.txt= per skill, no inline backticks in
-  skill prose, no em or en dash in any tracked or trackable file, no unfilled
-  template marker outside the project-setup templates, the global rules under
-  200 lines, and that every Python file compiles.
+- =tools/build.py= turns the claude.ai set, the local skills named in the
+  overrides and the project-setup templates (both from =home/.agents=) into
+  zips in =dist/= (git-ignored).
+- =tools/validate.py= checks the source; its docstring lists every check
+  (skill and subagent frontmatter, name and description limits, a
+  =LICENSE.txt= per skill, no inline backticks in skill prose, no em or en
+  dash in any tracked or trackable file, no unfilled template marker, the
+  global rules under 200 lines, every Python file compiling).
 - =tests/= holds four unittest suites: the hooks fed each tool's payload
   shape, the installer run against a temporary =HOME=, validate and build run
   on a copy of the repository, and the scripts bundled with as-built-docs and
@@ -46,7 +52,8 @@ What the repository holds, and what each part produces.
 - =.github/workflows/ci.yml= runs validate, the tests and build on every push
   and pull request, on Ubuntu with Python 3.9, Ubuntu with Python 3.12 and
   Pillow, and macOS with Python 3.12.
-- =docs/= holds the guides and the decision log; it produces nothing.
+- =docs/= holds the guides, the glossary and the diagrams; it
+  produces nothing. The rules that bind live in [[file:../DESIGN.org][DESIGN.org]].
 
 * How an install reaches each tool
 
@@ -65,19 +72,25 @@ What =python3 install.py= does, in order, and what each tool receives.
    scripts made executable) and the claude.ai set into =~/.agents/skills=, so
    every tool sees both skill sets. A file left in an installed skill folder
    that the repository no longer has goes to the backup.
-4. Claude Code: write =~/.claude/CLAUDE.md= with the import
-   =@~/.agents/AGENTS.md= when the import is missing; link each skill folder
-   in =~/.claude/skills= to =~/.agents/skills/<name>=; copy the subagent files
-   unchanged to =~/.claude/agents=; merge the adapter into
+4. Claude Code: when =~/.claude/CLAUDE.md= lacks the import
+   =@~/.agents/AGENTS.md=, replace it with one that has it (the old file goes
+   to the backup); back up the =learn= and =handoff= skill copies and the hook
+   copies in =~/.claude/hooks= that older versions left; link each skill
+   folder in =~/.claude/skills= to =~/.agents/skills/<name>=; copy the
+   subagent files unchanged to =~/.claude/agents=; merge the adapter into
    =~/.claude/settings.json=, adding =skillOverrides= that turn off the synced
-   copy (=anthropic-skills:<name>=) of every skill also uploaded to claude.ai.
+   copy (=anthropic-skills:<name>=) of every skill also uploaded to claude.ai,
+   and removing from =ask= every rule the adapter denies.
 5. Codex: link =~/.codex/AGENTS.md=; write =agents/<name>.toml= (a read-only
    sandbox for scout, =workspace-write= for the others, the reasoning effort
    when the source sets one); merge the guard and the after-edit hook into
    =~/.codex/hooks.json=, which Codex asks the user to trust.
 6. Gemini CLI: link =~/.gemini/GEMINI.md=; write =agents/<name>.md= with Gemini
-   tool names; merge the two hooks into =~/.gemini/settings.json= and put
-   =AGENTS.md= first in =context.fileName=, so project =AGENTS.md= files load.
+   tool names and a turn and time limit (=max_turns= 100 for each subagent;
+   =timeout_mins= 120 for gate-runner, 60 for reviewer, 30 for scout), above
+   Gemini CLI's defaults of 30 turns and 10 minutes; merge the two hooks into
+   =~/.gemini/settings.json= and put =AGENTS.md= first in =context.fileName=,
+   so project =AGENTS.md= files load.
 7. Copilot CLI: link =~/.copilot/copilot-instructions.md=; write
    =agents/<name>.agent.md= with Copilot tool names; write
    =~/.copilot/hooks/agents-global.json=.
@@ -98,8 +111,9 @@ How it stays safe to run again:
   shape cannot take the entries, is left alone with a note to merge it by hand.
 - =--dry-run= prints every action and changes nothing; =--audit= lists what in
   the agents' folders does not come from the repository, and broken links.
-- Nothing the repository dropped is removed from the tools' folders: =--audit=
-  shows the leftovers.
+- A whole skill, subagent, hook script or settings entry the repository
+  dropped stays in the tools' folders: =--audit= shows the first three, and
+  settings entries are removed by hand.
 
 Only the Claude Code copy of a subagent keeps its =model= field; the Codex,
 Gemini CLI and Copilot CLI copies carry none, so they run on the tool's
@@ -128,7 +142,7 @@ zips. The maintainer uploads each changed zip in claude.ai and pastes
 =home/.agents/AGENTS.md= into its instructions. claude.ai then syncs its copies
 into Claude Code as =anthropic-skills:<name>=; the =skillOverrides= that the
 installer wrote keep them off, so Claude Code loads each skill once, from
-=~/.claude/skills= (DESIGN.org, Rules that bind).
+=~/.claude/skills= ([[file:../DESIGN.org::#skills-load-locally][DESIGN.org, skills-load-locally]]).
 
 * What a session loads
 
@@ -141,22 +155,25 @@ demand.
    the import in =~/.claude/CLAUDE.md=, the links =~/.codex/AGENTS.md=,
    =~/.gemini/GEMINI.md= and =~/.copilot/copilot-instructions.md=, and a paste
    in Cursor's User Rules and in claude.ai's instructions.
-2. Project rules: the repository's own =AGENTS.md=. Claude Code reads it
-   directly only when the repository has no =CLAUDE.md=, so project-setup
-   makes a =CLAUDE.md= a bridge that imports it.
+2. Project rules: the repository's own =AGENTS.md=. Claude Code reads it by
+   itself only when the repository has no =CLAUDE.md=, so project-setup
+   creates a =CLAUDE.md= (a bridge that imports =AGENTS.md=) only for notes
+   that apply to Claude Code alone, and proposes replacing a =CLAUDE.md= that
+   duplicates rules with that bridge, or deleting it.
 3. Skill descriptions. Only each skill's name and description are listed at
    the start. The body of a =SKILL.md= loads when a request matches its
    description or the user names it; files next to it (templates, scripts,
    the palette) load only when a step reads them.
 4. Session refresh. In Claude Code only, after a compaction or a resume, the
-   session refresh adds a stale-memory reminder and the real git state to the
-   context.
+   tool runs the session refresh, which adds a stale-memory reminder, the real
+   git state and the newest task notes to the context.
 5. Subagents. A skill step delegates to a subagent, which starts in a fresh
    context with its own file as instructions and its own tool list, and
    returns a compact result instead of the files or logs it read. Without
    subagents, the skill follows =~/.agents/agents/<name>.md= itself.
-6. Hooks. The guard runs before each shell command and the after-edit hook
-   after each edit (the hooks section below).
+6. Hooks. The tool, not the model, runs the guard before each shell command
+   and the after-edit hook after each edit, and passes their replies on to
+   the model (the hooks section below).
 
 | Subagent    | Model in Claude Code | Returns                                 |
 |-------------+----------------------+-----------------------------------------|
@@ -169,28 +186,30 @@ documented gate commands and fixes nothing.
 
 * The workflow skills
 
-Which skills and subagents carry a change through a repository.
+Which skills and subagents serve each stage of a change; the stages
+themselves, with what each leaves and where, are in [[file:pipeline.org][docs/pipeline.org]].
 
 [[file:diagrams/arch_skills_workflow.svg]]
 
-1. project-setup runs once per repository: scout surveys it, decide settles
-   what the repository does not answer, and gate-runner runs each validation
-   command once. It leaves the project layer: =AGENTS.md=, a decision log, an
-   agent workflows doc and =.private/= in =.gitignore=.
-2. spec maps the area with scout, settles each design choice with decide,
-   and has a subagent that did not write it check the spec (in Claude Code the
-   general-purpose subagent, elsewhere reviewer). It stops after writing the
-   spec, by default to =.private/specs/=.
-3. A fresh session runs implement on the spec file. implement grounds the plan
-   with scout, takes the user's choices to decide, writes each test first by
-   trustworthy-tests, turns to systematic-debugging after two failed fixes,
-   runs the full gates through gate-runner and the review through reviewer,
-   and keeps the progress log in =.private/progress/=.
-4. session-close records the real state from git in a handoff in
-   =.private/handoff/= and names the next action for a fresh session, usually
-   implement on the spec from a given step.
-5. gates and review are the user's direct way to the same two subagents;
-   implement calls the subagents itself, not these skills.
+1. Set up: project-setup runs once per repository. scout surveys it, decide
+   settles what the repository does not answer, and gate-runner runs each
+   validation command once.
+2. Decide and specify: spec maps the area with scout, settles each design
+   choice with decide, and has a subagent that did not write it check the
+   spec (in Claude Code the general-purpose subagent, elsewhere reviewer).
+3. Implement, gates and review: a fresh session runs implement on the spec
+   file. implement grounds the plan with scout, takes the user's choices to
+   decide, writes each test first by trustworthy-tests, turns to
+   systematic-debugging after two failed fixes, runs the full gates through
+   gate-runner and the review through reviewer, and creates the worktree
+   through isolated-work when the plan's isolation was approved.
+4. On request: gates and review are the user's direct way to the same two
+   subagents; implement calls the subagents itself, not these skills.
+5. Close: session-close writes the handoff that the next fresh session reads
+   before resuming implement.
+6. Land and clean up: on the user's go, isolated-work rebases the branch,
+   gates the rebased commit through gate-runner, fast-forwards the target and
+   removes the worktree and the branch.
 
 decide is where every choice that belongs to the user is settled. Besides the
 callers drawn here, architecture-doc, mechanical-changes, parallel-agents,
@@ -212,26 +231,33 @@ Where the specialist skills hand work on.
 - Changes across files. mechanical-changes runs as an implement task, with its
   shards as plan steps; to spread the shards over several agents it uses
   parallel-agents, which sends a one-rule change across many files back to
-  mechanical-changes. Each parallel agent runs implement from step 5 with its
-  approved plan steps.
+  mechanical-changes. Each parallel agent runs implement from section 5 with
+  its approved plan steps, in a worktree that isolated-work creates and later
+  lands. isolated-work runs its change through implement.
 - Application design. clean-architecture gives the layers, event-driven-ui the
-  threads, and qt-quick applies both in Qt. A freeze whose cause is not yet
-  measured goes to systematic-debugging first, which sends a blocked UI
-  thread back to event-driven-ui.
+  threads, and qt-quick applies both in Qt. architecture-doc uses
+  clean-architecture's layers for an application, and under spec or implement
+  clean-architecture's steps for a feature become the plan's steps. A freeze
+  whose cause is not yet measured goes to systematic-debugging first, which
+  sends a blocked UI thread back to event-driven-ui.
 
 The subagents these skills use:
 
 - architecture-doc maps an existing codebase with scout and has both documents
   reviewed by a subagent that did not write them (the general-purpose
   subagent in Claude Code, reviewer elsewhere).
-- as-built-docs reads the code with read-only subagents and has each document
-  fact-checked by one that did not write it (the general-purpose subagent in
-  Claude Code; scout and reviewer elsewhere); gate-runner runs its long
-  pass or fail checks.
-- code-audit maps with scout and tries to refute each finding with a reviewer
-  subagent.
-- mechanical-changes sends its review to reviewer; parallel-agents runs each
-  branch's gates through gate-runner.
+- as-built-docs reads the code with read-only subagents on the session's model
+  (the general-purpose subagent in Claude Code, the tool's default general
+  agent elsewhere), not with scout, and has each document fact-checked by one
+  that did not write it (the general-purpose subagent in Claude Code, reviewer
+  elsewhere); gate-runner runs its long pass or fail checks.
+- code-audit maps with scout and tries to refute each finding with a subagent
+  given only the claim and the code (the general-purpose subagent in Claude
+  Code, elsewhere reviewer told that its target is the claim, not the branch
+  diff).
+- mechanical-changes sends its review to reviewer. parallel-agents gates each
+  branch through isolated-work, which runs gate-runner on the rebased commit,
+  and reviews the merged result through implement's review.
 
 * The claude.ai skills
 
@@ -245,11 +271,13 @@ same hand-offs work in chat and in a repository; a hand-off to a local skill
 applies where that skill is installed (the texts say "where available").
 
 - Debugging: systematic-debugging diagnoses first, reproduces the failure with
-  a test by trustworthy-tests, applies the fix with minimal-editing and checks
-  with verifying-before-claiming-done before saying it is fixed.
-  trustworthy-tests sends a flaky or unclear failure back to
-  systematic-debugging, and minimal-editing sends the fix of a failure there
-  first.
+  a test by trustworthy-tests, applies the fix with minimal-editing, or with
+  implement where it is available and the fix is more than a one-sentence
+  change (implement then writes the failing test), and checks with
+  verifying-before-claiming-done before saying it is fixed. It sends work
+  that blocks a UI thread to event-driven-ui. trustworthy-tests sends a flaky
+  or unclear failure back to systematic-debugging, and minimal-editing sends
+  the fix of a failure there first.
 - Choices: efficient-research gathers the facts, decision-analysis commits to
   a recommendation, and a choice inside the user's own project goes to decide,
   which turns to decision-analysis to compare outside products and proposes a
@@ -283,20 +311,25 @@ Where each tool runs them:
   =str_replace_editor= and =apply_patch=.
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=.
 
-Every tool gives the guard and the session refresh 10 s and the after-edit
-hook 60 s. Every hook exits 0 on a payload it cannot read, so a broken payload
-never stops the work, and prints nothing but JSON on Gemini CLI's stdout.
+Every tool gives the guard 10 s and the after-edit hook 60 s; the session
+refresh, in Claude Code only, gets 10 s. Every hook exits 0 on a payload it
+cannot read, so a broken payload never stops the work, and prints nothing but
+JSON on Gemini CLI's stdout.
 
 Session refresh (=session_refresh.py=):
 
 1. Print the reminder: the agent's memory of the code is a summary; re-read
    the files and confirm each symbol before editing.
 2. Add the branch (or the detached commit), up to 15 lines of
-   =git status --short= and the last five commits, all within 8 s of git
-   time, under the 10 s timeout past which Claude Code drops the output. A
-   list that git could not give is named as missing, never shown as a clean
-   tree.
-3. Exit 0; its stdout joins the agent's context.
+   =git status --short= and the last five commits. A list that git could not
+   give is named as missing, never shown as a clean tree.
+3. Add the three newest files of =.private/progress/= and of
+   =.private/handoff/=, found in the working folder or a parent up to the
+   repository root, and ask the agent to re-read the task's progress log. The
+   notes are listed before git runs, so a slow git cannot leave them out; the
+   listing and the git calls share 8 s, under the 10 s timeout past which
+   Claude Code drops the output.
+4. Exit 0; its stdout joins the agent's context.
 
 Guard (=guard_bash.py=):
 
@@ -304,21 +337,26 @@ Guard (=guard_bash.py=):
    (quotes, operators, substitutions, here-documents, wrappers such as =sudo=,
    =env= and =timeout=). Text that does not parse is split roughly, ignoring
    quotes, so a parse error never lets a command through.
-2. Block, in every tool: =--no-verify= on =git commit=, =push=, =merge=,
-   =rebase=, =am=, =pull= and =cherry-pick=; =git commit -n= and
-   =git am -n=; hook-skip variables (=*_SKIP_HOOKS=, =HUSKY= or =LEFTHOOK=
-   set to off, =OVERCOMMIT_DISABLE=, a =SKIP= list with git or pre-commit);
-   disabling =core.hooksPath=; pushes that force, delete, mirror or prune; and
-   =gh pr merge --admin=.
-3. Block every =git push= outside Claude Code: in Codex, Gemini CLI, Copilot
-   CLI, and in Cursor, which it tells apart by =CURSOR_VERSION= or the
-   =cursor_version= payload field (DESIGN.org, Rules that bind). In Claude Code a plain
-   push reaches the permission prompt that the adapter sets.
-4. Blocking is exit 2 with the reasons on stderr; Copilot CLI also gets a deny
-   decision as JSON on stdout, the only text its model sees.
+2. Block, in every tool, the gate bypasses: =--no-verify= on =git commit=,
+   =push=, =merge=, =rebase=, =am=, =pull= and =cherry-pick=; =git commit -n=
+   and =git am -n=; hook-skip variables (=*_SKIP_HOOKS=, =HUSKY= or
+   =LEFTHOOK= set to off, =OVERCOMMIT_DISABLE=, a =SKIP= list with git or
+   pre-commit); disabling =core.hooksPath=.
+3. Block, in every tool, every push and publish: =git push=,
+   =git subtree push=, =gh pr create= (or =gh pr new=), =gh pr merge=,
+   =gh release create= and =gh repo sync=
+   ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). A push that forces, deletes, mirrors or
+   prunes, and =gh pr merge --admin=, are named as such. In Claude Code the
+   adapter also denies =git push=, so the permission prompt never offers it.
+4. Blocking is exit 2 with the reasons on stderr, and advice: a push or a
+   publish means the work is ready for the maintainer's review; a gate bypass
+   means fix the failing check or ask the maintainer to run the command.
+   Copilot CLI also gets a deny decision as JSON on stdout, the only text its
+   model sees.
 
 It guards the usual forms; it is not a security boundary: a command passed as
-one string (=bash -c=, =eval=), aliases and scripts are not inspected.
+one string (=bash -c=, =eval=), aliases, scripts and =gh api= are not
+inspected.
 
 After-edit hook (=after_edit.py=):
 
@@ -326,7 +364,13 @@ After-edit hook (=after_edit.py=):
    edit's new string, a patch's added lines, a whole file's content.
 2. Report each line of the new text that holds an em or en dash (up to eight).
 3. For a C or C++ file in a project with a =.clang-format=, when a clang-format
-   binary is found, format the file in place, within 50 s of the 60 s timeout.
+   binary is found, format in place only the lines the edit changed
+   (=clang-format --lines=), within 50 s of the 60 s timeout. The lines come
+   from the payload when it carries them (Claude Code's patch of the edit,
+   also for a write over an existing file), otherwise from where the new text
+   stands in the file; a file written in full without such a patch, a new
+   file among them, is formatted whole, and an edit whose lines cannot be
+   located is not formatted.
 4. A dash or a clang-format failure is exit 2 with the report on stderr,
    which the agent sees; Copilot CLI shows that only to the user, so there the
    report goes to the model as =additionalContext= with exit 0. A reformat adds

@@ -32,6 +32,7 @@ scoping --> local : spec,\narchitecture-doc
 decide --> local : spec
 prompt --> local : project-setup
 handoff --> local : session-close
+debug --> local : implement,\nevent-driven-ui
 
 legend right
   Solid arrow: hands work to

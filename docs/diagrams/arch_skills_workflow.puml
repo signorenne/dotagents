@@ -1,43 +1,43 @@
 @startuml arch_skills_workflow
 !include palette.iuml
-title Which skills and subagents carry a change through a repository?
+title Which skills and subagents serve each stage of a change?
 
-component "decide" as decide
-component "gates" as gates
-component "project-setup" as setup
-component "spec" as spec
-component "review" as review
-package "Subagents" {
-  component "gate-runner" as runner
-  component "scout" as scout
-  component "reviewer" as reviewer
+package "Set up (once)" {
+  component "project-setup\nscout, gate-runner" as setup
 }
-component "session-close" as close
-component "implement" as implement
-component "trustworthy-tests" as tests
-component "systematic-debugging" as debug
+package "Decide and specify" {
+  component "decide" as decide
+  component "spec\nscout, reviewer" as spec
+}
+package "Implement, gates and review (fresh session)" {
+  component "implement\nscout, gate-runner, reviewer" as implement
+  component "trustworthy-tests" as tests
+  component "systematic-debugging" as debug
+}
+package "On request" {
+  component "gates\ngate-runner" as gates
+  component "review\nreviewer" as review
+}
+package "Close" {
+  component "session-close" as close
+}
+package "Land and clean up" {
+  component "isolated-work\ngate-runner" as isolated
+}
 
-decide <-- setup : open points
-decide <-- spec : design choices
-
-gates --> runner
-setup --> runner : commands
-setup --> scout : survey
-spec --> scout : map
-spec --> reviewer : check spec
-review --> reviewer
-
-runner <-- implement : gates
-scout <-- implement : ground
-reviewer <-- implement : review
-decide <-- implement : user's choices
-
+setup --> decide : open points
+spec -up-> decide : design choices
 spec ..> implement : spec file
-close ..> implement : handoff
+implement -up-> decide : user's choices
 implement --> tests : test first
 implement --> debug : two failed fixes
+close .left.> implement : handoff
+implement ---> isolated : worktree,\nlanding
+spec -[hidden]right- gates
+gates -[hidden]right- review
 
 legend right
+  Second line: the subagents it delegates to
   Solid arrow: calls in the same session
   Dashed arrow: a file read by a fresh session
 endlegend

@@ -2,16 +2,16 @@
 !include palette.iuml
 title What lives in the repository, and what does each part produce?
 
+package "adapters/claude" as adapters {
+  file "Adapter\nsettings.json" as fragment
+}
+
 package "home/.agents" as home {
   file "Global rules\nAGENTS.md" as rules
   folder "Local skills\nskills/" as skills
   folder "Subagents\nagents/" as agents
   folder "Hooks\nhooks/" as hooks
 }
-package "adapters/claude" as adapters {
-  file "Adapter\nsettings.json" as fragment
-}
-
 package "claude-ai" as online {
   folder "claude.ai set\nskills/" as webskills
   file "Overrides\noverrides.json" as overrides
@@ -33,9 +33,11 @@ package "Checks" {
 }
 
 home --> install : copied
+home --> build : skills in overrides,\nsetup templates
 adapters --> install : merged
-online --> install : copied
-online --> build : zipped
+online --> install : skills copied,\nsynced copies off
+online --> build : skills zipped,\nshort descriptions
+install -[hidden]right- build
 install --> installed : writes
 build --> dist : writes
 
