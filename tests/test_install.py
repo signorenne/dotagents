@@ -30,10 +30,13 @@ class Install(unittest.TestCase):
         for folder in (".claude", ".codex", ".gemini", ".copilot", ".cursor"):
             (self.home / folder).mkdir()
 
-    def install(self, *args: str) -> str:
+    def run_install(self, *args: str, installer: Path = INSTALL) -> subprocess.CompletedProcess:
         env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
-        result = subprocess.run([sys.executable, "-B", str(INSTALL), *args], env=env,
-                                capture_output=True, text=True, check=False)
+        return subprocess.run([sys.executable, "-B", str(installer), *args], env=env,
+                              capture_output=True, text=True, check=False)
+
+    def install(self, *args: str) -> str:
+        result = self.run_install(*args)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
@@ -56,23 +59,48 @@ class Install(unittest.TestCase):
         for name in PACK_SKILLS + ONLINE_SKILLS:
             self.assertTrue((agents / "skills" / name / "SKILL.md").is_file(), name)
         claude_skills = self.home / ".claude" / "skills"
-        for name in PACK_SKILLS:
+        for name in PACK_SKILLS + ONLINE_SKILLS:
             link = claude_skills / name
             self.assertTrue(link.is_symlink(), name)
             self.assertEqual(os.readlink(link), str(agents / "skills" / name))
-        for name in ONLINE_SKILLS:
-            self.assertFalse((claude_skills / name).exists(), f"{name} would shadow the synced copy")
         self.assertIn("@~/.agents/AGENTS.md", (self.home / ".claude/CLAUDE.md").read_text())
         for name in AGENTS:
             self.assertTrue((self.home / ".claude/agents" / f"{name}.md").is_file())
 
-    def test_claude_local_skills_flag_links_the_claude_ai_set(self):
-        self.install("--claude-local-skills")
-        for name in ONLINE_SKILLS:
-            self.assertTrue((self.home / ".claude/skills" / name).is_symlink(), name)
-        self.install()  # without the flag the extra links are removed again
-        for name in ONLINE_SKILLS:
-            self.assertFalse((self.home / ".claude/skills" / name).exists(), name)
+    def test_skills_folder_shared_with_agents_is_left_alone(self):
+        shared = self.home / ".agents/skills"
+        shared.mkdir(parents=True)
+        (self.home / ".claude/skills").symlink_to(shared)
+        out = self.install()
+        for name in PACK_SKILLS + ONLINE_SKILLS:
+            self.assertFalse((shared / name).is_symlink(), name)
+            self.assertTrue((shared / name / "SKILL.md").is_file(), name)
+        self.assertFalse((self.home / ".agents-backup").exists())
+        self.assertIn(f"{self.home / '.claude/skills'} resolves to {shared.resolve()}", out)
+        self.assertIn("0 change(s).", self.install().splitlines())
+
+    def test_link_reached_through_a_linked_folder_is_left_alone(self):
+        (self.home / ".codex").rmdir()
+        (self.home / ".agents").mkdir()
+        (self.home / ".codex").symlink_to(self.home / ".agents")
+        out = self.install("--tools", "codex")
+        instructions = self.home / ".agents/AGENTS.md"
+        self.assertFalse(instructions.is_symlink())
+        self.assertEqual(instructions.read_bytes(), (ROOT / "home/.agents/AGENTS.md").read_bytes())
+        self.assertIn(f"{self.home / '.codex/AGENTS.md'} resolves to {instructions}; left as it is.", out)
+
+    def test_synced_copies_of_repository_skills_are_turned_off(self):
+        settings = self.home / ".claude/settings.json"
+        settings.write_text(json.dumps({"skillOverrides": {"anthropic-skills:tutor": "on", "other": "off"}}))
+        self.install()
+        overrides = json.loads(settings.read_text())["skillOverrides"]
+        uploaded = set(ONLINE_SKILLS) | set(json.loads((ROOT / "claude-ai/overrides.json").read_text())["skills"])
+        self.assertIn("decide", uploaded)
+        for name in uploaded - {"tutor"}:
+            self.assertEqual(overrides["anthropic-skills:" + name], "off", name)
+        self.assertEqual(overrides["anthropic-skills:tutor"], "on", "a value set by hand must win")
+        self.assertEqual(overrides["other"], "off")
+        self.assertNotIn("anthropic-skills:spec", overrides, "only skills uploaded to claude.ai")
 
     def test_claude_settings_merge_keeps_user_values(self):
         settings = self.home / ".claude/settings.json"

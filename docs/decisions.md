@@ -87,3 +87,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The maintainer's accountability policy, as in nexenne's AI_DISCLAIMER.org.
 - Rejected: Tool default attribution trailers.
 - Revisit if: never without a new maintainer decision.
+
+## D-0008: Every skill loads locally from the repository
+
+- Status: Accepted
+- Proposed by: maintainer (every skill local), agent (synced copies turned off)
+- Decided by: maintainer
+- Date: 2026-10-07
+- Rule in: install.py, claude-ai/README.md
+- Decision: install.py links every skill of the repository, the claude.ai set included, into each local agent. In Claude Code it turns off the copies of the same skills synced from claude.ai (skillOverrides; a value set by hand wins), so each skill loads once, from the repository. Changes reach claude.ai by uploading the built zip.
+- Why: One version to edit and test locally before it reaches claude.ai. Claude Code lists a synced skill next to a local skill of the same name instead of replacing it.
+- Rejected: Relying on claude.ai sync for the claude.ai set in Claude Code (missing where sync does not run, stale until uploaded); keeping both copies listed.
+- Revisit if: Claude Code lets a local skill replace a synced skill of the same name.

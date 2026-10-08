@@ -10,7 +10,7 @@ What it gives every session, in chat or in a repository:
 - a repository workflow as skills: spec, implement, review, gates, session-close, decide, project-setup;
 - three subagents that keep the main context small: scout (read-only mapping), gate-runner (builds and tests, returns only verdicts), reviewer (independent review);
 - hooks that block git gate bypasses and force pushes, flag em and en dashes, run clang-format, and remind the agent after a compaction that its memory of the code may be stale;
-- a claude.ai skill set (decide, tutor, debugging, verification, scoping, editing, research, decisions, handoffs, prompts) that also syncs to Claude Code.
+- a claude.ai skill set (decide, tutor, debugging, verification, scoping, editing, research, decisions, handoffs, prompts), installed locally from this repository for every agent too.
 
 ## Quick start
 
@@ -37,7 +37,7 @@ The full guide, including the daily loop and the maieutic method, is docs/workfl
 
 | Agent | Global instructions | Skills | Subagents | Hooks |
 |---|---|---|---|---|
-| Claude Code | ~/.claude/CLAUDE.md imports ~/.agents/AGENTS.md | links in ~/.claude/skills; claude.ai set via sync | ~/.claude/agents | ~/.claude/settings.json, plus SessionStart after compact or resume |
+| Claude Code | ~/.claude/CLAUDE.md imports ~/.agents/AGENTS.md | every skill linked in ~/.claude/skills; synced claude.ai copies turned off | ~/.claude/agents | ~/.claude/settings.json, plus SessionStart after compact or resume |
 | Codex | ~/.codex/AGENTS.md link | reads ~/.agents/skills | ~/.codex/agents/*.toml | ~/.codex/hooks.json (approve in Codex) |
 | Gemini CLI | ~/.gemini/GEMINI.md link; context.fileName adds AGENTS.md | reads ~/.agents/skills | ~/.gemini/agents/*.md | ~/.gemini/settings.json |
 | Copilot CLI | ~/.copilot/copilot-instructions.md link | reads ~/.agents/skills | ~/.copilot/agents/*.agent.md | ~/.copilot/hooks/agents-global.json |
