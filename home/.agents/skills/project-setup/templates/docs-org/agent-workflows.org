@@ -115,6 +115,7 @@ Task:
 Spec: (path, or none)
 Branch:
 Plan approval: (by the maintainer on <date>, or not required: <reason>)
+Baseline: <command> on <commit> -> <result>
 
 Steps:
 1. <step> | status: todo, in progress or done | commit: <hash> <subject> | check: <command> -> <result>

@@ -35,9 +35,11 @@ Once the plan is approved (or needs no approval), create the task's progress log
 
 Write the log from what happened (commands run, git), never from intent. It is local working notes: never commit it.
 
-## 6. Branch
+## 6. Branch and baseline
 
 With isolation approved, isolated-work creates the branch and its worktree. Otherwise, if on main or master, create a branch first: <type>/<slug>, with the type from the project's commit types. When the spec added entries to a decision log that git tracks and they are not committed yet, commit them on their own as the branch's first commit.
+
+Before the first plan step, and again when resuming, run the narrowest documented check that covers the area the plan changes, on the base commit (on HEAD when resuming), and record it in the progress log as the baseline: the command, the commit and the result. A failure there predates the steps to come: report it to the user, and never fix it silently inside a step.
 
 ## 7. Build each step
 
