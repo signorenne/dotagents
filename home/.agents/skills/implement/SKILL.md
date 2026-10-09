@@ -32,6 +32,7 @@ Once the plan is approved (or needs no approval), create the task's progress log
 - A decision that also meets the decision log's recording bar goes there too (Proposed unless the user accepted it), and the progress entry names its id.
 - Deviations from the spec or plan, and new open questions.
 - Each refuted assumption, when its check breaks it: what was assumed, the check that broke it, what changed.
+- Each attempt that failed (an approach, a fix, a command): what was tried, the result, and why it was dropped, so a later session does not retry it.
 
 Write the log from what happened (commands run, git), never from intent. It is local working notes: never commit it.
 
