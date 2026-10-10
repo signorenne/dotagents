@@ -9,6 +9,8 @@ repository, then run this script again to regenerate the per-tool copies.
   python3 install.py              install for the agents detected on this machine
   python3 install.py --dry-run    show what would change, change nothing
   python3 install.py --tools claude,codex,gemini,copilot,cursor   choose explicitly
+  python3 install.py --audit      list what in the agents' folders does not come from
+                                  this repository, and broken links; changes nothing
 
 Every agent gets every skill from this repository. In Claude Code, the copies that
 claude.ai syncs of the same skills are turned off, so each skill loads once, from here.
@@ -351,6 +353,36 @@ class Installer:
             self.write(base / "agents" / f"{meta['name']}.agent.md", copilot_agent(meta, body))
         self.write(base / "hooks" / "agents-global.json", json.dumps(COPILOT_HOOKS, indent=2) + "\n")
 
+    def audit(self) -> int:
+        """Print what the skill and agent folders hold that this repository does not manage."""
+        skills = set(self.skills() + self.online_skills())
+        agents = [meta["name"] for _, meta, _ in self.subagents()]
+        hooks = {p.name for p in (SRC / "hooks").iterdir() if p.suffix == ".py"}
+        folders = {
+            self.agents_home / "skills": skills,
+            self.agents_home / "agents": {f"{a}.md" for a in agents},
+            self.agents_home / "hooks": hooks | {"__pycache__"},
+            self.home / ".claude" / "skills": skills | {"synced", ".trash"},
+            self.home / ".claude" / "agents": {f"{a}.md" for a in agents},
+            self.home / ".codex" / "agents": {f"{a}.toml" for a in agents},
+            self.home / ".gemini" / "agents": {f"{a}.md" for a in agents},
+            self.home / ".copilot" / "agents": {f"{a}.agent.md" for a in agents},
+        }
+        foreign, broken = [], []
+        for folder, managed in folders.items():
+            if not folder.is_dir():
+                continue
+            for entry in sorted(folder.iterdir()):
+                if entry.is_symlink() and not entry.exists():
+                    broken.append(entry)
+                elif entry.name not in managed:
+                    foreign.append(entry)
+        print("Not from dotagents (yours, another tool's, or left over; review each):")
+        print("\n".join(f"  {p}" for p in foreign) or "  none")
+        print("Broken links (safe to delete):")
+        print("\n".join(f"  {p}" for p in broken) or "  none")
+        return 0
+
     def install_cursor(self) -> None:
         self.notes.append(
             "Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself. "
@@ -376,6 +408,8 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("--tools", help="comma-separated subset of: " + ",".join(TOOLS))
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--audit", action="store_true",
+                        help="list unmanaged entries and broken links in the agents' folders; change nothing")
     args = parser.parse_args()
 
     home = Path(os.environ.get("HOME", "~")).expanduser()
@@ -385,6 +419,8 @@ def main() -> int:
         parser.error(f"unknown tools: {', '.join(unknown)}")
 
     installer = Installer(home, args.dry_run)
+    if args.audit:
+        return installer.audit()
     print(f"Agents: {', '.join(tools) or 'none detected (installing ~/.agents only)'}")
     installer.install_source()
     for tool in tools:

@@ -33,6 +33,21 @@ Then:
 
 The full guide, including the daily loop and the maieutic method, is docs/workflow.md.
 
+## Update
+
+```sh
+cd ~/dotagents
+git pull                       # or: git am <file>.patch
+python3 install.py --dry-run
+python3 install.py
+python3 install.py --audit     # what in the agents' folders is not from here; changes nothing
+```
+
+Then, only for what the update touched: paste home/.agents/AGENTS.md into claude.ai
+again, and upload the changed claude.ai skills (claude-ai/README.md, "Update a skill").
+To change the setup itself, run Claude Code (or any agent) in this repository: its
+AGENTS.md says where each change goes and which checks to run.
+
 ## What goes where
 
 | Agent | Global instructions | Skills | Subagents | Hooks |

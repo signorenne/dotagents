@@ -77,6 +77,24 @@ class Install(unittest.TestCase):
         self.assertEqual(overrides["other"], "off")
         self.assertNotIn("anthropic-skills:spec", overrides, "only skills uploaded to claude.ai")
 
+    def test_audit_lists_foreign_entries_and_broken_links_without_changes(self):
+        self.install()
+        mine = self.home / ".claude/skills/my-own-skill"
+        mine.mkdir()
+        dangling = self.home / ".claude/skills/gone"
+        dangling.symlink_to(self.home / ".agents/skills/gone")
+        (self.home / ".codex/agents/old.toml").write_text("")
+        before = self.snapshot()
+        out = self.install("--audit")
+        self.assertEqual(self.snapshot(), before)
+        foreign, broken = out.split("Broken links")
+        self.assertIn(str(mine), foreign)
+        self.assertIn(str(self.home / ".codex/agents/old.toml"), foreign)
+        self.assertIn(str(dangling), broken)
+        self.assertNotIn(str(dangling), foreign)
+        for name in PACK_SKILLS + ONLINE_SKILLS:
+            self.assertNotIn(str(self.home / ".claude/skills" / name) + "\n", out)
+
     def test_claude_settings_merge_keeps_user_values(self):
         settings = self.home / ".claude/settings.json"
         settings.write_text(json.dumps({"model": "opus", "permissions": {"allow": ["Bash(npm test *)"]}}))
