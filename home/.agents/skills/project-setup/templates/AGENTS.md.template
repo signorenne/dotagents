@@ -23,7 +23,7 @@ For any task, read this file, then only the docs the task needs:
 - Establish context before changing code: goal, constraints, and how the existing
   code already solves nearby problems. Look for reuse before writing new code.
 - Ground every change in the current code: re-read the files you will touch and
-  confirm the symbols you call exist. Specs, handoffs and summaries can be stale.
+  confirm the symbols you call exist. Specs, progress logs, handoffs and summaries can be stale.
 - State the intended change and its expected outcome before editing.
 - Break work into small, verifiable steps; land each as its own commit.
 - Verify each step with the narrowest check, then widen before finishing (see
@@ -41,8 +41,9 @@ For any task, read this file, then only the docs the task needs:
 
 - <FILL: kind of change>: <FILL: path pattern>
 - Decision log: <FILL: docs/decisions.md>; the rule itself stays in its owning doc.
-- Specs and handoffs: .private/specs/<slug>.<ext> and
-  .private/handoff/<date>-<slug>.<ext>, local and git-ignored.
+- Specs, progress logs and handoffs: .private/specs/<slug>.<ext>,
+  .private/progress/<slug>.<ext> and .private/handoff/<date>-<slug>.<ext>,
+  local and git-ignored.
 
 ## Hard rules
 

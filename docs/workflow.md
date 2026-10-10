@@ -30,7 +30,8 @@ The subagents keep the main conversation small: scout maps code and docs read-on
 
 - One task per session; start a fresh session (Claude Code: /clear) between unrelated tasks.
 - After a compaction or a resume, a hook reminds the agent that its memory of the code is a summary and prints the real branch, changes and last commits.
-- Specs and handoffs live in .private/ inside each repository (git-ignored); decisions live in the project's decision log.
+- Specs, progress logs and handoffs live in .private/ inside each repository (git-ignored); decisions live in the project's decision log.
+- implement keeps .private/progress/<slug> current after every step: steps with commits and checks, and every decision marked by you or by the agent. Agent decisions stay "Review: pending" until you keep or change them; implement and session-close list the pending ones.
 - Check where tokens go with /context and /usage in Claude Code.
 
 ## Per project

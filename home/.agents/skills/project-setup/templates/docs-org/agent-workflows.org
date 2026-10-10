@@ -15,7 +15,8 @@ playbooks.
 2. /Plan/ : choose files, steps, validation commands, and the smallest coherent
    scope. Each step becomes one commit.
 3. /Implement/ : re-read the code before each edit, then change code, tests,
-   examples and docs together.
+   examples and docs together. Log each step and each
+   decision (by the maintainer or by the agent) in the progress log.
 4. /Review/ : inspect the diff for behavior, missing coverage, drift, and
    commands that still need to run.
 
@@ -97,3 +98,31 @@ Verify before use (files and symbols the next session depends on):
 
 A handoff that must outlive the session goes to
 =.private/handoff/<date>-<slug>.org=. Missing commands are never fine.
+
+* Progress log template
+
+#+BEGIN_EXAMPLE
+Task:
+Spec: (path, or none)
+Branch:
+Plan approval: (by the maintainer on <date>, or not required: <reason>)
+
+Steps:
+1. <step> | status: todo, in progress or done | commit: <hash> <subject> | check: <command> -> <result>
+
+Decisions (newest last):
+P1 <date> by maintainer | by agent: <decision>
+   Why: <reason>
+   Alternative not taken: <option>
+   Decision log: <id and status, or below the recording bar>
+   Review: pending, kept, or changed (by P<n>)
+
+Deviations from the spec or plan:
+Open questions:
+#+END_EXAMPLE
+
+Every implementation that needs a plan keeps one at
+=.private/progress/<slug>.org=, updated after each step and when each decision is
+taken, from what happened rather than from intent. Decisions by the agent stay
+"Review: pending" until the maintainer keeps or changes them. It is local and
+never committed.
