@@ -45,7 +45,7 @@ repeat that AGENTS.md does not already describe.
 ## Setup
 
 1. claude.ai: paste home/.agents/AGENTS.md into Settings > General > Instructions for Claude, then upload the skill set (claude-ai/README.md).
-2. Linux PC: install Claude Code (curl -fsSL https://claude.ai/install.sh | bash), sign in with your claude.ai account, install any other agents you use, then run python3 install.py --dry-run and python3 install.py from this repository.
+2. Linux or macOS: install Claude Code (curl -fsSL https://claude.ai/install.sh | bash), sign in with your claude.ai account, install any other agents you use, then run python3 install.py --dry-run and python3 install.py from this repository.
 3. Cursor only: paste ~/.agents/AGENTS.md into Settings > Rules > User Rules. Codex only: approve the hooks when it asks.
 4. Check in Claude Code: /memory, /skills, /agents, /hooks, and that git commit --allow-empty -m test --no-verify is blocked.
 
