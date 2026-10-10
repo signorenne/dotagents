@@ -99,3 +99,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: One version to edit and test locally before it reaches claude.ai. Claude Code lists a synced skill next to a local skill of the same name instead of replacing it.
 - Rejected: Relying on claude.ai sync for the claude.ai set in Claude Code (missing where sync does not run, stale until uploaded); keeping both copies listed.
 - Revisit if: Claude Code lets a local skill replace a synced skill of the same name.
+
+## D-0009: Implementation keeps a progress log with the author of every decision
+
+- Status: Accepted
+- Proposed by: agent
+- Decided by: maintainer
+- Date: 2026-10-09
+- Rule in: home/.agents/skills/implement/SKILL.md, project-setup templates (agent workflows)
+- Decision: implement writes .private/progress/<slug> during the work: each step with its commit and check, and each decision as it is taken, marked by the maintainer or by the agent, with the reason and the alternative not taken. Agent decisions stay Review: pending until the maintainer keeps or changes them; those that meet the decision log's bar also go there as Proposed.
+- Why: The maintainer reviews every choice, his and the agent's, in one place, and a later session resumes from facts instead of memory.
+- Rejected: Progress only in commits and the final handoff (agent decisions scattered, nothing between steps if a session dies).
+- Revisit if: the log duplicates what commits and the decision log already show.
