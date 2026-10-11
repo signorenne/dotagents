@@ -410,6 +410,30 @@ class GuardBash(unittest.TestCase):
         allowed = run("guard_bash.py", {"toolName": "bash", "toolArgs": json.dumps({"command": "ls"})}, "copilot")
         self.assertEqual((allowed.returncode, allowed.stdout), (0, ""))
 
+    def test_antigravity_gets_a_decision_as_json(self):
+        # Antigravity hooks docs (antigravity.google/docs/hooks?tab=cli): PreToolUse reads
+        # toolCall {name, args} (run_command's args hold CommandLine) and answers on stdout
+        # with JSON: decision (required; "allow" defers to the next hook or the default
+        # policy, "deny" blocks) and reason, shown to the agent. Exit codes are not
+        # documented, so the hook always exits 0 with its decision.
+        def call(command):
+            return {"toolCall": {"name": "run_command", "args": {"CommandLine": command, "Cwd": "/tmp",
+                                                                  "WaitMsBeforeAsync": 5000}},
+                    "stepIdx": 19, "conversationId": "c", "workspacePaths": ["/tmp"], "modelName": "m"}
+        blocked = run("guard_bash.py", call("git push --force origin main"), "antigravity")
+        self.assertEqual((blocked.returncode, blocked.stderr), (0, ""))
+        reply = json.loads(blocked.stdout)
+        self.assertEqual(sorted(reply), ["decision", "reason"])
+        self.assertEqual(reply["decision"], "deny")
+        self.assertIn("force push", reply["reason"])
+        self.assertIn("ready for their review", reply["reason"])
+        for payload in (call("npm test"), "not json", DEEP_JSON, [1], {"toolCall": "x"},
+                        {"toolCall": {"name": "run_command", "args": {"CommandLine": 5}}}):
+            with self.subTest(payload=str(payload)[:40]):
+                allowed = run("guard_bash.py", payload, "antigravity")
+                self.assertEqual((allowed.returncode, allowed.stderr), (0, ""))
+                self.assertEqual(json.loads(allowed.stdout), {"decision": "allow"})
+
     def test_gemini_needs_json_on_success(self):
         result = run("guard_bash.py", bash("ls"), "gemini")
         self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
@@ -459,6 +483,34 @@ class AfterEdit(unittest.TestCase):
                 self.assertEqual((result.returncode, result.stderr), (0, ""))
                 self.assertIn("Em/en dash", json.loads(result.stdout)["additionalContext"])
                 self.assertIn(target, json.loads(result.stdout)["additionalContext"])
+
+    def test_antigravity_reply_is_an_empty_object(self):
+        # Antigravity hooks docs: PostToolUse reads toolCall {name, args} (write_to_file:
+        # TargetFile, CodeContent; replace_file_content: TargetFile, ReplacementContent) and
+        # answers {}; no exit code and no field that reaches the agent are documented, so
+        # the dash report goes to stderr with exit 0.
+        target = str(self.tmp / "notes.md")
+        cases = [
+            {"toolCall": {"name": "write_to_file", "args": {"TargetFile": target, "CodeContent": f"a {EM} b",
+                                                             "Overwrite": True}}},
+            {"toolCall": {"name": "replace_file_content",
+                          "args": {"TargetFile": target, "TargetContent": "a", "ReplacementContent": f"x {EN} y",
+                                   "AllowMultiple": False}}},
+        ]
+        for payload in cases:
+            with self.subTest(tool=payload["toolCall"]["name"]):
+                result = run("after_edit.py", payload, "antigravity")
+                self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
+                self.assertIn("Em/en dash", result.stderr)
+                self.assertIn(target, result.stderr)
+        for payload in ({"toolCall": {"name": "write_to_file", "args": {"TargetFile": target, "CodeContent": "plain"}}},
+                        {"toolCall": {"name": "write_to_file", "args": {"TargetFile": target, "CodeContent": f"a {EM}"}},
+                         "error": "permission denied"},
+                        "not json", DEEP_JSON, [1], {"toolCall": "x"}, {"toolCall": {"args": {"TargetFile": 5}}},
+                        {"toolCall": {"args": {"TargetFile": "a.md", "CodeContent": "x"}}, "workspacePaths": 5}):
+            with self.subTest(payload=str(payload)[:60]):
+                result = run("after_edit.py", payload, "antigravity")
+                self.assertEqual((result.returncode, result.stdout.strip(), result.stderr), (0, "{}", ""))
 
     def test_clean_text_passes(self):
         payload = {"tool_name": "Edit", "tool_input": {"file_path": str(self.tmp / "a.md"), "new_string": "plain - hyphen"}}
@@ -582,6 +634,9 @@ class AfterEdit(unittest.TestCase):
             return {"tool_name": "apply_patch", "cwd": str(self.tmp),
                     "tool_input": {"command": f"*** Begin Patch\n{body}*** End Patch\n"}}
 
+        def agy(name, **args):
+            return {"toolCall": {"name": name, "args": args}, "workspacePaths": ["/elsewhere"]}
+
         write = {"tool_name": "Write", "tool_input": {"file_path": path, "content": "int   a( );\n"}}
         cases = [
             ("one line", "claude", edit("int   b( );"), lines("2:2")),
@@ -620,6 +675,26 @@ class AfterEdit(unittest.TestCase):
             ("codex move", "codex",
              codex("*** Update File: old.cpp\n*** Move to: a.cpp\n@@\n-int x;\n+int   b( );\n"), lines("2:2")),
             ("codex add", "codex", codex("*** Add File: a.cpp\n+int   a( );\n"), whole),
+            ("antigravity replace", "antigravity",
+             agy("replace_file_content", TargetFile=path, TargetContent="x", ReplacementContent="int   c( );",
+                 AllowMultiple=False), lines("3:3")),
+            ("antigravity replace all", "antigravity",
+             agy("replace_file_content", TargetFile=path, TargetContent="x", ReplacementContent="int   a( );",
+                 AllowMultiple=True), lines("1:1", "5:5")),
+            ("antigravity write", "antigravity",
+             agy("write_to_file", TargetFile=path, CodeContent="int   a( );\n", Overwrite=True), whole),
+            ("antigravity relative path", "antigravity",
+             {**agy("replace_file_content", TargetFile="a.cpp", ReplacementContent="int   b( );"),
+              "workspacePaths": [str(self.tmp)]}, lines("2:2")),
+            ("antigravity failed call", "antigravity",
+             {**agy("write_to_file", TargetFile=path, CodeContent="int   a( );\n"), "error": "exit status 1"}, None),
+            # The docs give a string; any other error value still means the call failed.
+            ("antigravity failed call, error object", "antigravity",
+             {**agy("write_to_file", TargetFile=path, CodeContent="int   a( );\n"), "error": {"message": "e"}}, None),
+            # Antigravity documents no fields for the chunks of multi_replace_file_content.
+            ("antigravity multi replace", "antigravity",
+             agy("multi_replace_file_content", TargetFile=path,
+                 ReplacementChunks=[{"ReplacementContent": "int   b( );"}]), None),
         ]
         for name, tool, payload, expected in cases:
             with self.subTest(case=name):

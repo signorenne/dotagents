@@ -4,7 +4,8 @@
 """Shell-command guard shared by every coding agent: block commands that bypass git
 gates, rewrite or delete published history, or push and publish.
 
-Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|copilot|cursor>
+Usage in a hook config:
+  python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|antigravity|copilot|cursor>
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
 wrappers such as sudo, env, xargs, time, nice, timeout):
@@ -34,8 +35,10 @@ not inspected).
 Blocking: exit 2 with the reason on stderr (Claude Code, Codex, Gemini CLI, Cursor).
 Copilot denies on exit 2 but shows stderr only to the user, so it also gets
 {"permissionDecision": "deny", "permissionDecisionReason": ...} on stdout, the reason
-it shows to the agent. Unreadable input exits 0 so a broken payload never stops normal
-work. Gemini CLI needs JSON on stdout when the hook succeeds.
+it shows to the agent. Antigravity CLI documents a JSON decision on stdout and no exit
+codes, so it gets {"decision": "deny", "reason": ...} or {"decision": "allow"}, always
+with exit 0. Unreadable input exits 0 so a broken payload never stops normal work.
+Gemini CLI needs JSON on stdout when the hook succeeds.
 """
 
 import argparse
@@ -593,6 +596,10 @@ def command_reasons(commands: list) -> dict:
 
 def extract_command(payload: dict) -> str:
     """Find the shell command in any supported agent's payload shape."""
+    call = payload.get("toolCall")  # Antigravity CLI: run_command's args hold CommandLine
+    args = call.get("args") if isinstance(call, dict) else None
+    if isinstance(args, dict) and isinstance(args.get("CommandLine"), str):
+        return args["CommandLine"]
     for container in (payload.get("tool_input"), payload.get("toolArgs"), payload):
         if isinstance(container, str):
             try:
@@ -607,13 +614,15 @@ def extract_command(payload: dict) -> str:
 def allow(tool: str) -> int:
     if tool == "gemini":
         print("{}")
+    elif tool == "antigravity":
+        print(json.dumps({"decision": "allow"}))  # defers to the next hook or the default policy
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tool", default="claude",
-                        choices=["claude", "codex", "gemini", "copilot", "cursor"])
+                        choices=["claude", "codex", "gemini", "antigravity", "copilot", "cursor"])
     tool = parser.parse_args().tool
     try:
         payload = json.load(sys.stdin)
@@ -637,6 +646,9 @@ def main() -> int:
     if not all(reasons.values()):
         advice.append(GATE_ADVICE)
     message = "Blocked: " + "; ".join(reasons) + ". " + " ".join(advice)
+    if tool == "antigravity":
+        print(json.dumps({"decision": "deny", "reason": message}))
+        return 0
     print(message, file=sys.stderr)
     if tool == "copilot":
         print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": message}))

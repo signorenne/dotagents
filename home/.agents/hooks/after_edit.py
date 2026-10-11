@@ -3,7 +3,8 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """After-edit hook shared by every coding agent.
 
-Usage in a hook config: python3 "$HOME/.agents/hooks/after_edit.py" --tool <claude|codex|gemini|copilot>
+Usage in a hook config:
+  python3 "$HOME/.agents/hooks/after_edit.py" --tool <claude|codex|gemini|antigravity|copilot>
 
 1. Flags em dash (U+2014) and en dash (U+2013) characters in the text the agent just
    wrote: the new string of an edit, the added lines of a patch, the whole content of a
@@ -25,7 +26,11 @@ Payload shapes understood: Claude Code and Cursor (Write/Edit with file_path, co
 new_string), Gemini CLI (write_file/replace with file_path, content, new_string), Codex
 (apply_patch with the patch text in tool_input.command), Copilot (toolArgs as a JSON
 string with path, file_text, new_str), Cursor native afterFileEdit (file_path,
-edits[].new_string).
+edits[].new_string), Antigravity CLI (toolCall.args of write_to_file with TargetFile and
+CodeContent, of replace_file_content with ReplacementContent and AllowMultiple; a
+relative TargetFile starts at the first workspace path, and a call that reports an error
+wrote nothing). Antigravity documents no fields for the chunks of
+multi_replace_file_content, so that edit is neither checked nor formatted.
 
 Problems: exit 2 with the report on stderr, which the agent sees; Copilot shows that
 only to the user, so there the report goes to the model as additionalContext with exit
@@ -33,7 +38,9 @@ only to the user, so there the report goes to the model as additionalContext wit
 needs JSON on stdout when the hook succeeds. The reformat notice reaches the agent as
 additionalContext in each agent's documented format: hookSpecificOutput for Claude
 Code and Codex (PostToolUse) and Gemini CLI (AfterTool), a top-level field for Copilot.
-Cursor runs the Claude Code hook command and gets its format.
+Cursor runs the Claude Code hook command and gets its format. Antigravity CLI documents
+only {} as the reply and no exit codes, so it gets {} with exit 0, and a report goes to
+stderr, where it is not documented to reach the agent.
 """
 
 import argparse
@@ -159,9 +166,29 @@ def parse_patch(patch: str) -> tuple[list[str], str, dict]:
     return files, "\n".join(added), targets
 
 
+def antigravity_edit(payload: dict, call: dict) -> tuple[list[Path], str, dict]:
+    """extract() for Antigravity CLI's toolCall {name, args}."""
+    args = as_dict(call.get("args"))
+    path, error = args.get("TargetFile"), payload.get("error")
+    if not isinstance(path, str) or not path or error:  # a failed call wrote nothing
+        return [], "", {}
+    roots = payload.get("workspacePaths")
+    root = next((r for r in roots if isinstance(r, str) and r), "") if isinstance(roots, list) else ""
+    file_path = Path(path) if Path(path).is_absolute() else Path(root or os.getcwd()) / path
+    content, new = args.get("CodeContent"), args.get("ReplacementContent")
+    if isinstance(content, str):
+        return [file_path], content, {file_path: None}
+    if isinstance(new, str):
+        return [file_path], new, {file_path: [Piece(new, everywhere=args.get("AllowMultiple") is True)]}
+    return [file_path], "", {file_path: []}
+
+
 def extract(payload: dict) -> tuple[list[Path], str, dict]:
     """Return (edited files, new text, what to format in each file) for any supported
     payload shape."""
+    call = as_dict(payload.get("toolCall"))
+    if call:
+        return antigravity_edit(payload, call)
     tool_input = as_dict(payload.get("tool_input")) or as_dict(payload.get("toolArgs"))
     cwd = payload.get("cwd")
     cwd = Path(cwd) if isinstance(cwd, str) and cwd else Path(os.getcwd())
@@ -338,13 +365,15 @@ def finish(tool: str, notices: list[str]) -> int:
             "hookEventName": "AfterTool", "additionalContext": context}}) if notices else "{}")
     elif tool == "copilot" and notices:
         print(json.dumps({"additionalContext": context}))
+    elif tool == "antigravity":
+        print("{}")
     return 0
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--tool", default="claude",
-                        choices=["claude", "codex", "gemini", "copilot", "cursor"])
+                        choices=["claude", "codex", "gemini", "antigravity", "copilot", "cursor"])
     tool = parser.parse_args().tool
     deadline = time.monotonic() + DEADLINE_SECONDS
     try:
@@ -372,6 +401,8 @@ def main() -> int:
     if problems and tool == "copilot":
         # Copilot shows a postToolUse exit 2 only to the user; the context reaches the model.
         notices = ["\n\n".join(problems + notices)]
+    elif problems and tool == "antigravity":
+        print("\n\n".join(problems + notices), file=sys.stderr)
     elif problems:
         print("\n\n".join(problems + notices), file=sys.stderr)
         return 2
