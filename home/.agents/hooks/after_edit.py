@@ -39,8 +39,8 @@ needs JSON on stdout when the hook succeeds. The reformat notice reaches the age
 additionalContext in each agent's documented format: hookSpecificOutput for Claude
 Code and Codex (PostToolUse) and Gemini CLI (AfterTool), a top-level field for Copilot.
 Cursor runs the Claude Code hook command and gets its format. Antigravity CLI documents
-only {} as the reply and no exit codes, so it gets {} with exit 0, and a report goes to
-stderr, where it is not documented to reach the agent.
+only {} as the reply and no exit codes, so it gets {} with exit 0, and the report and the
+reformat notice go to stderr, where they are not documented to reach the agent.
 """
 
 import argparse
@@ -401,7 +401,7 @@ def main() -> int:
     if problems and tool == "copilot":
         # Copilot shows a postToolUse exit 2 only to the user; the context reaches the model.
         notices = ["\n\n".join(problems + notices)]
-    elif problems and tool == "antigravity":
+    elif tool == "antigravity" and (problems or notices):
         print("\n\n".join(problems + notices), file=sys.stderr)
     elif problems:
         print("\n\n".join(problems + notices), file=sys.stderr)
