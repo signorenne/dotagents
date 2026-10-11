@@ -178,7 +178,7 @@ against it (events, matchers, tool names, timeouts).
 |----------------------+-------------------------------------------------+-----------------------------------------+---------|
 | =guard_bash.py=      | before a shell command                          | all five (Cursor through Claude Code's) | 10 s    |
 | =after_edit.py=      | after a file edit or write                      | all five (Cursor through Claude Code's) | 60 s    |
-| =session_refresh.py= | at session start after a compaction or a resume | Claude Code                             | 10 s    |
+| =session_refresh.py= | at session start after a compaction or a resume | Claude Code, Codex                      | 10 s    |
 | =compact_brief.py=   | before a compaction                             | Claude Code                             | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip

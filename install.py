@@ -75,10 +75,14 @@ def script(name: str, tool: str) -> str:
     return f'python3 "$HOME/.agents/hooks/{name}" --tool {tool}'
 
 
+# Codex runs SessionStart with matcher on the source (startup, resume, clear, compact,
+# fork) and adds plain stdout as developer context, as Claude Code does.
 CODEX_HOOKS = {
     "PreToolUse": [{"matcher": "Bash", "hooks": [hook(script("guard_bash.py", "codex"), timeout=10)]}],
     "PostToolUse": [{"matcher": "apply_patch|Edit|Write",
                      "hooks": [hook(script("after_edit.py", "codex"), timeout=60)]}],
+    "SessionStart": [{"matcher": "compact|resume",
+                      "hooks": [hook('python3 "$HOME/.agents/hooks/session_refresh.py"', timeout=10)]}],
 }
 GEMINI_HOOKS = {
     "BeforeTool": [{"matcher": "run_shell_command",
