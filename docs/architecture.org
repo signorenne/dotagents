@@ -82,9 +82,10 @@ What =python3 install.py= does, in order, and what each tool receives.
    =~/.claude/settings.json=, adding =skillOverrides= that turn off the synced
    copy (=anthropic-skills:<name>=) of every skill also uploaded to claude.ai,
    and removing from =ask= every rule the adapter denies.
-5. Codex: link =~/.codex/AGENTS.md=; write =agents/<name>.toml= (a read-only
-   sandbox for scout, =workspace-write= for the others, the reasoning effort
-   when the source sets one); merge the guard, the after-edit hook and the
+5. Codex: link =~/.codex/AGENTS.md=; write =agents/<name>.toml= (with
+   =sandbox_mode= read-only for scout and =workspace-write= for the others,
+   which Codex ignores in an agent file, and the reasoning effort when the
+   source sets one); merge the guard, the after-edit hook and the
    session refresh (=SessionStart= after =compact= or =resume=) into
    =~/.codex/hooks.json=, which Codex asks the user to trust; write
    =rules/dotagents.rules=, whose =prefix_rule= entries forbid every push and
@@ -196,7 +197,9 @@ demand.
 | reviewer    | opus, high effort    | findings ranked blocker, major, minor   |
 
 scout and reviewer only read and run read-only commands; gate-runner runs the
-documented gate commands and fixes nothing.
+documented gate commands and fixes nothing. In Claude Code gate-runner also
+starts without the user, project and local =CLAUDE.md= files (=omitClaudeMd=,
+Claude Code v2.1.271 or later); the other tools' copies drop the field.
 
 * The workflow skills
 
