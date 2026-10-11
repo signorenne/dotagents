@@ -85,7 +85,9 @@ What =python3 install.py= does, in order, and what each tool receives.
    sandbox for scout, =workspace-write= for the others, the reasoning effort
    when the source sets one); merge the guard, the after-edit hook and the
    session refresh (=SessionStart= after =compact= or =resume=) into
-   =~/.codex/hooks.json=, which Codex asks the user to trust.
+   =~/.codex/hooks.json=, which Codex asks the user to trust; write
+   =rules/dotagents.rules=, whose =prefix_rule= entries forbid every push and
+   publish (Codex rules are experimental).
 6. Gemini CLI: link =~/.gemini/GEMINI.md=; write =agents/<name>.md= with Gemini
    tool names and a turn and time limit (=max_turns= 100 for each subagent;
    =timeout_mins= 120 for gate-runner, 60 for reviewer, 30 for scout), above
@@ -371,7 +373,9 @@ Guard (=guard_bash.py=):
    =gh release create= and =gh repo sync=
    ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). A push that forces, deletes, mirrors or
    prunes, and =gh pr merge --admin=, are named as such. In Claude Code the
-   adapter also denies =git push=, so the permission prompt never offers it.
+   adapter also denies =git push=, so the permission prompt never offers it;
+   in Codex, =~/.codex/rules/dotagents.rules= forbids the same commands, also
+   before the user trusts the hooks.
 4. Blocking is exit 2 with the reasons on stderr, and advice: a push or a
    publish means the work is ready for the maintainer's review; a gate bypass
    means fix the failing check or ask the maintainer to run the command.

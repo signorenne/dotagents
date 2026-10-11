@@ -90,6 +90,19 @@ GEMINI_HOOKS = {
     "AfterTool": [{"matcher": "write_file|replace",
                    "hooks": [hook(script("after_edit.py", "gemini"), name="agents-after-edit", timeout=60000)]}],
 }
+# Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts
+# with its pattern, without prompting. They hold even while Codex skips the hooks, which
+# it does until the user trusts them. A pattern part that is a list matches any of its words.
+CODEX_RULES = (
+    (["git", "push"], "git push publishes commits to a remote."),
+    (["git", "subtree", "push"], "git subtree push publishes commits to a remote."),
+    (["gh", "pr", ["create", "new"]], "gh pr create publishes a branch as a pull request."),
+    (["gh", "pr", "merge"], "gh pr merge merges into a published branch."),
+    (["gh", "release", "create"], "gh release create publishes a release."),
+    (["gh", "repo", "sync"], "gh repo sync pushes to a repository."),
+)
+CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "
+                      "leaves this machine: stop and tell the user the work is ready for review.")
 # Copilot CLI's native format: camelCase events send toolName and toolArgs, and a
 # matcher is a regex on the whole native tool name (GitHub's hooks reference).
 COPILOT_HOOKS = {
@@ -161,6 +174,19 @@ def codex_agent(meta: dict, body: str) -> str:
     lines.append("developer_instructions = '''")
     lines.append(body.rstrip("\n"))
     lines.append("'''")
+    return "\n".join(lines) + "\n"
+
+
+def codex_rules() -> str:
+    """The Starlark rules file that forbids pushing and publishing in Codex."""
+    lines = ["# Written by dotagents install.py: change the dotagents repository and run it again.",
+             "# No agent pushes or publishes (DESIGN.org, no-agent-push)."]
+    for pattern, reason in CODEX_RULES:
+        lines += ["prefix_rule(",
+                  f"    pattern = {json.dumps(pattern)},",
+                  '    decision = "forbidden",',
+                  f"    justification = {json.dumps(reason + ' ' + CODEX_RULES_ADVICE)},",
+                  ")"]
     return "\n".join(lines) + "\n"
 
 
@@ -433,6 +459,8 @@ class Installer:
         for path, meta, body in self.subagents():
             self.write(base / "agents" / f"{meta['name']}.toml", codex_agent(meta, body))
         self.merge_json(base / "hooks.json", lambda s: {**s, "hooks": merge_event_hooks(s.get("hooks"), CODEX_HOOKS)})
+        # Codex writes default.rules itself (its allow list), so this file has its own name.
+        self.write(base / "rules" / "dotagents.rules", codex_rules())
         self.notes.append("Codex: review and trust ~/.codex/hooks.json when Codex asks; user hooks run only after review.")
 
     def install_gemini(self) -> None:
