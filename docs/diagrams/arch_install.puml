@@ -9,7 +9,7 @@ collections "&#126;/.agents" as agents
 collections "&#126;/.claude" as claude
 collections "&#126;/.codex" as codex
 collections "&#126;/.gemini" as gemini
-collections "&#126;/.copilot" as copilot
+collections "&#126;/.copilot\nor $COPILOT_HOME" as copilot
 
 user -> install : python3 install.py
 install -> install : check the source\n(stop if broken)
@@ -31,12 +31,18 @@ install -> claude : merge settings.json\n(permissions, hooks,\nskillOverrides)
 == Codex ==
 install -> codex : link AGENTS.md
 install -> codex : write agents/*.toml
-install -> codex : merge hooks.json
+install -> codex : merge hooks.json\n(and SessionStart)
+install -> codex : write rules/dotagents.rules\n(no push, no publish)
 
 == Gemini CLI ==
 install -> gemini : link GEMINI.md
 install -> gemini : write agents/*.md\n(turn and time limits)
 install -> gemini : merge settings.json\n(hooks, context.fileName)
+
+== Antigravity CLI ==
+install -> gemini : link GEMINI.md\n(shared with Gemini CLI)
+install -> gemini : merge config/hooks.json\n(two named hooks)
+install -> gemini : merge config/skills.json\n(lists &#126;/.agents/skills)
 
 == Copilot CLI ==
 install -> copilot : link copilot-instructions.md

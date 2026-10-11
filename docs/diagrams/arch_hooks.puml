@@ -3,6 +3,7 @@
 title What do the hooks do around the agent's work?
 
 participant "Agent tool" as tool
+participant "compact_brief.py" as brief
 participant "session_refresh.py" as refresh
 participant "guard_bash.py" as guard
 participant "after_edit.py" as edit
@@ -10,19 +11,25 @@ participant "git" as git
 participant "clang-format" as format
 collections ".private/" as notes
 
-== Claude Code: after a compaction or resume ==
+== Claude Code: before a compaction ==
+tool -> brief : payload (cwd, trigger)
+brief -> notes : newest progress\nand handoff files
+brief -> git : branch, status
+brief --> tool : exit 0 always: what\nthe summary must keep
+
+== Claude Code and Codex: after a compaction or resume ==
 tool -> refresh : payload (cwd, source)
 refresh -> notes : newest progress\nand handoff files
 refresh -> git : branch, status,\nlast 5 commits
-refresh --> tool : stale-memory reminder,\ngit state, notes and\n"re-read the progress log"
+refresh --> tool : stale-memory reminder,\nafter a compaction "invoke\nthe workflow skill again",\ngit state, notes and\n"re-read the progress log"
 
 == Before a shell command ==
 tool -> guard : payload with the command
 guard -> guard : split into\nsimple commands
 alt a gate bypass, any git push or\ngit subtree push, gh pr create,\ngh pr merge, gh release create\nor gh repo sync (every tool)
-  guard --> tool : exit 2, reason on stderr;\nCopilot CLI: also a deny\ndecision as JSON on stdout
+  guard --> tool : exit 2, reason on stderr;\nCopilot CLI: also a deny\ndecision as JSON on stdout;\nAntigravity CLI: exit 0\nand a deny decision
 else nothing to block
-  guard --> tool : exit 0
+  guard --> tool : exit 0 (Antigravity CLI:\nan allow decision)
 end
 
 == After an edit ==
@@ -32,7 +39,7 @@ opt C or C++ file with a .clang-format
   edit -> format : format the lines the edit\nchanged (a new file whole)
 end
 alt a dash, or clang-format failed
-  edit --> tool : exit 2, report on stderr;\nCopilot CLI: exit 0, report\nas additionalContext
+  edit --> tool : exit 2, report on stderr;\nCopilot CLI: exit 0, report\nas additionalContext;\nAntigravity CLI: exit 0, {},\nreport on stderr only
 else nothing wrong
   edit --> tool : exit 0, notice if reformatted
 end
