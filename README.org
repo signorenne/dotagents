@@ -29,8 +29,9 @@ What it gives every session, in chat or in a repository:
 - Hooks that block git gate bypasses and every push or publish (no agent
   pushes: the maintainer reviews and pushes), flag em and en dashes, run
   clang-format on the C and C++ lines an edit changed, and, in Claude Code,
-  remind the agent after a compaction that its memory of the code may be
-  stale and point it to the task's progress log and handoff.
+  tell the compaction summary what resuming the task needs, then remind the
+  agent after the compaction that its memory of the code may be stale and
+  point it to the task's progress log and handoff.
 - A claude.ai skill set (decide, tutor, debugging, verification, tests,
   scoping, editing, research, decisions, handoffs, prompts), installed locally
   from this repository for every agent too.

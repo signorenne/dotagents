@@ -20,7 +20,7 @@ What the repository holds, and what each part produces.
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
-  (=agents/=) and the three hook scripts (=hooks/=). =install.py= copies all of
+  (=agents/=) and the four hook scripts (=hooks/=). =install.py= copies all of
   it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
@@ -35,7 +35,7 @@ What the repository holds, and what each part produces.
   =-20= names) and =./build/*=; ask before =git reset --hard=, =git clean=,
   =git rebase= and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
   reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
-  =engineering@synced= turned off; the three hook entries.
+  =engineering@synced= turned off; the four hook entries.
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
 - =tools/build.py= turns the claude.ai set, the local skills named in the
   overrides and the project-setup templates (both from =home/.agents=) into
@@ -164,9 +164,11 @@ demand.
    the start. The body of a =SKILL.md= loads when a request matches its
    description or the user names it; files next to it (templates, scripts,
    the palette) load only when a step reads them.
-4. Session refresh. In Claude Code only, after a compaction or a resume, the
-   tool runs the session refresh, which adds a stale-memory reminder, the real
-   git state and the newest task notes to the context.
+4. Compaction brief and session refresh. In Claude Code only, before a
+   compaction the tool runs the compaction brief, which tells the summary what
+   resuming the task needs; after a compaction or a resume it runs the session
+   refresh, which adds a stale-memory reminder, the real git state and the
+   newest task notes to the context.
 5. Subagents. A skill step delegates to a subagent, which starts in a fresh
    context with its own file as instructions and its own tool list, and
    returns a compact result instead of the files or logs it read. Without
@@ -301,8 +303,9 @@ What each hook does around the agent's work.
 Where each tool runs them:
 
 - Claude Code: the guard on =PreToolUse= for =Bash=, the after-edit hook on
-  =PostToolUse= for =Edit= and =Write=, and the session refresh on
-  =SessionStart= after =compact= or =resume=.
+  =PostToolUse= for =Edit= and =Write=, the compaction brief on =PreCompact=
+  (manual and automatic), and the session refresh on =SessionStart= after
+  =compact= or =resume=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
   =Write=.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
@@ -312,9 +315,24 @@ Where each tool runs them:
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=.
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
-refresh, in Claude Code only, gets 10 s. Every hook exits 0 on a payload it
-cannot read, so a broken payload never stops the work, and prints nothing but
-JSON on Gemini CLI's stdout.
+refresh and the compaction brief, in Claude Code only, get 10 s. Every hook
+exits 0 on a payload it cannot read, so a broken payload never stops the work,
+and prints nothing but JSON on Gemini CLI's stdout.
+
+Compaction brief (=compact_brief.py=):
+
+1. Ask the summary to keep what resuming needs: the task, its slug and the
+   check that says it is done; the branch; the paths of the task's progress
+   log and handoff; the current plan step; each decision marked
+   =Review: pending=; the files changed; the commands still needed and the
+   last result of each command run.
+2. Fill in what it can read: the branch, up to 15 lines of
+   =git status --short= and the newest task notes, with session refresh's
+   finder and time budget (8 s).
+3. Print it, cut under Claude Code's 10,000-character cap, and exit 0 every
+   time: exit 2 would block the compaction, and when the compaction recovers
+   from a full context the request would fail. Its command ends in =|| true=
+   because =python3= exits 2 when the script is missing.
 
 Session refresh (=session_refresh.py=):
 

@@ -205,7 +205,7 @@ class Install(unittest.TestCase):
         self.assertEqual(merged["model"], "opus")
         self.assertIn("Bash(npm test *)", merged["permissions"]["allow"])
         self.assertIn("Bash(cmake --build *)", merged["permissions"]["allow"])
-        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PreToolUse", "SessionStart"])
+        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PreCompact", "PreToolUse", "SessionStart"])
         self.install()
         again = json.loads(settings.read_text())
         self.assertEqual(len(again["hooks"]["PreToolUse"]), 1, "hook entries must not duplicate")
@@ -305,6 +305,26 @@ class Install(unittest.TestCase):
                                               "toolArgs": json.dumps({"command": "ls"})})
         self.assertEqual(allowed.returncode, 0, allowed)
         self.assertNotEqual(json.loads(allowed.stdout or "{}").get("permissionDecision"), "deny")
+
+    def test_claude_compaction_brief_never_blocks_compaction(self):
+        # Claude Code's PreCompact: exit 2 blocks the compaction, and stdout of an exit 0
+        # becomes instructions for the summary (code.claude.com/docs/en/hooks). python3
+        # itself exits 2 when the script is missing, so the command must not pass that on.
+        self.install("--tools", "claude")
+        groups = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]["PreCompact"]
+        (group,) = groups
+        self.assertNotIn("matcher", group, "manual and automatic compactions both")
+        (handler,) = group["hooks"]
+        self.assertEqual(handler["type"], "command")
+        self.assertLessEqual(handler["timeout"], 10)
+        payload = {"hook_event_name": "PreCompact", "trigger": "auto", "custom_instructions": None,
+                   "cwd": str(self.home)}
+        installed = self.run_hook(handler["command"], payload)
+        self.assertEqual(installed.returncode, 0, installed)
+        self.assertIn("Review: pending", installed.stdout)
+        (self.home / ".agents/hooks/compact_brief.py").unlink()
+        missing = self.run_hook(handler["command"], payload)
+        self.assertEqual(missing.returncode, 0, missing)
 
     def assert_hook_group(self, group: dict, script: str, tool: str, matching, other, timeout_range):
         """One matcher group with one command handler, as Codex and Gemini CLI document it."""
