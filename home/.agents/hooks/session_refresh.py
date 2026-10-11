@@ -3,7 +3,8 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """SessionStart hook (Claude Code, matcher "compact|resume"): after a compaction or a
 resume, remind the agent that its picture of the code is a summary and print the real
-repository state, so stale function names are caught before they cause edits. When the
+repository state, so stale function names are caught before they cause edits. After a
+compaction it also asks the agent to invoke its workflow skill again. When the
 project keeps git-ignored task notes, it also lists the three most recent files under
 .private/progress/ and under .private/handoff/ (found in the working folder or a parent,
 up to the repository root) and asks the agent to re-read the progress log.
@@ -36,6 +37,10 @@ NOTES_PER_FOLDER = 3
 NOTES_SECONDS = 1
 MAX_SCANNED_FILES = 2000
 REREAD = "Re-read the task's progress log before the next step."
+# After a compaction Claude Code re-attaches only the start (5,000 tokens) of each skill
+# invoked before it, and may drop older ones; Codex documents nothing on it, so the line
+# gives no tool's reason.
+SKILL_AGAIN = "Invoke your workflow skill again before the next step."
 
 
 def git(*args: str, cwd: str, deadline: float) -> tuple[str, str]:
@@ -121,6 +126,8 @@ def main() -> int:
         "editing or calling code, re-read the files involved and confirm each symbol "
         "with a search; state in one line what you will change before each edit.",
     ]
+    if source == "compact":
+        lines.append(SKILL_AGAIN)
     # A list that is missing for lack of time or a git error is named, so it is never
     # read as a clean tree. Outside a repository git branch fails and nothing is shown.
     branch, problem = git("branch", "--show-current", cwd=cwd, deadline=deadline)

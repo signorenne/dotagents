@@ -691,6 +691,22 @@ class SessionRefresh(unittest.TestCase):
         self.assertEqual(result.returncode, 0)
         self.assertIn("Uncommitted changes:\n M tracked.txt\n", result.stdout)
 
+    SKILL_AGAIN = "Invoke your workflow skill again before the next step"
+
+    def test_after_compaction_asks_to_invoke_the_workflow_skill_again(self):
+        # After a compaction Claude Code re-attaches only the first 5,000 tokens of each
+        # invoked skill and may drop older ones (code.claude.com/docs/en/skills). Codex runs
+        # the same hook and documents no such limit, so the line gives no tool's reason.
+        repo, env = self.committed_repo()
+        compact = self.refresh_with({"cwd": str(repo), "source": "compact"}, env)
+        self.assertEqual((compact.returncode, compact.stderr), (0, ""))
+        self.assertIn(self.SKILL_AGAIN + ".\n", compact.stdout)
+        for source in ("resume", "startup"):
+            with self.subTest(source=source):
+                other = self.refresh_with({"cwd": str(repo), "source": source}, env)
+                self.assertEqual(other.returncode, 0)
+                self.assertNotIn(self.SKILL_AGAIN, other.stdout)
+
     def test_clean_tree_reports_no_changes(self):
         repo, env = self.committed_repo()
         result = self.refresh(repo, env)
