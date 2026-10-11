@@ -12,7 +12,7 @@ working-memory floor for agents changing this repository.
 
 One setup for every coding agent and for claude.ai: global rules, skills,
 subagents and safety hooks, installed for Claude Code, Codex, Gemini CLI,
-GitHub Copilot CLI and Cursor from a single source.
+Antigravity CLI, GitHub Copilot CLI and Cursor from a single source.
 
 What it gives every session, in chat or in a repository:
 
@@ -70,10 +70,11 @@ python3 install.py             # installs for the agents found on this machine
 #+END_SRC
 
 The installer detects the agents present (=~/.claude=, =~/.codex=, =~/.gemini=,
-=~/.copilot= or =$COPILOT_HOME=, =~/.cursor= or their commands on =PATH=),
-moves every file it replaces to =~/.agents-backup/<timestamp>/=, and is safe to
-run again: a second run changes nothing. =--tools claude,codex= picks the agents explicitly. It
-needs only =python3= (3.9 or later) and runs on Linux and macOS (on macOS,
+=~/.gemini/antigravity-cli=, =~/.copilot= or =$COPILOT_HOME=, =~/.cursor= or
+their commands on =PATH=), moves every file it replaces to
+=~/.agents-backup/<timestamp>/=, and is safe to run again: a second run changes
+nothing. =--tools claude,codex= picks the agents explicitly. It needs only
+=python3= (3.9 or later) and runs on Linux and macOS (on macOS,
 =xcode-select --install= provides =python3= and =git=). [[file:DESIGN.org][DESIGN.org]] lists
 what each agent gets.
 
@@ -137,8 +138,9 @@ dotagents/
 
 * Skills
 
-Every agent gets every skill. In Claude Code, Copilot and Cursor a skill runs
-as =/name=, in Codex as =$name=; Gemini CLI activates one when asked in words.
+Every agent gets every skill. In Claude Code, Antigravity CLI, Copilot and
+Cursor a skill runs as =/name=, in Codex as =$name=; Gemini CLI activates one
+when asked in words.
 
 ** Repository workflow
 

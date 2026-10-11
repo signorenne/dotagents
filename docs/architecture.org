@@ -66,8 +66,9 @@ What =python3 install.py= does, in order, and what each tool receives.
    =overrides.json= a skills object. On any problem it prints the list,
    installs nothing and exits 1.
 2. Choose the tools: the =--tools= list, or every tool whose folder
-   (=~/.claude=, =~/.codex=, =~/.gemini=, =~/.copilot= or =$COPILOT_HOME=,
-   =~/.cursor=) or command exists.
+   (=~/.claude=, =~/.codex=, =~/.gemini=, =~/.gemini/antigravity-cli=,
+   =~/.copilot= or =$COPILOT_HOME=, =~/.cursor=) or command (=agy= for
+   Antigravity CLI) exists.
 3. Shared source: copy every file of =home/.agents= to =~/.agents= (hook
    scripts made executable) and the claude.ai set into =~/.agents/skills=, so
    every tool sees both skill sets. A file left in an installed skill folder
@@ -94,14 +95,21 @@ What =python3 install.py= does, in order, and what each tool receives.
    Gemini CLI's defaults of 30 turns and 10 minutes; merge the two hooks into
    =~/.gemini/settings.json= and put =AGENTS.md= first in =context.fileName=,
    so project =AGENTS.md= files load.
-7. Copilot CLI, in =$COPILOT_HOME= when it is set, else =~/.copilot=: link
+7. Antigravity CLI: link =~/.gemini/GEMINI.md= (the same link as Gemini
+   CLI's); merge the guard and the after-edit hook into
+   =~/.gemini/config/hooks.json= under the names =dotagents-guard= and
+   =dotagents-after-edit=, keeping an =enabled= value set by hand; add
+   =~/.agents/skills=, as an absolute path, to the entries of the skills
+   manifest =~/.gemini/config/skills.json=. No subagents and no session
+   refresh.
+8. Copilot CLI, in =$COPILOT_HOME= when it is set, else =~/.copilot=: link
    =copilot-instructions.md=; write =agents/<name>.agent.md= with Copilot tool
    names; write =hooks/agents-global.json=.
-8. Cursor: write nothing. Cursor reads =~/.agents/skills=, =~/.claude/agents=
+9. Cursor: write nothing. Cursor reads =~/.agents/skills=, =~/.claude/agents=
    and the Claude Code hooks by itself, so it gets subagents and hooks only
    when Claude Code is installed too; the installer reminds the user to paste
    the global rules into Cursor's User Rules.
-9. Print the number of changes, the backup folder and the notes.
+10. Print the number of changes, the backup folder and the notes.
 
 How it stays safe to run again:
 
@@ -156,7 +164,8 @@ demand.
 
 1. Global rules. Each tool reaches =~/.agents/AGENTS.md= through its own file:
    the import in =~/.claude/CLAUDE.md=, the links =~/.codex/AGENTS.md=,
-   =~/.gemini/GEMINI.md= and =~/.copilot/copilot-instructions.md=, and a paste
+   =~/.gemini/GEMINI.md= (Gemini CLI and Antigravity CLI) and
+   =~/.copilot/copilot-instructions.md=, and a paste
    in Cursor's User Rules and in claude.ai's instructions.
 2. Project rules: the repository's own =AGENTS.md=. Claude Code reads it by
    itself only when the repository has no =CLAUDE.md=, so project-setup
@@ -314,6 +323,9 @@ Where each tool runs them:
   Codex adds as developer context.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
   =write_file= and =replace=.
+- Antigravity CLI: =PreToolUse= for =run_command=, =PostToolUse= for
+  =write_to_file=, =replace_file_content= and =multi_replace_file_content=,
+  from =~/.gemini/config/hooks.json=.
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
   =str_replace_editor= and =apply_patch=.
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=.
@@ -322,7 +334,7 @@ Every tool gives the guard 10 s and the after-edit hook 60 s; the session
 refresh (Claude Code and Codex) and the compaction brief (Claude Code) get
 10 s. Every hook
 exits 0 on a payload it cannot read, so a broken payload never stops the work,
-and prints nothing but JSON on Gemini CLI's stdout.
+and prints nothing but JSON on Gemini CLI's and Antigravity CLI's stdout.
 
 Compaction brief (=compact_brief.py=):
 

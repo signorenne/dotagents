@@ -8,7 +8,7 @@ repository, then run this script again to regenerate the per-tool copies.
 
   python3 install.py              install for the agents detected on this machine
   python3 install.py --dry-run    show what would change, change nothing
-  python3 install.py --tools claude,codex,gemini,copilot,cursor   choose explicitly
+  python3 install.py --tools claude,codex,gemini,antigravity,copilot,cursor   choose explicitly
   python3 install.py --audit      list what in the agents' folders does not come from
                                   this repository, and broken links; changes nothing
 
@@ -33,7 +33,7 @@ ONLINE = PACK / "claude-ai" / "skills"
 CLAUDE_FRAGMENT = PACK / "adapters" / "claude" / "settings.json"
 UPLOADED_EXTRA = PACK / "claude-ai" / "overrides.json"
 SYNCED_PREFIX = "anthropic-skills:"
-TOOLS = ("claude", "codex", "gemini", "copilot", "cursor")
+TOOLS = ("claude", "codex", "gemini", "antigravity", "copilot", "cursor")
 # Hook scripts this repository installs, and those an older version kept in ~/.claude/hooks.
 OUR_HOOK_SCRIPTS = sorted(p.name for p in (SRC / "hooks").glob("*.py"))
 OLD_HOOK_SCRIPTS = ("guard_bash.py", "after_edit.py")
@@ -103,6 +103,18 @@ CODEX_RULES = (
 )
 CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "
                       "leaves this machine: stop and tell the user the work is ready for review.")
+# Antigravity CLI (agy), which replaced Gemini CLI for most users, reads global hooks from
+# ~/.gemini/config/hooks.json: an object that maps a hook name to its events. PreToolUse
+# and PostToolUse matchers are regexes on the tool name (run_command runs a shell command;
+# write_to_file, replace_file_content and multi_replace_file_content edit files); timeout
+# is in seconds. It has no event after a compaction or a resume, so no session refresh.
+ANTIGRAVITY_HOOKS = {
+    "dotagents-guard": {"PreToolUse": [{"matcher": "run_command", "hooks": [
+        hook(script("guard_bash.py", "antigravity"), timeout=10)]}]},
+    "dotagents-after-edit": {"PostToolUse": [{
+        "matcher": "write_to_file|replace_file_content|multi_replace_file_content",
+        "hooks": [hook(script("after_edit.py", "antigravity"), timeout=60)]}]},
+}
 # Copilot CLI's native format: camelCase events send toolName and toolArgs, and a
 # matcher is a regex on the whole native tool name (GitHub's hooks reference).
 COPILOT_HOOKS = {
@@ -494,6 +506,36 @@ class Installer:
             return settings
         self.merge_json(base / "settings.json", mutate)
 
+    def install_antigravity(self) -> None:
+        base = self.home / ".gemini"
+        self.link(base / "GEMINI.md", self.agents_home / "AGENTS.md")
+
+        def hooks(config: dict) -> dict:
+            for name, events in ANTIGRAVITY_HOOKS.items():
+                old = config.get(name)
+                config[name] = json.loads(json.dumps(events))
+                if isinstance(old, dict) and isinstance(old.get("enabled"), bool):
+                    config[name]["enabled"] = old["enabled"]  # a hook turned off by hand stays off
+            return config
+        self.merge_json(base / "config" / "hooks.json", hooks)
+
+        # A personal skills manifest adds a folder to the skills Antigravity loads; it does
+        # not expand ~, so the path is absolute.
+        skills = str(self.agents_home / "skills")
+
+        def manifest(config: dict) -> dict:
+            entries = config.setdefault("entries", [])
+            if not isinstance(entries, list):
+                raise CannotMerge("its entries value is not a list")
+            if not any(isinstance(entry, dict) and entry.get("path") == skills for entry in entries):
+                entries.append({"path": skills})
+            return config
+        self.merge_json(base / "config" / "skills.json", manifest)
+        self.notes.append(
+            "Antigravity CLI: check the hooks with /hooks. It documents no reply that reaches the agent "
+            "after an edit, so dash reports stay in the hook's stderr there; it gets no session refresh "
+            "and no subagents.")
+
     def install_copilot(self) -> None:
         base = self.copilot_home
         if not base.is_absolute():
@@ -554,6 +596,7 @@ def detect(home: Path) -> list[str]:
         "claude": (home / ".claude", ["claude"]),
         "codex": (home / ".codex", ["codex"]),
         "gemini": (home / ".gemini", ["gemini"]),
+        "antigravity": (home / ".gemini" / "antigravity-cli", ["agy"]),
         "copilot": (copilot_folder(home), ["copilot"]),
         "cursor": (home / ".cursor", ["cursor-agent", "cursor"]),
     }

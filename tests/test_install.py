@@ -12,6 +12,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+from unittest import mock
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -64,7 +65,7 @@ class Install(unittest.TestCase):
     def setUp(self):
         self.home = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, self.home)
-        for folder in (".claude", ".codex", ".gemini", ".copilot", ".cursor"):
+        for folder in (".claude", ".codex", ".gemini", ".gemini/antigravity-cli", ".copilot", ".cursor"):
             (self.home / folder).mkdir()
 
     def run_install(self, *args: str, installer: Path = INSTALL, env: dict = None,
@@ -241,10 +242,16 @@ class Install(unittest.TestCase):
         codex.write_text("[]\n")
         gemini = self.home / ".gemini/settings.json"
         gemini.write_text(json.dumps({"context": "AGENTS.md"}))
-        before = (claude.read_text(), codex.read_text(), gemini.read_text())
-        out = self.install("--tools", "claude,codex,gemini")
-        self.assertEqual((claude.read_text(), codex.read_text(), gemini.read_text()), before)
-        for path in (claude, codex, gemini):
+        antigravity = self.home / ".gemini/config/hooks.json"
+        antigravity.parent.mkdir()
+        antigravity.write_text("[]\n")
+        manifest = self.home / ".gemini/config/skills.json"
+        manifest.write_text(json.dumps({"entries": {"path": "/x"}}))
+        paths = (claude, codex, gemini, antigravity, manifest)
+        before = [path.read_text() for path in paths]
+        out = self.install("--tools", "claude,codex,gemini,antigravity")
+        self.assertEqual([path.read_text() for path in paths], before)
+        for path in paths:
             self.assertIn(f"Could not merge {path}", out)
 
     def test_other_agents_get_instructions_agents_and_hooks(self):
@@ -467,6 +474,79 @@ class Install(unittest.TestCase):
                                ["write_file", "replace", "read_file"], range(1000, 600001))
         self.assert_hook_group(after, "after_edit.py", "gemini", ["write_file", "replace"],
                                ["run_shell_command", "read_file"], range(1000, 600001))
+
+    def test_antigravity_hooks_follow_the_documented_format(self):
+        # Antigravity hooks docs (antigravity.google/docs/hooks?tab=cli): the CLI reads global
+        # hooks from ~/.gemini/config/hooks.json, an object that maps a hook name to its events
+        # (an optional "enabled": false turns one off); PreToolUse and PostToolUse hold matcher
+        # groups whose matcher is a regex on the tool name and whose handlers have type
+        # "command", command and timeout in seconds. run_command runs shell commands;
+        # write_to_file, replace_file_content and multi_replace_file_content edit files.
+        config_file = self.home / ".gemini/config/hooks.json"
+        config_file.parent.mkdir(parents=True)
+        mine = {"my-linter-hook": {"PostToolUse": [{"matcher": "run_command", "hooks": [
+            {"type": "command", "command": "./scripts/lint.sh", "timeout": 10}]}]}}
+        config_file.write_text(json.dumps(mine))
+        self.install("--tools", "antigravity")
+        config = json.loads(config_file.read_text())
+        self.assertEqual(config["my-linter-hook"], mine["my-linter-hook"])
+        ours = [events for name, events in config.items() if name != "my-linter-hook"]
+        self.assertEqual(len(ours), 2)
+        self.assertEqual(sorted(event for events in ours for event in events), ["PostToolUse", "PreToolUse"])
+        (pre,), (post,) = [group for events in ours for group in events.get("PreToolUse", [])], \
+            [group for events in ours for group in events.get("PostToolUse", [])]
+        edits = ["write_to_file", "replace_file_content", "multi_replace_file_content"]
+        self.assert_hook_group(pre, "guard_bash.py", "antigravity", ["run_command"], edits + ["view_file"],
+                               range(1, 601))
+        self.assert_hook_group(post, "after_edit.py", "antigravity", edits, ["run_command", "view_file"],
+                               range(1, 601))
+        for name in edits:
+            self.assertTrue(re.fullmatch(post["matcher"], name), name)
+        # The documented PreToolUse input; the reply is a JSON decision.
+        payload = {"toolCall": {"name": "run_command", "args": {"CommandLine": "git push origin main",
+                                                                "Cwd": "/workspace/project",
+                                                                "WaitMsBeforeAsync": 5000}},
+                   "stepIdx": 19, "conversationId": "c", "workspacePaths": ["/workspace/project"]}
+        blocked = self.run_hook(pre["hooks"][0]["command"], payload)
+        self.assertEqual((blocked.returncode, json.loads(blocked.stdout)["decision"]), (0, "deny"))
+        payload["toolCall"]["args"]["CommandLine"] = "npm test"
+        allowed = self.run_hook(pre["hooks"][0]["command"], payload)
+        self.assertEqual((allowed.returncode, json.loads(allowed.stdout)), (0, {"decision": "allow"}))
+        # A hook turned off by hand stays off, and a second run changes nothing.
+        name = next(n for n, events in config.items() if "PreToolUse" in events and n != "my-linter-hook")
+        config[name]["enabled"] = False
+        config_file.write_text(json.dumps(config))
+        self.install("--tools", "antigravity")
+        self.assertIs(json.loads(config_file.read_text())[name]["enabled"], False)
+        self.assertIn("0 change(s).", self.install("--tools", "antigravity").splitlines())
+
+    def test_antigravity_reads_the_global_rules_and_the_skills(self):
+        # Antigravity docs: the CLI reads global rules from ~/.gemini/GEMINI.md (rules,
+        # gcli-migration), and a personal manifest ~/.gemini/config/skills.json adds the skill
+        # folders listed in entries[].path, absolute because ~ is not expanded (customization
+        # discovery).
+        manifest = self.home / ".gemini/config/skills.json"
+        manifest.parent.mkdir(parents=True)
+        manifest.write_text(json.dumps({"entries": [{"path": "/home/developer/team-config/skills"}],
+                                        "exclude": ["load-test"]}))
+        self.install("--tools", "antigravity")
+        self.assertEqual(os.readlink(self.home / ".gemini/GEMINI.md"), str(self.home / ".agents/AGENTS.md"))
+        data = json.loads(manifest.read_text())
+        self.assertEqual(data, {"entries": [{"path": "/home/developer/team-config/skills"},
+                                            {"path": str(self.home / ".agents/skills")}],
+                                "exclude": ["load-test"]})
+        for name in PACK_SKILLS + ONLINE_SKILLS:
+            self.assertTrue((self.home / ".agents/skills" / name / "SKILL.md").is_file(), name)
+        self.assertFalse((self.home / ".gemini/skills").exists(), "Gemini CLI reads that folder too")
+
+    def test_antigravity_is_detected_by_its_folder(self):
+        home = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, home)
+        (home / ".gemini/antigravity-cli").mkdir(parents=True)
+        with mock.patch.object(install.shutil, "which", return_value=None):
+            self.assertIn("antigravity", install.detect(home))
+            (home / ".gemini/antigravity-cli").rmdir()
+            self.assertNotIn("antigravity", install.detect(home))
 
     def test_gemini_subagents_outlast_the_default_limits(self):
         # Gemini CLI stops a subagent at max_turns (default 30) and timeout_mins (default 10),
