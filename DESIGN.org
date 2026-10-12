@@ -158,12 +158,12 @@ installer runs again.
   entries are merged into the tool's settings file: earlier copies of this
   repository's hook entries are removed and the current ones appended, a rule
   the adapter denies is removed from =ask= (where an older install put it),
-  and the rest of the file is kept. Antigravity CLI's hooks file maps hook
-  names to events: the installer rewrites its own two names
-  (=dotagents-guard=, =dotagents-after-edit=), keeps an =enabled= value set by
-  hand, and adds =~/.agents/skills= to the entries of the skills manifest. The adapter also turns off the synced
-  plugin =engineering@synced=. A file that does not parse is left alone with a
-  note to merge it by hand.
+  and the rest of the file is kept. The adapter also turns off the synced
+  plugin =engineering@synced=. Antigravity CLI's hooks file maps hook names to
+  events: the installer rewrites its own two names (=dotagents-guard=,
+  =dotagents-after-edit=), keeps an =enabled= value set by hand, and adds
+  =~/.agents/skills= to the entries of the skills manifest. A file that does
+  not parse is left alone with a note to merge it by hand.
 - /Antigravity CLI/ : it replaced Gemini CLI for Google AI Pro, Ultra and free
   users on 18 June 2026; Gemini CLI stays for Code Assist licences and paid
   API keys, so both adapters stay. Antigravity CLI gets the guard and the
@@ -215,10 +215,11 @@ summary (after a compaction, also to invoke its workflow skill again, since
 Claude Code keeps only the start of each skill through one), prints the real
 branch, changes and last commits, lists the newest files of
 =.private/progress/= and =.private/handoff/=, and asks the agent to re-read the
-progress log. The compaction brief tells the summary what resuming needs: the task and its slug, the branch, the paths of the progress log and
-handoff, the current plan step, the decisions marked Review: pending, the files
-changed and the commands still needed with their last results; it fills in the
-branch, the uncommitted changes and the newest task notes itself.
+progress log. The compaction brief tells the summary what resuming needs: the
+task and its slug, the branch, the paths of the progress log and handoff, the
+current plan step, the decisions marked Review: pending, the files changed and
+the commands still needed with their last results; it fills in the branch, the
+uncommitted changes and the newest task notes itself.
 
 The hooks share one failure model:
 
