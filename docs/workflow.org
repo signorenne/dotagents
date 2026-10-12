@@ -70,11 +70,11 @@ first errors, reviewer reviews a finished change in a fresh context.
 
 - One task per session; start a fresh session (Claude Code: =/clear=) between
   unrelated tasks.
-- In Claude Code, after a compaction or a resume, the session refresh reminds
+- In Claude Code and Codex, after a compaction or a resume, the session refresh reminds
   the agent that its memory of the code is a summary, prints the real branch,
   changes and last commits, lists the newest progress and handoff files, and
-  asks it to re-read the progress log. The other tools have no session start
-  hook: ask for that re-read yourself.
+  asks it to re-read the progress log and invoke its workflow skill again. The
+  other tools have no such hook: ask for that re-read yourself.
 - Specs, progress logs and handoffs live in =.private/= inside each repository
   (git-ignored); decisions live in the project's decision log.
 - implement keeps =.private/progress/<slug>.<ext>= current after every step;

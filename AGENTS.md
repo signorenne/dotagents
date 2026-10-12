@@ -2,7 +2,7 @@
 
 Guide for AI agents and contributors changing this repository. dotagents is the
 source of a personal, cross-agent setup: global rules, skills, subagents and
-hooks for Claude Code, Codex, Gemini CLI, GitHub Copilot and Cursor, an installer
+hooks for Claude Code, Codex, Gemini CLI, Antigravity CLI, GitHub Copilot and Cursor, an installer
 that wires them into each tool, and a skill set for claude.ai. The global rules for
 how agents work live in home/.agents/AGENTS.md; this file covers only how to change
 the repository itself.
@@ -42,7 +42,7 @@ docs/                      Org docs: docs map, architecture, pipeline, workflow 
 - No em dash or en dash characters anywhere, and no inline backticks in skill prose.
 - Instructions are written for models: a positive instruction, a reason only where the rule is not obvious, an example where it shows the expected output, no capitalized emphasis.
 - Change a skill's behavior only on purpose. Skills are concise and complete (every step and rule a model would otherwise get wrong, stated once) and follow docs/skill-authoring.org.
-- Hooks never block on unreadable input and never print anything but JSON on Gemini CLI's stdout.
+- Hooks never block on unreadable input and never print anything but JSON on Gemini CLI's or Antigravity CLI's stdout.
 - Commit subjects: type(scope): description, lower case, imperative, one line, no body, no AI attribution trailers.
 
 ## Validation commands
