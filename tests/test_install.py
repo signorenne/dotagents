@@ -90,6 +90,14 @@ class Install(unittest.TestCase):
         self.install("--dry-run")
         self.assertEqual(self.snapshot(), before)
 
+    def test_dry_run_counts_what_a_real_run_changes(self):
+        # Gemini CLI and Antigravity CLI share ~/.gemini/GEMINI.md: one link, one change.
+        def count(out):
+            return next(line for line in out.splitlines() if "change(s)." in line).split()[0]
+        dry = self.install("--dry-run")
+        self.assertEqual(len([line for line in dry.splitlines() if "GEMINI.md ->" in line]), 1, dry)
+        self.assertEqual(count(dry), count(self.install()))
+
     def test_second_run_changes_nothing(self):
         self.install()
         self.assertIn("0 change(s).", self.install().splitlines())

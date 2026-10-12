@@ -305,6 +305,7 @@ class Installer:
         self.changes = 0
         self.backups = 0
         self.notes = []
+        self.linked = set()  # (link, target) pairs done in this run, which a dry run cannot see on disk
 
     def say(self, action: str, text: str, change: bool = True) -> None:
         self.changes += change
@@ -346,8 +347,9 @@ class Installer:
         return saved
 
     def link(self, path: Path, target: Path) -> None:
-        if path.is_symlink() and os.readlink(path) == str(target):
+        if (path, target) in self.linked or (path.is_symlink() and os.readlink(path) == str(target)):
             return
+        self.linked.add((path, target))
         if real_path(path) is not None and real_path(path) == real_path(target):
             # Reached through a linked folder, path is the target itself: replacing it
             # would move the target away and leave a link to itself.
