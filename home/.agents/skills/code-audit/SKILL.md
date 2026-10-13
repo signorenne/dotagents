@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: "Audits an existing repository or area for problems and writes a local report: security issues, likely bugs and maintainability smells, each confirmed by an independent check and carrying severity, confidence, file:line and evidence, with everything uncertain kept apart as questions for the user. Use when the user asks to audit, inspect or assess code, or to find bugs, code smells, risks or technical debt in a codebase or module. Not for reviewing one change before a commit (review) or documenting code (as-built-docs)."
+description: "Audits an existing repository or area for problems and writes a local report: security issues, likely bugs and maintainability smells, each confirmed by an independent check and carrying severity, confidence, file:line and evidence, with everything uncertain kept apart as questions for the user. Use when the user asks to audit, inspect or assess code, or to find bugs, code smells, risks or technical debt in a codebase or module. Not for reviewing one change before a commit (branch-review) or documenting code (as-built-docs)."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 

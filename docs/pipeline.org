@@ -107,7 +107,7 @@ add the skill, the subagents and where a fresh session starts.
 ** 6. Review
 
 - /Skill/ : implement delegates to reviewer with the intent, the progress log
-  path and the base commit. The [[file:../home/.agents/skills/review/SKILL.md][review]] skill is the maintainer's direct way.
+  path and the base commit. The [[file:../home/.agents/skills/branch-review/SKILL.md][branch-review]] skill is the maintainer's direct way.
 - /Produces/ : findings ranked blocker, major and minor, with what the reviewer
   could not verify and the gates not run. implement checks each finding at
   its location and gives it one disposition: fixed when the change caused

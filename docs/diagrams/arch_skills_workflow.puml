@@ -16,7 +16,7 @@ package "Implement, gates and review (fresh session)" {
 }
 package "On request" {
   component "gates\ngate-runner" as gates
-  component "review\nreviewer" as review
+  component "branch-review\nreviewer" as review
 }
 package "Close" {
   component "session-close" as close

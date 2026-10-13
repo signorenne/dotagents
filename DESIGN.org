@@ -101,7 +101,7 @@ to =session-close= inside a git repository.
   so only verdicts and first errors reach the conversation; =implement= and
   =isolated-work= also give it the folder and the commit to test, and
   =parallel-agents= gates each branch through =isolated-work=.
-- =review=, =implement= and =mechanical-changes= hand the finished change to
+- =branch-review=, =implement= and =mechanical-changes= hand the finished change to
   =reviewer=; =parallel-agents= runs implement's review on the merged
   result.
 - =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
