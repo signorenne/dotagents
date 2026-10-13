@@ -34,7 +34,7 @@ Keep the machine awake during long runs: a session caught by sleep mid-response 
 An agent knows this conversation only through its brief (it does load the project's instruction files). Each brief holds:
 
 - the goal and why it matters, the acceptance criteria this agent owns, the user's binding decisions quoted, and what was ruled out;
-- its worktree path, branch, base commit, scratch folder and progress log path (.private/progress/<slug>-<agent>.<ext>, so the logs of agents on one spec do not collide); the files it owns and the folders it must not touch; the other agents running and what they own;
+- its worktree path, branch, base commit, scratch folder and progress log path (the absolute path of .private/progress/<slug>-<agent>.<ext> in the main checkout, so the logs of agents on one spec do not collide); the files it owns and the folders it must not touch; the other agents running and what they own;
 - where to start (files and lines), as a starting point: it reports where it had to go beyond it;
 - the build and test commands for its worktree, the commit style and the gates;
 - the rules: follow the implement skill from section 5 with the plan steps in this brief, when available; commit each verified step; never merge, push, or touch the target branch or the main checkout, except its progress log in the main checkout's .private/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
@@ -51,7 +51,7 @@ An agent knows this conversation only through its brief (it does load the projec
 
 Land into the target of the approved split, one branch at a time, the one others depend on first. git merge-tree --write-tree <target> <branch> shows conflicts without changing anything.
 
-1. Copy the agent's progress log and any git-ignored notes it hands over into the main checkout under their own names, because removing a worktree deletes its ignored files.
+1. Copy any git-ignored notes the agent left in its worktree into the main checkout's .private/ under their own names, because removing a worktree deletes its ignored files; its progress log is already there.
 2. Land the branch as the isolated-work skill says (section 3: pin, rebase onto the target's tip, gate the pinned commit, fast-forward, remove the worktree and the branch), and note in your log which agent commit became which landed commit.
 3. The branches still open rebase onto the new tip before their own landing: two branches that pass alone can fail together.
 
