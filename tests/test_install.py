@@ -85,6 +85,32 @@ class Install(unittest.TestCase):
         return {str(p.relative_to(self.home)): (os.readlink(p) if p.is_symlink() else p.read_bytes())
                 for p in sorted(self.home.rglob("*")) if p.is_file() or p.is_symlink()}
 
+    def test_a_renamed_skill_leaves_no_installed_copy(self):
+        # review became branch-review: its old copy would still load in the tools that read
+        # ~/.agents/skills, and its Claude Code link would point at it.
+        old = self.home / ".agents/skills/review"
+        old.mkdir(parents=True)
+        (old / "SKILL.md").write_text('---\nname: review\nlicense: "MIT, Copyright (c) 2026 '
+                                      'Nicolò Plebani (nexenne). See LICENSE.txt"\n---\n', encoding="utf-8")
+        (self.home / ".claude/skills").mkdir(parents=True)
+        (self.home / ".claude/skills/review").symlink_to(old)
+        mine = self.home / ".agents/skills/my-review"
+        mine.mkdir(parents=True)
+        (mine / "SKILL.md").write_text("---\nname: my-review\n---\n", encoding="utf-8")
+        self.install()
+        self.assertFalse(old.exists())
+        self.assertFalse((self.home / ".claude/skills/review").is_symlink())
+        self.assertTrue((self.home / ".claude/skills/branch-review").is_symlink())
+        self.assertTrue((mine / "SKILL.md").is_file())
+        self.assertTrue(list((self.home / ".agents-backup").rglob("review/SKILL.md")))
+
+    def test_a_folder_of_the_same_name_that_is_not_ours_stays(self):
+        theirs = self.home / ".agents/skills/review"
+        theirs.mkdir(parents=True)
+        (theirs / "SKILL.md").write_text("---\nname: review\nlicense: Apache-2.0\n---\n", encoding="utf-8")
+        self.install()
+        self.assertTrue((theirs / "SKILL.md").is_file())
+
     def test_dry_run_changes_nothing(self):
         before = self.snapshot()
         self.install("--dry-run")
