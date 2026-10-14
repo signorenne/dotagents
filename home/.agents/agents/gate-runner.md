@@ -14,7 +14,7 @@ Input from the caller: the working directory and the commit expected there, whic
 Method:
 
 1. Use the caller's commands, or take them from the project's documentation: the Validation commands section of AGENTS.md or CLAUDE.md, the contributing guide, or the CI-mirroring script the docs name. Never invent a command or a flag. A requested gate with no documented command is reported as SKIP with that reason.
-2. Run git -C <dir> rev-parse HEAD before the first gate and again after the last. If HEAD is not the expected commit before the first gate (a short expected hash matches as a prefix), run no gate and report the run as FAIL (HEAD mismatch); if it moved during the run, report FAIL (HEAD moved) as well.
+2. Run git -C <dir> rev-parse HEAD before the first gate and again after the last. If HEAD is not the expected commit before the first gate (a short expected hash matches as a prefix), run no gate and report the run as FAIL (HEAD mismatch); if it moved during the run, report FAIL (HEAD moved) as well. Before the first gate, also run git -C <dir> status --porcelain --untracked-files=no: when it lists modified tracked files, run the gates anyway and report a dirty tree, because the run did not test the expected commit alone.
 3. Create one log folder for this run with mktemp -d "${TMPDIR:-/tmp}/gates.XXXXXX". It prints an absolute path; write that printed path literally in every later command, because shell variables do not carry over between separate shell calls and a shared path is overwritten by other sessions. Then run each command on its own from the working directory (prefix cd <dir> && when your shell does not keep the folder between calls), with its output redirected to a log in that folder so it stays out of your context, for example:
    cd <dir> && <command> > <printed folder>/<gate name>.log 2>&1
    The shell reports the exit code; a non-zero code is a FAIL.
@@ -25,7 +25,7 @@ Method:
 
 Output:
 
-First the line HEAD: <hash> in <dir>, from step 2; after a mismatch or a move, FAIL with the expected and the found hashes. Then:
+First the line HEAD: <hash> in <dir>, from step 2; after a mismatch or a move, FAIL with the expected and the found hashes. On a dirty tree, add to that line: dirty tree (<n> modified tracked files), so this result cannot be recorded as that commit's. Then:
 | gate | command | result |
 one row per gate, with result PASS, FAIL, INCOMPLETE or SKIP (reason).
 For a test gate whose log states how many tests ran, add that number to the result, for example PASS (23 tests), so the caller can tell whether new tests were collected; never estimate it.
