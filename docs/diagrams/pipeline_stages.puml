@@ -39,6 +39,12 @@ repeat
   :gates (gate-runner)
   and review (reviewer);
   note right : results and their commit in the progress log
+  if (the changed approach failed,\na blocker on the second review pass,\nor a SKIP or INCOMPLETE gate\nthe code cannot fix?) then (yes)
+    :stop and report
+    to the maintainer;
+    note right : the evidence in the progress log and the handoff
+    end
+  endif
 repeat while (FAIL, INCOMPLETE, SKIP\nor a blocker?) is (fix)
 :session-close;
 note right : .private/handoff/<date>-<slug>
