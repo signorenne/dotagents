@@ -48,17 +48,17 @@ Before the first plan step, and again when resuming, run the narrowest documente
 - Behavior change: write or update the test first, following the trustworthy-tests skill if it is available, and see it fail for the right reason before writing the code that makes it pass. Bug: make the test fail on the unfixed code before the fix. Change an existing test's expected value only with the evidence the global rules require; a failing test that could pass only by being deleted, skipped or loosened is a question for the user, not an edit, except deleting the test of a behavior the approved spec or plan removes.
 - Never edit a generated file (marked as generated, or written by a build step): change its generator or input and regenerate, committing both when the output is tracked; check that regenerating from unchanged input gives no diff, and if the generator is missing, stop and report. The exceptions are generators that keep hand edits in marked regions, and one-off scaffolding the project now owns.
 - Keep the project's deliverable set in sync within the step (for example header and API docs, test, example, guide, build lists, umbrella include). A step that adds a build or test command also adds it to the project's documented validation commands, because gate-runner runs only documented commands.
-- Run the narrowest check (one test binary or test case). Run short commands directly; delegate to gate-runner when output is long.
+- Run the narrowest check (one test binary or test case). Run short commands directly; delegate to gate-runner when output is long, and give it, for every run, the working folder and the commit expected there (git rev-parse HEAD), so its result belongs to that commit.
 - Commit the step in the project's convention, unless the user said not to commit. Where the sandbox blocks git commit (Codex by default), ask for approval, or leave the step uncommitted and log it as not committed.
 - Update the progress log (section 5) before starting the next step.
 
 ## 8. Gates
 
-When all steps are in, delegate to gate-runner for the project's full pre-PR gates. Record each gate run in the progress log: the command, its result and the commit it ran on (the HEAD gate-runner prints), so the reviewer sees the evidence. Fix failures in the code, never by weakening a gate or a test; correcting an expected value that the evidence proves wrong is not weakening, and the progress log cites that evidence. A SKIP or INCOMPLETE gate has not passed: never report the work as done while one stands; list it with its reason (and an INCOMPLETE gate's log path) among the commands still to run (Commands still needed in the handoff format).
+When all steps are in, delegate to gate-runner for the project's full pre-PR gates, with the working folder and the expected commit. Record each gate run in the progress log: the command, its result and the commit it ran on (the HEAD gate-runner prints), so the reviewer sees the evidence. Fix failures in the code, never by weakening a gate or a test; correcting an expected value that the evidence proves wrong is not weakening, and the progress log cites that evidence. A SKIP or INCOMPLETE gate has not passed: never report the work as done while one stands; list it with its reason (and an INCOMPLETE gate's log path) among the commands still to run (Commands still needed in the handoff format).
 
 ## 9. Review
 
-Delegate to reviewer with the intent of the change, the progress log path, and the branch's base commit when it is not main. Check each finding at its location, then give it one disposition:
+Delegate to reviewer with the intent of the change, the working folder and the commit expected at its HEAD, the progress log path, and the branch's base commit when it is not main. Check each finding at its location, then give it one disposition:
 
 - Fixed, when this change caused it.
 - Contested, only with evidence the reviewer could read: a file and line, a test, a command's output, a line of the spec. That it is intentional is not evidence.
