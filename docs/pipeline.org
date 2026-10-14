@@ -218,6 +218,7 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
 | A review finding                  | fix, contest with evidence, ask, or defer if it predates the change        | progress log, with its disposition |
 | A blocker or major after fixes    | stop and report: the cause is probably upstream (spec, plan or a rule)     | progress log and handoff           |
 | Two failed fixes for one problem  | stop, restate the evidence, change approach with systematic-debugging      | progress log, as failed attempts   |
+| The changed approach fails too    | stop and report with the evidence; the maintainer decides                  | progress log and handoff           |
 | A refuted claim changes the plan  | stop and report before changing course; the maintainer decides             | progress log and handoff           |
 | A conflict with a rule that binds | stop and state it; the maintainer changes the task or the rule             | progress log; a Proposed rule      |
 | An interruption or a usage limit  | resume from the progress log, the newest handoff and the commits           | progress log                       |
