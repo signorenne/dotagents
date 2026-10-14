@@ -152,10 +152,11 @@ add the skill, the subagents and where a fresh session starts.
 
 - /Skill/ : isolated-work (section 3), on the maintainer's go.
 - /Steps/ : pin the branch's commit; rebase it onto the target's current tip
-  inside the worktree; run the full gates on the pinned, rebased commit
-  through gate-runner, because a rebased commit has never been tested;
-  fast-forward the target to it; confirm the target now points there. A merge
-  commit only when the project's documented convention asks for one.
+  inside the worktree, writing both hashes into the progress log; run the full
+  gates on the pinned, rebased commit through gate-runner, because a rebased
+  commit has never been tested; fast-forward the target to it; confirm the
+  target now points there. A merge commit only when the project's documented
+  convention asks for one.
 - /Produces/ : a linear history on the local target branch.
 
 Without isolation, the branch stays in the main checkout until the maintainer

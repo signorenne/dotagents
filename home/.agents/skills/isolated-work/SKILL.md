@@ -31,10 +31,10 @@ When the work is done (gates and review passed on its last commit), report the b
 
 ## 3. Land on the user's go
 
-Write every hash into the commands literally: shell variables do not survive between commands.
+Write every hash into the commands literally: shell variables do not survive between commands. Write the pinned and the rebased hashes into the progress log as soon as you have them, so an interrupted landing resumes from the commits it had reached.
 
-1. Pin: git -C <path> rev-parse HEAD.
-2. Rebase onto the target's current tip in the worktree (git -C <path> rebase <target>), resolve conflicts there, and pin the rebased commit. Run the full gates on that exact commit through gate-runner, given the worktree path and the pinned hash: a rebased commit has never been tested.
+1. Pin: git -C <path> rev-parse HEAD, and log the hash.
+2. Rebase onto the target's current tip in the worktree (git -C <path> rebase <target>), resolve conflicts there, and pin the rebased commit, logging it next to the first. Run the full gates on that exact commit through gate-runner, given the worktree path and the pinned hash: a rebased commit has never been tested.
 3. Fast-forward the target to the pinned hash: where the target is checked out and clean, git -C <that checkout> merge --ff-only <hash>; where it is checked out nowhere, git update-ref refs/heads/<target> <hash> <old target hash> after git merge-base --is-ancestor <target> <hash> succeeds. Use a merge commit (git merge --no-ff) only when the project's documented convention asks for one.
 4. Confirm git rev-parse <target> prints the pinned hash.
 5. Remove: git worktree remove <path>. It refuses when the worktree has uncommitted changes: report them and never pass --force without the user. Then delete the branch with git branch -D <branch> only if git rev-parse <branch> still prints the pinned hash and git merge-base --is-ancestor <hash> <target> succeeds; if the branch moved, report the extra commits. Finish with git worktree prune.
