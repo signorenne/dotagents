@@ -62,9 +62,10 @@ add the skill, the subagents and where a fresh session starts.
   every claim (in Claude Code the general-purpose subagent, elsewhere
   reviewer), and stops without writing code.
 - /Produces/ : a self-contained spec that names files, symbols, commands and
-  acceptance criteria a test or a command can fail. A rule change the
-  maintainer approved sits among its deliverables with its exact text, so
-  implement applies it without asking again.
+  acceptance criteria a test or a command can fail, and the commit its claims
+  were checked on. A rule change the maintainer approved sits among its
+  deliverables with its exact text, so implement applies it without asking
+  again.
 - /Lives in/ : =.private/specs/<slug>.<ext>=, git-ignored, unless the project's
   spec workflow names another place.
 - /Next/ : a fresh session (in Claude Code =/clear=) runs implement on the spec
@@ -73,9 +74,11 @@ add the skill, the subagents and where a fresh session starts.
 ** 4. Implement
 
 - /Skill/ : [[file:../home/.agents/skills/implement/SKILL.md][implement]], in a fresh session. It grounds the plan with scout and
-  its own reading of the code, and shows the plan: one commit per step, each
-  with its files and its check. It waits for approval when the plan touches
-  more than one file, changes a public API or meets the maintainer's choice.
+  its own reading of the code (without scout when the spec's affected paths
+  have not changed since the commit the spec was checked on), and shows the
+  plan: one commit per step, each with its files and its check. It waits for
+  approval when the plan touches more than one file, changes a public API or
+  meets the maintainer's choice.
   For a change across modules, a public API change, or a migration of data or
   many files, the plan proposes [[file:../home/.agents/skills/isolated-work/SKILL.md][isolated-work]], approved with the plan.
   Before the first step, and on resume, it runs the narrowest documented

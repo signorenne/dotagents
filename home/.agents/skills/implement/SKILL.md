@@ -16,7 +16,7 @@ Pick the matching workflow from the project's docs (its AGENTS.md recipes and ag
 
 ## 3. Ground in the current code
 
-Unless the change fits in one sentence and one or two known files, delegate to scout. Then re-read yourself the files you will edit and the code you will call, and confirm with a search that every symbol named in the spec, the brief or a handoff still exists with the expected signature. Report any difference before planning; a renamed or missing symbol changes the plan.
+Unless the change fits in one sentence and one or two known files, delegate to scout. Skip scout when the spec records the commit its check ran on and git diff --quiet <that commit> HEAD -- <the paths of its affected areas> exits 0: the code the spec was checked against has not changed. Either way, re-read yourself the files you will edit and the code you will call, and confirm with a search that every symbol named in the spec, the brief or a handoff still exists with the expected signature. Report any difference before planning; a renamed or missing symbol changes the plan.
 
 ## 4. Plan
 
