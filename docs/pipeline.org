@@ -59,8 +59,10 @@ add the skill, the subagents and where a fresh session starts.
 
 - /Skill/ : [[file:../home/.agents/skills/spec/SKILL.md][spec]]. It maps the area with scout, settles each design choice
   with decide, writes the spec, has a subagent that did not write it check
-  every claim (in Claude Code the general-purpose subagent, elsewhere
-  reviewer), and stops without writing code.
+  every claim and give a second reading of each acceptance criterion where
+  one exists (in Claude Code the general-purpose subagent, elsewhere
+  reviewer), asks the maintainer which reading is meant, and stops without
+  writing code.
 - /Produces/ : a self-contained spec that names files, symbols, commands and
   acceptance criteria a test or a command can fail, the behavior a change to
   existing behavior must keep (each pinned by a test), and the commit its
