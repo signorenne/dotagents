@@ -102,8 +102,9 @@ to =session-close= inside a git repository.
   =isolated-work= also give it the folder and the commit to test, and
   =parallel-agents= gates each branch through =isolated-work=.
 - =branch-review=, =implement= and =mechanical-changes= hand the finished change to
-  =reviewer=; =parallel-agents= runs implement's review on the merged
-  result.
+  =reviewer=, which reports the HEAD it reviewed; =implement= also gives it the
+  folder and the commit it expects there, and =parallel-agents= runs
+  implement's review on the merged result.
 - =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
   subagent that did not write them, and =code-audit= has each finding attacked
   by one briefed only on the claim and the code: in Claude Code the
