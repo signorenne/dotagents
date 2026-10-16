@@ -298,6 +298,41 @@ Each rule has a stable anchor, its =CUSTOM_ID=, for skills and docs to cite
 =#=), and an "In:" line naming the files that carry it out. A changed rule
 keeps its anchor.
 
+Each rule has a guide, the text that tells the agent to keep it, and a
+sensor, the check that catches a breach. The reviewer checks every change
+against all of them (conflicts with Accepted decisions, in
+=home/.agents/agents/reviewer.md=), so the table names only the sensors
+specific to each rule: "none: the model only" means that, apart from that
+review, only the agent's own care keeps the rule. "Planned" marks a check that
+is designed but not merged yet.
+
+| Rule                        | Guide                                                          | Sensor                                                                                                                                                    |
+|-----------------------------+----------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =refute-first=              | global rules (Refute before you rely), session-close (lessons) | the reviewer's attack on a change's central claims                                                                                                        |
+| =stop-on-plan-change=       | global rules (Refute before you rely, Grounding)               | none: the model only                                                                                                                                      |
+| =grouped-questions=         | decide, global rules (Decisions)                               | none: the model only                                                                                                                                      |
+| =progress-log=              | implement (section 5), session-close                           | the reviewer (recorded failing runs, log claims checked against the diff); planned: a Stop hook for a branch commit newer than its log or missing from it |
+| =tests-attacked=            | implement (section 7), trustworthy-tests                       | the reviewer's attack on each new or changed test                                                                                                         |
+| =learning-in-global-rules=  | global rules (Learning), tutor                                 | none: the model only                                                                                                                                      |
+| =one-source=                | =AGENTS.md= (Where changes go)                                 | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                        |
+| =skills-load-locally=       | =AGENTS.md= (Where changes go)                                 | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                     |
+| =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)           | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                              |
+| =skills-from-real-runs=     | =docs/skill-authoring.org=                                     | none: the model only                                                                                                                                      |
+| =light-scripts=             | =AGENTS.md= (Where changes go)                                 | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                       |
+| =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                   | none: the model only                                                                                                                                      |
+| =tutor-name=                | this rule                                                      | none: the model only                                                                                                                                      |
+| =as-built-session-model=    | as-built-docs                                                  | none: the model only                                                                                                                                      |
+| =clean-architecture-layers= | clean-architecture                                             | in a project, the layer checks the skill adds to the gates                                                                                                |
+| =ui-never-blocks=           | event-driven-ui                                                | in a project, the owning-thread assertions and platform detectors the skill turns on                                                                      |
+| =diagram-palette=           | plantuml-diagrams                                              | none: the model only                                                                                                                                      |
+| =as-built-for-people=       | as-built-docs                                                  | in a project, the skill's checks 1 to 7, each seen catching a planted error, and its fact-check                                                           |
+| =as-built-pictures=         | as-built-docs                                                  | in a project, the skill's check 7 (a legend entry for each marker)                                                                                        |
+| =confirmed-audit-findings=  | code-audit                                                     | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                        |
+| =no-agent-push=             | global rules (Agentic work, Git)                               | the guard in every tool (=tests/test_hooks.py=), Claude Code's deny rules, the Codex rules file; planned: onFailure block on the guard                    |
+| =isolated-worktrees=        | isolated-work, parallel-agents, implement (section 4)          | Claude Code asks before =git rebase=; planned: before =git -C <dir> rebase=, =git update-ref=, =git branch -D=                                            |
+| =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                   | Claude Code's empty attribution settings; planned: this repository's commit-msg hook (AI trailers, subject format)                                        |
+| =mit-license=               | =AGENTS.md= (Hard rules)                                       | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                               |
+
 ** Working method
 
 *** Refute before you rely is the core method
