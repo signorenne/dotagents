@@ -28,6 +28,11 @@
       "Bash(git reset --hard *)",
       "Bash(git clean *)",
       "Bash(git rebase *)",
+      "Bash(git -C * rebase *)",
+      "Bash(git update-ref *)",
+      "Bash(git -C * update-ref *)",
+      "Bash(git branch -D *)",
+      "Bash(git -C * branch -D *)",
       "Bash(rm -rf *)"
     ],
     "deny": [

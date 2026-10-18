@@ -269,6 +269,19 @@ class Install(unittest.TestCase):
                 if before:
                     self.assertIn("Bash(npm publish *)", permissions["ask"])
 
+    def test_claude_settings_ask_before_landing_commands(self):
+        # Landing a branch rebases it, moves a branch ref and deletes the branch: each
+        # rewrites or drops history, so Claude Code asks first, also in the git -C form.
+        # Claude Code evaluates deny, then ask, then allow (code.claude.com/docs/en/permissions).
+        self.install("--tools", "claude")
+        permissions = json.loads((self.home / ".claude/settings.json").read_text())["permissions"]
+        for rule in ("Bash(git rebase *)", "Bash(git -C * rebase *)", "Bash(git update-ref *)",
+                     "Bash(git -C * update-ref *)", "Bash(git branch -D *)", "Bash(git -C * branch -D *)"):
+            with self.subTest(rule=rule):
+                self.assertIn(rule, permissions["ask"])
+                self.assertNotIn(rule, permissions["deny"])
+                self.assertNotIn(rule, permissions["allow"])
+
     def test_settings_that_cannot_be_merged_are_left_unchanged(self):
         claude = self.home / ".claude/settings.json"
         claude.write_text(json.dumps({"model": "opus", "hooks": ["an entry"]}))
