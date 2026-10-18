@@ -44,6 +44,7 @@ docs/                      Org docs: docs map, architecture, pipeline, workflow 
 - Change a skill's behavior only on purpose. Skills are concise and complete (every step and rule a model would otherwise get wrong, stated once) and follow docs/skill-authoring.org.
 - Hooks never block on unreadable input and never print anything but JSON on Gemini CLI's or Antigravity CLI's stdout.
 - Commit subjects: type(scope): description, lower case, imperative, one line, no body, no AI attribution trailers.
+- Small commits may go straight on the local main branch here, an exception to the global rule (DESIGN.org#main-commits-here); parallel or risky work still goes through isolated-work.
 
 ## Validation commands
 
