@@ -216,11 +216,13 @@ summary (after a compaction, also to invoke its workflow skill again, since
 Claude Code keeps only the start of each skill through one), prints the real
 branch, changes, last commits and other worktrees, lists the newest files of
 =.private/progress/= and =.private/handoff/= (in a linked worktree, the main
-checkout's), and asks the agent to re-read the progress log. The compaction brief tells the summary what resuming needs: the
-task and its slug, the branch, the paths of the progress log and handoff, the
-current plan step, the decisions marked Review: pending, the files changed and
-the commands still needed with their last results; it fills in the branch, the
-uncommitted changes and the newest task notes itself.
+checkout's), and asks the agent to re-read the progress log. The compaction
+brief tells the summary what resuming needs: the task and its slug, the
+branch, the paths of the progress log and handoff, the workflow skill and its
+running section or step, the current plan step, the decisions marked
+Review: pending, the files changed and the commands still needed with their
+last results; it fills in the branch, the uncommitted changes and the newest
+task notes itself.
 
 The hooks share one failure model:
 
