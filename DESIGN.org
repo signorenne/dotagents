@@ -342,7 +342,9 @@ is designed but not merged yet.
 :END:
 Every agent tries to break each claim its work depends on with the cheapest
 check that could fail, records what broke in the progress log and the
-handoff, and drafts a rule change for each lesson a rule should have taught.
+handoff, and drafts, for each lesson a rule should have taught, a check that
+catches the mistake when one command or tool call can, otherwise a rule
+change.
 It sits in the always-loaded global rules because problems were caught by
 external checks and independent agents, never by rereading.
 
