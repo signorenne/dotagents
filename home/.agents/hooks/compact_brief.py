@@ -6,10 +6,11 @@ needs. When a PreCompact hook exits 0, Claude Code uses its stdout as instructio
 the summary, cut at 10,000 characters. The brief asks the summary to keep the task and
 its slug, the branch, the paths of the task's progress log and handoff, the workflow
 skill and its running section or step, the current plan step, the decisions marked
-Review: pending, the files changed, and the commands still needed with their last
-results. It fills in what it can read itself: the branch,
-the uncommitted changes, and the newest files of .private/progress/ and
-.private/handoff/ (session_refresh.py's finder).
+Review: pending, the user's constraints that no file records (word for word) and
+what is blocked on what, the files changed, and the commands still needed with their
+last results. It fills in what it can read itself: the branch, the uncommitted
+changes, and the newest files of .private/progress/ and .private/handoff/
+(session_refresh.py's finder).
 
 Usage: python3 "$HOME/.agents/hooks/compact_brief.py" || true
 Always exits 0: exit 2 blocks the compaction, and when the compaction recovers from a
@@ -84,6 +85,8 @@ def brief(branch: str, changes: str, notes: str) -> str:
         "that was running, so it is invoked again there.",
         "- The current plan step: the step in progress, the steps done and the steps left.",
         "- Each decision marked Review: pending, with who took it and why.",
+        "- Each constraint the user stated in this session that no file records, word for word, "
+        "and what is blocked and on what.",
         "- The files changed, each with what changed"
         + (f". Uncommitted now:\n{indented(changes)}" if changes else "."),
         "- The commands still needed (gates, tests, checks), and the last result of each "

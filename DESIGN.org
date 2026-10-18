@@ -220,9 +220,10 @@ checkout's), and asks the agent to re-read the progress log. The compaction
 brief tells the summary what resuming needs: the task and its slug, the
 branch, the paths of the progress log and handoff, the workflow skill and its
 running section or step, the current plan step, the decisions marked
-Review: pending, the files changed and the commands still needed with their
-last results; it fills in the branch, the uncommitted changes and the newest
-task notes itself.
+Review: pending, the user's constraints that no file records (word for word)
+and what is blocked on what, the files changed and the commands still needed
+with their last results; it fills in the branch, the uncommitted changes and
+the newest task notes itself.
 
 The hooks share one failure model:
 
