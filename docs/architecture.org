@@ -362,7 +362,8 @@ Session refresh (=session_refresh.py=):
    first 5,000 tokens of each skill invoked before it, and may drop older
    ones.
 2. Add the branch (or the detached commit), up to 15 lines of
-   =git status --short= and the last five commits. A list that git could not
+   =git status --short=, the last five commits and the repository's other
+   worktrees with their branches (up to ten). A list that git could not
    give is named as missing, never shown as a clean tree.
 3. Add the three newest files of =.private/progress/= and of
    =.private/handoff/=, with absolute paths, found in the working folder or a

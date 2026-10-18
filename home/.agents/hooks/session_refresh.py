@@ -3,8 +3,9 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """SessionStart hook (Claude Code and Codex, matcher "compact|resume"): after a
 compaction or a resume, remind the agent that its picture of the code is a summary and
-print the real repository state, so stale function names are caught before they cause
-edits. After a compaction it also asks the agent to invoke its workflow skill again.
+print the real repository state (branch, changes, last commits and the other
+worktrees), so stale function names are caught before they cause edits. After a
+compaction it also asks the agent to invoke its workflow skill again.
 When the project keeps git-ignored task notes, it also lists the three most recent
 files under .private/progress/ and under .private/handoff/ (found in the working folder
 or a parent, up to the repository root, or in a linked worktree in the main checkout),
@@ -24,6 +25,7 @@ import time
 from pathlib import Path
 
 MAX_STATUS_LINES = 15
+MAX_WORKTREES = 10
 # Total budget for the notes listing and all git calls, under the 10 s hook timeout in
 # adapters/claude/settings.json: Claude Code drops all output of a hook that times out.
 DEADLINE_SECONDS = 8
@@ -85,6 +87,34 @@ def private_folder(cwd: str, deadline: float) -> Path | None:
         if dot_git.exists():
             return None
     return None
+
+
+def other_worktrees(porcelain: str, cwd: str) -> list[str]:
+    """"path (branch)" lines for the worktrees in git worktree list --porcelain output,
+    except the one that holds cwd, a bare repository and folders that no longer exist."""
+    entries, entry = [], {}
+    for line in porcelain.splitlines() + [""]:
+        if line:
+            key, _, value = line.partition(" ")
+            entry[key] = value
+            continue
+        if entry.get("worktree"):
+            entries.append(entry)
+        entry = {}
+    try:
+        here = Path(cwd).resolve()
+        paths = [Path(e["worktree"]).resolve() for e in entries]
+        holders = [p for p in paths if p == here or p in here.parents]
+        current = max(holders, key=lambda p: len(p.parts)) if holders else None
+        lines = []
+        for path, e in zip(paths, entries):
+            if path == current or "bare" in e or "prunable" in e or not path.is_dir():
+                continue
+            branch = e.get("branch", "").replace("refs/heads/", "", 1)
+            lines.append(f"{path.as_posix()} ({branch or 'detached at ' + e.get('HEAD', '')[:7]})")
+        return lines
+    except (OSError, ValueError, RuntimeError):
+        return []
 
 
 def task_notes(cwd: str, deadline: float) -> list[str]:
@@ -168,6 +198,16 @@ def main() -> int:
             lines.append(f"Last commits not shown: git log {problem}.")
         elif recent:
             lines.append("Last commits:\n" + recent)
+        listed, problem = git("worktree", "list", "--porcelain", cwd=cwd, deadline=deadline)
+        if problem == TIMED_OUT:
+            lines.append(f"Other worktrees not shown: git worktree list {problem}.")
+        elif listed:
+            others = other_worktrees(listed, cwd)
+            shown = others[:MAX_WORKTREES]
+            more = len(others) - len(shown)
+            if shown:
+                lines.append("Other worktrees of this repository:\n" + "\n".join(shown)
+                             + (f"\n... and {more} more" if more > 0 else ""))
     if notes:
         lines.append("Task notes (git-ignored), most recent first:\n" + "\n".join(notes))
         lines.append(REREAD)
