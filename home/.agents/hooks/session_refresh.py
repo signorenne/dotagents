@@ -7,7 +7,8 @@ print the real repository state, so stale function names are caught before they 
 edits. After a compaction it also asks the agent to invoke its workflow skill again.
 When the project keeps git-ignored task notes, it also lists the three most recent
 files under .private/progress/ and under .private/handoff/ (found in the working folder
-or a parent, up to the repository root) and asks the agent to re-read the progress log.
+or a parent, up to the repository root, or in a linked worktree in the main checkout),
+with absolute paths, and asks the agent to re-read the progress log.
 
 Usage: python3 "$HOME/.agents/hooks/session_refresh.py"
 Plain stdout on exit 0 is added to the agent's context. Never fails the session.
@@ -67,22 +68,31 @@ def text_field(payload: dict, key: str, default: str) -> str:
     return value if isinstance(value, str) and value else default
 
 
-def private_folder(cwd: str) -> Path | None:
-    """The .private folder in cwd or its nearest parent, not above the repository root."""
+def private_folder(cwd: str, deadline: float) -> Path | None:
+    """The .private folder in cwd or its nearest parent, not above the repository root.
+    A linked worktree keeps its notes in the main checkout's: the folder that holds the
+    common git folder (git rev-parse --git-common-dir)."""
     start = Path(cwd).absolute()
     for directory in (start, *start.parents):
         if (directory / ".private").is_dir():
             return directory / ".private"
-        if (directory / ".git").exists():
+        dot_git = directory / ".git"
+        if dot_git.is_file():  # a linked worktree (or a submodule, whose notes stay unfound)
+            common, problem = git("rev-parse", "--path-format=absolute", "--git-common-dir",
+                                  cwd=str(directory), deadline=deadline)
+            main = Path(common).parent / ".private" if common and not problem else None
+            return main if main is not None and main.is_dir() else None
+        if dot_git.exists():
             return None
     return None
 
 
 def task_notes(cwd: str, deadline: float) -> list[str]:
     """The most recent files of each note folder, newest first, as "path (modified)" lines
-    relative to the project root. Errors and slowness only shorten the list."""
+    with absolute paths, which hold from a subfolder or a worktree too. Errors and
+    slowness only shorten the list."""
     try:
-        private = private_folder(cwd)
+        private = private_folder(cwd, deadline)
         if private is None:
             return []
         lines, scanned = [], 0
@@ -101,7 +111,7 @@ def task_notes(cwd: str, deadline: float) -> list[str]:
             found.sort(key=lambda item: item[0], reverse=True)
             for mtime, path in found[:NOTES_PER_FOLDER]:
                 when = time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))
-                lines.append(f"{path.relative_to(private.parent).as_posix()} ({when})")
+                lines.append(f"{path.as_posix()} ({when})")
         return lines
     except (OSError, ValueError, OverflowError):
         return []

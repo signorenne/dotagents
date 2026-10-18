@@ -365,8 +365,10 @@ Session refresh (=session_refresh.py=):
    =git status --short= and the last five commits. A list that git could not
    give is named as missing, never shown as a clean tree.
 3. Add the three newest files of =.private/progress/= and of
-   =.private/handoff/=, found in the working folder or a parent up to the
-   repository root, and ask the agent to re-read the task's progress log. The
+   =.private/handoff/=, with absolute paths, found in the working folder or a
+   parent up to the repository root or, in a linked worktree, in the main
+   checkout (the folder of =git rev-parse --git-common-dir=), and ask the
+   agent to re-read the task's progress log. The
    notes are listed before git runs, so a slow git cannot leave them out; the
    listing and the git calls share 8 s, under the 10 s timeout past which
    Claude Code drops the output.

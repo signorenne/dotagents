@@ -215,8 +215,8 @@ The session refresh reminds the agent that its picture of the code is a
 summary (after a compaction, also to invoke its workflow skill again, since
 Claude Code keeps only the start of each skill through one), prints the real
 branch, changes and last commits, lists the newest files of
-=.private/progress/= and =.private/handoff/=, and asks the agent to re-read the
-progress log. The compaction brief tells the summary what resuming needs: the
+=.private/progress/= and =.private/handoff/= (in a linked worktree, the main
+checkout's), and asks the agent to re-read the progress log. The compaction brief tells the summary what resuming needs: the
 task and its slug, the branch, the paths of the progress log and handoff, the
 current plan step, the decisions marked Review: pending, the files changed and
 the commands still needed with their last results; it fills in the branch, the

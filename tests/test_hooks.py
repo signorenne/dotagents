@@ -59,6 +59,15 @@ def committed_repo(test: unittest.TestCase) -> tuple:
     return repo, env
 
 
+def linked_worktree(test: unittest.TestCase, repo: Path, env: dict, branch: str = "feat/task") -> Path:
+    """A linked worktree of repo on a new branch, in a sibling folder removed after the test."""
+    worktree = Path(tempfile.mkdtemp()) / "wt"
+    test.addCleanup(shutil.rmtree, worktree.parent)
+    subprocess.run(["git", "-C", str(repo), "worktree", "add", "-q", "-b", branch, str(worktree)],
+                   check=True, env=env)
+    return worktree
+
+
 def write_notes(repo: Path, notes: dict) -> None:
     """Create .private files {relative path: modification time in epoch seconds},
     git-ignored as in a real project."""
@@ -851,6 +860,25 @@ class SessionRefresh(unittest.TestCase):
                 self.assertNotIn("s.org", result.stdout)
                 self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
 
+    def test_linked_worktree_lists_the_main_checkouts_notes(self):
+        # A worktree has no .private/: its notes are in the main checkout's, the parent
+        # of git rev-parse --git-common-dir. They are listed with absolute paths, since
+        # the agent's folder is the worktree, not the checkout that holds them.
+        repo, env = self.committed_repo()
+        day = 1_790_000_000
+        self.write_notes(repo, {"progress/task.org": day, "handoff/2026-11-12-task.org": day + 60})
+        worktree = linked_worktree(self, repo, env)
+        (worktree / "src").mkdir()
+        for cwd in (worktree, worktree / "src"):
+            with self.subTest(cwd=cwd):
+                result = self.refresh_with({"cwd": str(cwd), "source": "compact"}, env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertIn("Current branch: feat/task", result.stdout)
+                for name, mtime in (("progress/task.org", day), ("handoff/2026-11-12-task.org", day + 60)):
+                    when = time.strftime('%Y-%m-%d %H:%M', time.localtime(mtime))
+                    self.assertIn(f"{(repo / '.private' / name).as_posix()} ({when})", result.stdout)
+                self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
+
     def test_no_task_notes_no_reminder(self):
         repo, env = self.committed_repo()
         for notes in ({}, {"specs/s.org": 1_790_000_000}):
@@ -931,6 +959,15 @@ class CompactBrief(unittest.TestCase):
         self.assertIn(".private/progress/task.org", result.stdout)
         self.assertIn(".private/handoff/2026-11-12-task.org", result.stdout)
         self.assertIn("Uncommitted now:\n   M tracked.txt", result.stdout)
+
+    def test_linked_worktree_points_to_the_main_checkouts_notes(self):
+        repo, env = committed_repo(self)
+        write_notes(repo, {"progress/task.org": 1_790_000_000})
+        worktree = linked_worktree(self, repo, env)
+        result = self.brief({"cwd": str(worktree)}, env)
+        self.assert_brief(result)
+        self.assertIn("The branch: feat/task.", result.stdout)
+        self.assertIn(f"{(repo / '.private/progress/task.org').as_posix()} (", result.stdout)
 
     def test_long_state_stays_under_the_cap(self):
         repo, env = committed_repo(self)
