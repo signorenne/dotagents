@@ -56,7 +56,8 @@
           {
             "type": "command",
             "command": "python3 \"$HOME/.agents/hooks/guard_bash.py\" --tool claude",
-            "timeout": 10
+            "timeout": 10,
+            "onFailure": "block"
           }
         ]
       }

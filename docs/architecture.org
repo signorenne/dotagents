@@ -336,9 +336,11 @@ Where each tool runs them:
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
 refresh (Claude Code and Codex) and the compaction brief (Claude Code) get
-10 s. Every hook
-exits 0 on a payload it cannot read, so a broken payload never stops the work,
-and prints nothing but JSON on Gemini CLI's and Antigravity CLI's stdout.
+10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
+never stops the work, and prints nothing but JSON on Gemini CLI's and
+Antigravity CLI's stdout. In Claude Code the guard's entry sets =onFailure=
+to =block=: a guard that cannot start, crashes or times out blocks the
+command instead of letting it run.
 
 Compaction brief (=compact_brief.py=):
 

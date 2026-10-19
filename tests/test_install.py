@@ -282,6 +282,23 @@ class Install(unittest.TestCase):
                 self.assertNotIn(rule, permissions["deny"])
                 self.assertNotIn(rule, permissions["allow"])
 
+    def test_claude_guard_blocks_when_it_cannot_run(self):
+        # Claude Code hooks docs: "onFailure": "block" on a command hook (v2.1.295 or later)
+        # makes a hook that cannot start, exits other than 0 or 2, times out or prints
+        # invalid JSON block the tool call as exit 2 would. Only the guard needs it: a
+        # broken guard must not let a push through, and the other hooks report, not guard.
+        self.install("--tools", "claude")
+        hooks = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]
+        handlers = {h["command"]: h for groups in hooks.values() for g in groups for h in g["hooks"]}
+        guard = handlers.pop('python3 "$HOME/.agents/hooks/guard_bash.py" --tool claude')
+        self.assertEqual(guard.get("onFailure"), "block")
+        for command, handler in handlers.items():
+            self.assertNotIn("onFailure", handler, command)
+        # Unreadable input is not a failure: the guard exits 0 and the command runs.
+        result = subprocess.run(["sh", "-c", guard["command"]], input="not json", capture_output=True, text=True,
+                                env={**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}, check=False)
+        self.assertEqual((result.returncode, result.stdout), (0, ""))
+
     def test_settings_that_cannot_be_merged_are_left_unchanged(self):
         claude = self.home / ".claude/settings.json"
         claude.write_text(json.dumps({"model": "opus", "hooks": ["an entry"]}))

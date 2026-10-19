@@ -231,6 +231,11 @@ The hooks share one failure model:
 - /Never block on unreadable input/ : a payload that does not parse exits 0,
   so a broken payload never stops normal work. The session refresh never fails
   the session.
+- /A guard that cannot run blocks in Claude Code/ : its entry sets
+  =onFailure= to =block= (Claude Code v2.1.295 or later), so a guard that
+  cannot start, crashes, times out or prints invalid output blocks the
+  command as exit 2 would; a broken install never lets a push through. A
+  payload it cannot read is not a failure: it still exits 0.
 - /Never block a compaction/ : exit 2 from a PreCompact hook blocks the
   compaction, and one that recovers from a full context then fails the
   request. The compaction brief always exits 0, and its command ends in
