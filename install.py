@@ -87,6 +87,9 @@ CODEX_HOOKS = {
                      "hooks": [hook(script("after_edit.py", "codex"), timeout=60)]}],
     "SessionStart": [{"matcher": "compact|resume",
                       "hooks": [hook('python3 "$HOME/.agents/hooks/session_refresh.py"', timeout=10)]}],
+    # Stop reads stop_hook_active and takes {"decision": "block", "reason"} on exit 0, as in
+    # Claude Code; exit 2 also continues, so a missing script must not pass python3's 2 on.
+    "Stop": [{"hooks": [hook('python3 "$HOME/.agents/hooks/progress_check.py" || true', timeout=10)]}],
 }
 GEMINI_HOOKS = {
     "BeforeTool": [{"matcher": "run_shell_command",

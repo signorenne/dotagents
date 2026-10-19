@@ -20,7 +20,7 @@ What the repository holds, and what each part produces.
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
-  (=agents/=) and the four hook scripts (=hooks/=). =install.py= copies all of
+  (=agents/=) and the five hook scripts (=hooks/=). =install.py= copies all of
   it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
@@ -36,7 +36,7 @@ What the repository holds, and what each part produces.
   =git rebase=, =git update-ref= and =git branch -D= (the last three also
   as =git -C <dir> ...=), the commands that land a branch, and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
   reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
-  =engineering@synced= turned off; the four hook entries.
+  =engineering@synced= turned off; the five hook entries.
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
 - =tools/build.py= turns the claude.ai set, the local skills named in the
   overrides and the project-setup templates (both from =home/.agents=) into
@@ -320,11 +320,11 @@ Where each tool runs them:
 
 - Claude Code: the guard on =PreToolUse= for =Bash=, the after-edit hook on
   =PostToolUse= for =Edit= and =Write=, the compaction brief on =PreCompact=
-  (manual and automatic), and the session refresh on =SessionStart= after
-  =compact= or =resume=.
+  (manual and automatic), the session refresh on =SessionStart= after
+  =compact= or =resume=, and the progress check on =Stop=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
-  =Write=, and =SessionStart= after =compact= or =resume=, whose plain stdout
-  Codex adds as developer context.
+  =Write=, =SessionStart= after =compact= or =resume=, whose plain stdout
+  Codex adds as developer context, and =Stop=.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
   =write_file= and =replace=.
 - Antigravity CLI: =PreToolUse= for =run_command=, =PostToolUse= for
@@ -332,11 +332,13 @@ Where each tool runs them:
   from =~/.gemini/config/hooks.json=.
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
   =str_replace_editor= and =apply_patch=.
-- Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=.
+- Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=;
+  its stop input has no =stop_hook_active=, so there the progress check
+  lets every stop through.
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
-refresh (Claude Code and Codex) and the compaction brief (Claude Code) get
-10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
+refresh and the progress check (Claude Code and Codex) and the compaction
+brief (Claude Code) get 10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
 never stops the work, and prints nothing but JSON on Gemini CLI's and
 Antigravity CLI's stdout. In Claude Code the guard's entry sets =onFailure=
 to =block=: a guard that cannot start, crashes or times out blocks the
@@ -379,6 +381,23 @@ Session refresh (=session_refresh.py=):
    listing and the git calls share 8 s, under the 10 s timeout past which
    Claude Code drops the output.
 4. Exit 0; its stdout joins the agent's context.
+
+Progress check (=progress_check.py=):
+
+1. Let the stop through unless =stop_hook_active= is =false=: once the agent
+   continues because of a stop hook, the next stop goes through.
+2. On a branch =<type>/<slug>=, find =.private/progress/<slug>.*= with session
+   refresh's finder (in a linked worktree, the main checkout's) and list the
+   branch's own commits, the 50 newest that no other local or
+   remote-tracking branch holds.
+3. When one of them is newer than the log's last change, or no prefix of its
+   hash of at least 7 characters is in the log, answer
+   ={"decision": "block", "reason": ...}=: three lines that name the log and
+   the commits, ask to record each step with its commit and check, and then
+   to end the turn.
+4. Anything else, an error or a git slower than 8 s lets the stop through,
+   and its command ends in =|| true=, since exit 2 from a Stop hook keeps the
+   agent going.
 
 Guard (=guard_bash.py=):
 

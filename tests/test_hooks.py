@@ -1071,5 +1071,152 @@ class CompactBrief(unittest.TestCase):
         self.assertIn(".private/progress/p.org", result.stdout)
 
 
+def commit(folder: Path, env: dict, message: str) -> tuple:
+    """An empty commit in folder: (its full hash, its committer time in epoch seconds)."""
+    git = ["git", "-C", str(folder), "-c", "user.name=t", "-c", "user.email=t@example.com",
+           "-c", "commit.gpgsign=false"]
+    subprocess.run([*git, "commit", "-q", "--allow-empty", "-m", message], check=True, env=env)
+    out = subprocess.run([*git, "log", "-1", "--format=%H %ct"], check=True, env=env,
+                         capture_output=True, text=True).stdout.split()
+    return out[0], int(out[1])
+
+
+class ProgressCheck(unittest.TestCase):
+    # Claude Code's Stop hook (code.claude.com/docs/en/hooks): input stop_hook_active
+    # (true when Claude Code already continues because of a stop hook), cwd; output
+    # {"decision": "block", "reason": ...} keeps Claude going with the reason. Codex's Stop
+    # (learn.chatgpt.com/docs/hooks) reads the same fields and the same JSON on exit 0.
+    def check(self, payload, env: dict = None, script: Path = HOOKS / "progress_check.py"):
+        data = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, str(script)], input=data, capture_output=True,
+                              text=True, check=False, env=env)
+
+    def stop(self, cwd: Path, **fields) -> dict:
+        return {"session_id": "s", "cwd": str(cwd), "hook_event_name": "Stop", "stop_hook_active": False,
+                "last_assistant_message": "Done.", **fields}
+
+    def task(self, worktree: bool = True) -> tuple:
+        """(repository, folder of branch feat/task, env, progress log of the task)."""
+        repo, env = committed_repo(self)
+        if worktree:
+            folder = linked_worktree(self, repo, env)
+        else:
+            folder = repo
+            subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feat/task"], check=True, env=env)
+        write_notes(repo, {"progress/task.org": time.time()})
+        return repo, folder, env, repo / ".private/progress/task.org"
+
+    def assert_lets_stop(self, result):
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def assert_blocks(self, result, log: Path, short: str):
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        reply = json.loads(result.stdout)
+        self.assertEqual(sorted(reply), ["decision", "reason"])
+        self.assertEqual(reply["decision"], "block")
+        lines = reply["reason"].splitlines()
+        self.assertEqual(len(lines), 3, reply["reason"])
+        self.assertIn(log.as_posix(), lines[0])
+        self.assertIn(short, lines[0])
+        self.assertIn("feat/task", lines[0])
+        self.assertIn("commit hash", lines[1])
+        self.assertIn("check", lines[1])
+        self.assertEqual(lines[2], "Then end the turn.")
+
+    def test_blocks_when_a_commit_is_missing_from_the_log(self):
+        for worktree in (True, False):
+            with self.subTest(worktree=worktree):
+                repo, folder, env, log = self.task(worktree)
+                full, when = commit(folder, env, "feat(x): step one")
+                log.write_text("* Steps\n** step one\n")
+                os.utime(log, (when + 60, when + 60))
+                self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
+                log.write_text(f"* Steps\n** step one {full[:7]}: check passed\n")
+                os.utime(log, (when + 60, when + 60))
+                self.assert_lets_stop(self.check(self.stop(folder), env))
+
+    def test_blocks_when_a_commit_is_newer_than_the_log(self):
+        repo, folder, env, log = self.task()
+        full, when = commit(folder, env, "feat(x): step one")
+        log.write_text(f"** step one {full}\n")
+        os.utime(log, (when - 120, when - 120))
+        self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
+
+    def test_a_longer_or_shorter_hash_prefix_counts(self):
+        repo, folder, env, log = self.task()
+        first, when = commit(folder, env, "one")
+        second, _ = commit(folder, env, "two")
+        log.write_text(f"one: {first[:12]}\ntwo: commit {second[:7].upper()}\n")
+        os.utime(log, (when + 60, when + 60))
+        self.assert_lets_stop(self.check(self.stop(folder), env))
+        log.write_text(f"one: {first[:6]}\ntwo: {second[:7]}\n")  # 6 characters are not a hash
+        os.utime(log, (when + 60, when + 60))
+        self.assert_blocks(self.check(self.stop(folder), env), log, first[:7])
+
+    def test_only_the_branchs_own_commits_count(self):
+        # The base branch's commits (here init on work) are not the task's steps.
+        repo, folder, env, log = self.task()
+        log.write_text("* Steps\n")
+        self.assert_lets_stop(self.check(self.stop(folder), env))
+
+    def test_lets_the_stop_through_once_continued_or_without_the_flag(self):
+        repo, folder, env, log = self.task()
+        commit(folder, env, "feat(x): step one")
+        log.write_text("* Steps\n")
+        os.utime(log, (1, 1))
+        # Cursor runs Claude Code's Stop hooks with its own input (status, loop_count) and
+        # no cap on follow-ups (cursor.com/docs/reference/third-party-hooks), so a missing
+        # flag lets the stop through too.
+        for payload in (self.stop(folder, stop_hook_active=True), self.stop(folder, stop_hook_active="false"),
+                        {"cwd": str(folder), "status": "completed", "loop_count": 0},
+                        {k: v for k, v in self.stop(folder).items() if k != "stop_hook_active"}):
+            with self.subTest(payload=payload):
+                self.assert_lets_stop(self.check(payload, env))
+
+    def test_lets_the_stop_through_outside_a_task_branch_with_a_log(self):
+        repo, env = committed_repo(self)
+        commit(repo, env, "two")
+        write_notes(repo, {"progress/work.org": 1, "progress/other.org": 1})
+        self.assert_lets_stop(self.check(self.stop(repo), env))  # work: not <type>/<slug>
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feat/task"], check=True, env=env)
+        commit(repo, env, "three")
+        self.assert_lets_stop(self.check(self.stop(repo), env))  # no .private/progress/task.*
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--detach"], check=True, env=env)
+        write_notes(repo, {"progress/task.org": 1})
+        self.assert_lets_stop(self.check(self.stop(repo), env))  # detached HEAD
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside)
+        self.assert_lets_stop(self.check(self.stop(outside), env))  # not a repository
+
+    def test_bad_input_lets_the_stop_through(self):
+        for payload in ("not json", "", DEEP_JSON, [1], {"stop_hook_active": False},
+                        {"stop_hook_active": False, "cwd": 5}, {"stop_hook_active": False, "cwd": "bad\u0000path"},
+                        {"stop_hook_active": False, "cwd": "/no/such/folder"}):
+            with self.subTest(payload=str(payload)[:40]):
+                self.assert_lets_stop(self.check(payload))
+
+    def test_without_session_refresh_the_stop_goes_through(self):
+        hooks = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, hooks)
+        shutil.copy(HOOKS / "progress_check.py", hooks)
+        repo, folder, env, log = self.task()
+        commit(folder, env, "feat(x): step one")
+        os.utime(log, (1, 1))
+        self.assert_lets_stop(self.check(self.stop(folder), env, script=hooks / "progress_check.py"))
+        self.assertEqual([p.name for p in hooks.iterdir()], ["progress_check.py"])
+
+    def test_slow_git_stays_within_hook_timeout(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo feat/p\nexit 0\n')
+        (tmp / ".git").mkdir()
+        write_notes(tmp, {"progress/p.org": 1})
+        env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
+        start = time.monotonic()
+        result = self.check(self.stop(tmp), env)
+        self.assertLess(time.monotonic() - start, 9.5)
+        self.assert_lets_stop(result)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -96,6 +96,17 @@
           }
         ]
       }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/hooks/progress_check.py\" || true",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   }
 }
