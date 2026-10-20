@@ -20,7 +20,7 @@ What the repository holds, and what each part produces.
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
-  (=agents/=) and the five hook scripts (=hooks/=). =install.py= copies all of
+  (=agents/=) and the six hook scripts (=hooks/=). =install.py= copies all of
   it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
@@ -36,7 +36,7 @@ What the repository holds, and what each part produces.
   =git rebase=, =git update-ref= and =git branch -D= (the last three also
   as =git -C <dir> ...=), the commands that land a branch, and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
   reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
-  =engineering@synced= turned off; the five hook entries.
+  =engineering@synced= turned off; the six hook entries.
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
 - =tools/build.py= turns the claude.ai set, the local skills named in the
   overrides and the project-setup templates (both from =home/.agents=) into
@@ -321,7 +321,8 @@ Where each tool runs them:
 - Claude Code: the guard on =PreToolUse= for =Bash=, the after-edit hook on
   =PostToolUse= for =Edit= and =Write=, the compaction brief on =PreCompact=
   (manual and automatic), the session refresh on =SessionStart= after
-  =compact= or =resume=, and the progress check on =Stop=.
+  =compact= or =resume=, the progress check on =Stop=, and the repeated
+  failure hook on =PostToolUseFailure= for =Bash=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
   =Write=, =SessionStart= after =compact= or =resume=, whose plain stdout
   Codex adds as developer context, and =Stop=.
@@ -337,8 +338,8 @@ Where each tool runs them:
   lets every stop through.
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
-refresh and the progress check (Claude Code and Codex) and the compaction
-brief (Claude Code) get 10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
+refresh and the progress check (Claude Code and Codex), the compaction
+brief and the repeated failure hook (Claude Code) get 10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
 never stops the work, and prints nothing but JSON on Gemini CLI's and
 Antigravity CLI's stdout. In Claude Code the guard's entry sets =onFailure=
 to =block=: a guard that cannot start, crashes or times out blocks the
@@ -398,6 +399,22 @@ Progress check (=progress_check.py=):
 4. Anything else, an error or a git slower than 8 s lets the stop through,
    and its command ends in =|| true=, since exit 2 from a Stop hook keeps the
    agent going.
+
+Repeated failure (=repeated_failure.py=):
+
+1. Take a failed =Bash= call that was not an interrupt and key it by a hash
+   of its command and its whole error: the first line (=Exit code N=) as it
+   is, the rest with every word that holds a digit masked, since timings,
+   counts, dates, object addresses, Java hashes and temporary names change
+   between runs while a test runner's fixed header does not tell two
+   failures apart.
+2. Count it in =dotagents-failures-<session>.json= in the system temp
+   folder, which keeps the 200 most recent keys and is replaced whole on
+   each write.
+3. From the third identical failure on, return =additionalContext=: after
+   two failed fixes, stop, restate the assumptions and the evidence, change
+   approach (=systematic-debugging=), and report to the user if the new
+   approach fails too. It never blocks and always exits 0.
 
 Guard (=guard_bash.py=):
 

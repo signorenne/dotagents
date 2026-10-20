@@ -38,7 +38,8 @@ depend on the model remembering it.
   model, and where set effort and color), the source of every other tool's
   copy.
 - /Hooks/ : =guard_bash.py=, =after_edit.py=, =session_refresh.py=,
-  =compact_brief.py= and =progress_check.py= in =home/.agents/hooks/=,
+  =compact_brief.py=, =progress_check.py= and =repeated_failure.py= in
+  =home/.agents/hooks/=,
   shared by every tool; the guard and the after-edit hook learn which tool
   called them from =--tool=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
@@ -133,14 +134,14 @@ There is one source, =home/.agents=, installed as =~/.agents=
 Nothing is edited in a tool's own folder: a change is made here and the
 installer runs again.
 
-| Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                      |
-|-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+--------------------------------------------------------------------------------------------|
-| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PreCompact, Stop, and SessionStart after compact or resume |
-| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop (approve in Codex)                                        |
-| Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                                  |
-| Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                              |
-| Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                      |
-| Cursor          | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                                             |
+| Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                                          |
+|-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+----------------------------------------------------------------------------------------------------------------|
+| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PostToolUseFailure, PreCompact, Stop, and SessionStart after compact or resume |
+| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop (approve in Codex)                                                            |
+| Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                                                      |
+| Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                                                  |
+| Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                                          |
+| Cursor          | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                                                                 |
 
 - /Generated, not copied by hand/ : each tool's subagent file is rendered from
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
@@ -197,13 +198,14 @@ against it (events, matchers, tool names, timeouts).
 
 * Hooks and their failure model
 
-| Hook                 | Runs                                            | Tools                                  | Timeout |
-|----------------------+-------------------------------------------------+----------------------------------------+---------|
-| =guard_bash.py=      | before a shell command                          | all six (Cursor through Claude Code's) | 10 s    |
-| =after_edit.py=      | after a file edit or write                      | all six (Cursor through Claude Code's) | 60 s    |
-| =session_refresh.py= | at session start after a compaction or a resume | Claude Code, Codex                     | 10 s    |
-| =compact_brief.py=   | before a compaction                             | Claude Code                            | 10 s    |
-| =progress_check.py=  | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
+| Hook                  | Runs                                            | Tools                                  | Timeout |
+|-----------------------+-------------------------------------------------+----------------------------------------+---------|
+| =guard_bash.py=       | before a shell command                          | all six (Cursor through Claude Code's) | 10 s    |
+| =after_edit.py=       | after a file edit or write                      | all six (Cursor through Claude Code's) | 60 s    |
+| =session_refresh.py=  | at session start after a compaction or a resume | Claude Code, Codex                     | 10 s    |
+| =compact_brief.py=    | before a compaction                             | Claude Code                            | 10 s    |
+| =progress_check.py=   | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
+| =repeated_failure.py= | after a shell command fails                     | Claude Code                            | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
@@ -230,7 +232,14 @@ the newest task notes itself. The progress check runs when the agent ends
 its turn: on a branch =<type>/<slug>= whose =.private/progress/<slug>.*=
 exists, it sends the agent back once when a commit of the branch (one no
 other local or remote-tracking branch holds) is newer than the log or not
-named in it, to record the step, its commit and its check.
+named in it, to record the step, its commit and its check. The repeated
+failure hook counts each failing shell command per session, by its command
+and its whole error with each word that holds a digit masked after the first
+line (timings, counts, addresses and temporary names change between runs);
+from the third identical failure on
+it reminds the agent to stop after two failed fixes, restate its
+assumptions and evidence, change approach (=systematic-debugging=) and, if
+that fails too, report to the user.
 
 The hooks share one failure model:
 

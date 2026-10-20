@@ -1218,5 +1218,116 @@ class ProgressCheck(unittest.TestCase):
         self.assert_lets_stop(result)
 
 
+
+class RepeatedFailure(unittest.TestCase):
+    # Claude Code's PostToolUseFailure (code.claude.com/docs/en/hooks): input session_id,
+    # tool_name, tool_input, error (for Bash a first line "Exit code N", then the output),
+    # is_interrupt; hookSpecificOutput.additionalContext reaches Claude next to the error.
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.env = {**os.environ, "TMPDIR": str(self.tmp)}
+
+    def report(self, payload) -> subprocess.CompletedProcess:
+        data = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, str(HOOKS / "repeated_failure.py")], input=data,
+                              capture_output=True, text=True, check=False, env=self.env)
+
+    @staticmethod
+    def failure(command: str = "make test", error: str = "Exit code 2\nerror: x.c:3: expected ';'",
+                session: str = "s1", **extra) -> dict:
+        return {"session_id": session, "transcript_path": "/t.jsonl", "cwd": "/w", "permission_mode": "default",
+                "hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                "tool_input": {"command": command, "description": "Run"}, "tool_use_id": "toolu_1",
+                "error": error, "is_interrupt": False, "duration_ms": 10, **extra}
+
+    def assert_quiet(self, result):
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def assert_reminds(self, result):
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        output = json.loads(result.stdout)["hookSpecificOutput"]
+        self.assertEqual(output["hookEventName"], "PostToolUseFailure")
+        for part in ("failed the same way 3 times", "make test", "After two failed fixes, stop",
+                     "restate your assumptions and the evidence", "change approach",
+                     "systematic-debugging", "report to the user"):
+            self.assertIn(part, output["additionalContext"].replace("4 times", "3 times"))
+
+    def test_the_third_identical_failure_gets_the_reminder(self):
+        self.assert_quiet(self.report(self.failure()))
+        self.assert_quiet(self.report(self.failure()))
+        self.assert_reminds(self.report(self.failure()))
+        self.assert_reminds(self.report(self.failure()))  # and every one after it
+
+    def test_timings_and_counts_do_not_matter(self):
+        # Timings, counts and dates in the output change between runs of one failure.
+        for seconds, when in ((1, "10:02:07"), (2, "10:03:15")):
+            self.assert_quiet(self.report(self.failure(
+                error=f"Exit code 1\n[{when}] start\nFAIL a\nFAIL b\n\n2 failed in {seconds}.{seconds}5 s")))
+        self.assert_reminds(self.report(self.failure(error="Exit code 1\n[11:00:00] start\nFAIL a\nFAIL b\n\n"
+                                                           "2 failed in 30.12 s")))
+
+    def test_addresses_hashes_and_temporary_names_do_not_matter(self):
+        # Object reprs, Java identity hashes and mkdtemp folders change between runs too.
+        runs = [("0x7f3a2c1d9e80", "6d06d69c", "tmpab3x9k2q"), ("0x7f11d0b2c4f0", "7852e922", "tmpq8zr1m0c"),
+                ("0x7fe0aa63b1d0", "4e25154f", "tmp9w2k7c4x")]
+        for index, (address, java, folder) in enumerate(runs):
+            with self.subTest(run=index):
+                result = self.report(self.failure(error=(
+                    f"Exit code 1\nE AssertionError: <Node object at {address}> != None\n"
+                    f"java.lang.IllegalStateException: com.example.Pool@{java}\n/tmp/{folder}/out.txt missing")))
+                (self.assert_reminds if index == 2 else self.assert_quiet)(result)
+
+    def test_a_fixed_header_does_not_hide_a_different_failure(self):
+        # Test runners start with the same lines on every run (pytest: the session line,
+        # the platform, the root folder), so the failure itself comes further down.
+        header = ("Exit code 1\n============================= test session starts ==============================\n"
+                  "platform linux -- Python 3.13.1, pytest-8.3.4, pluggy-1.5.0\nrootdir: /w\ncollected 12 items\n\n")
+        for name in ("test_one", "test_two", "test_three"):
+            with self.subTest(name=name):
+                self.assert_quiet(self.report(self.failure(
+                    command="pytest", error=f"{header}FAILED tests/test_a.py::{name}\n1 failed, 11 passed in 0.52s")))
+
+    def test_different_failures_count_apart(self):
+        for payload in (self.failure(), self.failure(error="Exit code 2\nerror: y.c:9: expected ';'"),
+                        self.failure(error="Exit code 1\nerror: x.c:3: expected ';'"),
+                        self.failure(command="make check"), self.failure(session="s2"),
+                        self.failure(), self.failure(command="make check"), self.failure(session="s2")):
+            with self.subTest(payload=payload):
+                self.assert_quiet(self.report(payload))
+
+    def test_interrupts_other_tools_and_bad_input_are_not_counted(self):
+        ignored = [self.failure(is_interrupt=True), self.failure(tool_name="Edit"),
+                   self.failure(error=5), self.failure(session=""), self.failure(session=7),
+                   {**self.failure(), "tool_input": {"command": 5}}, {**self.failure(), "tool_input": "make test"},
+                   "not json", "", DEEP_JSON, [1], {"session_id": "s1"}]
+        for payload in ignored * 3:
+            with self.subTest(payload=str(payload)[:60]):
+                self.assert_quiet(self.report(payload))
+
+    def test_the_counts_stay_in_the_temp_folder_whatever_the_session_id(self):
+        for _ in range(3):
+            result = self.report(self.failure(session="../../escape/x"))
+        self.assert_reminds(result)
+        self.assertEqual(sorted(p.parent for p in self.tmp.rglob("*") if p.is_file()), [self.tmp])
+
+    def test_the_count_file_stays_small(self):
+        # In-process, so 260 failures do not start 260 interpreters.
+        spec = importlib.util.spec_from_file_location("repeated_failure_under_test", HOOKS / "repeated_failure.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with mock.patch.object(module.tempfile, "gettempdir", return_value=str(self.tmp)):
+            for index in range(260):
+                module.count(self.failure(command=f"make test{index}"))
+        (state,) = list(self.tmp.iterdir())
+        self.assertEqual(len(json.loads(state.read_text())), module.MAX_KEYS)
+        self.assertLess(state.stat().st_size, 20000)
+        # A file that is not ours or not readable starts the count again instead of failing.
+        for junk in ("[1, 2]", "{not json", "x" * 100000, json.dumps({"k": "v"})):
+            with self.subTest(junk=junk[:20]):
+                state.write_text(junk)
+                self.assert_quiet(self.report(self.failure()))
+
+
 if __name__ == "__main__":
     unittest.main()
