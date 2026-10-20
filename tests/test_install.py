@@ -699,6 +699,33 @@ class Install(unittest.TestCase):
         self.assertEqual(sorted(minutes, key=minutes.get)[-1], "gate-runner")
         self.assertEqual(list(minutes.values()).count(minutes["gate-runner"]), 1, "gate-runner runs longest")
 
+    def source_agents(self) -> dict:
+        return {name: install.parse_agent((ROOT / "home/.agents/agents" / f"{name}.md").read_text())[0]
+                for name in AGENTS}
+
+    @staticmethod
+    def frontmatter_keys(text: str) -> set:
+        head = text[len("---\n"):].split("\n---\n", 1)[0]
+        return {line.split(":", 1)[0] for line in head.splitlines() if line and not line.startswith(" ")}
+
+    def test_effort_reaches_codex_and_no_other_generated_copy(self):
+        # Claude Code reads effort from the agent file (code.claude.com/docs/en/sub-agents);
+        # Codex's custom agents take model_reasoning_effort; Gemini CLI's strict schema and
+        # Copilot CLI's agent profiles have no such field. gate-runner only runs commands
+        # and reports, so it runs at low effort.
+        self.install("--tools", "claude,codex,gemini,copilot")
+        source = self.source_agents()
+        self.assertEqual(source["gate-runner"].get("effort"), "low")
+        for name, meta in source.items():
+            with self.subTest(agent=name):
+                self.assertEqual(self.frontmatter_keys((self.home / ".claude/agents" / f"{name}.md").read_text())
+                                 >= {"effort"}, "effort" in meta)
+                codex = (self.home / ".codex/agents" / f"{name}.toml").read_text()
+                if tomllib:
+                    self.assertEqual(tomllib.loads(codex).get("model_reasoning_effort"), meta.get("effort"))
+                for copy in (self.home / ".gemini/agents" / f"{name}.md", self.home / ".copilot/agents" / f"{name}.agent.md"):
+                    self.assertNotIn("effort", self.frontmatter_keys(copy.read_text()), copy)
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")

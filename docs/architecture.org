@@ -199,11 +199,13 @@ demand.
 | Subagent    | Model in Claude Code | Returns                                 |
 |-------------+----------------------+-----------------------------------------|
 | scout       | sonnet               | a cited brief of the area               |
-| gate-runner | haiku                | a verdict table and the first errors    |
+| gate-runner | haiku, low effort    | a verdict table and the first errors    |
 | reviewer    | opus, high effort    | findings ranked blocker, major, minor   |
 
 scout and reviewer only read and run read-only commands; gate-runner runs the
-documented gate commands and fixes nothing. In Claude Code gate-runner also
+documented gate commands and fixes nothing, at low effort, since it reports
+and decides nothing (Codex gets the same reasoning effort; Gemini CLI and
+Copilot CLI have no such field). In Claude Code gate-runner also
 starts without the user, project and local =CLAUDE.md= files (=omitClaudeMd=,
 Claude Code v2.1.271 or later); the other tools' copies drop the field.
 
