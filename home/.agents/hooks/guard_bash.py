@@ -133,6 +133,9 @@ GIT_PUBLISHERS = {
     "svn": ("dcommit", "git svn dcommit publishes commits to a Subversion repository"),
     "p4": ("submit", "git p4 submit publishes commits to a Perforce depot"),
 }
+# git's own programs that the guard inspects, run by their own name (git-push from git
+# --exec-path, git-lfs); other git-* programs (git-cliff, git-crypt) are not git.
+GIT_PROGRAMS = HOOK_SUBCOMMANDS | {"config", "subtree"} | set(GIT_PUBLISHERS)
 PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON,
                    RELEASE_REASON, REPO_SYNC_REASON, REPO_CREATE_PUSH_REASON,
                    *(reason for _, reason in GIT_PUBLISHERS.values())}
@@ -451,10 +454,10 @@ def program_of(words: list) -> str:
 
 
 def as_git(words: list) -> list:
-    """A git command run as its own program (git-push, git-subtree, from git --exec-path)
-    as the git subcommand it is."""
+    """One of git's own programs that the guard inspects (git-push, git-subtree, from git
+    --exec-path) as the git subcommand it is."""
     program = program_of(words)
-    if program.startswith("git-") and len(program) > len("git-"):
+    if program.startswith("git-") and program[len("git-"):] in GIT_PROGRAMS:
         return ["git", program[len("git-"):], *words[1:]]
     return words
 

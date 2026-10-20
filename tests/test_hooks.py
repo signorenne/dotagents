@@ -496,6 +496,7 @@ class GuardBypassBattery(unittest.TestCase):
         # absolute paths and git's own programs
         "/usr/bin/git push", "/usr/local/bin/git push origin main", "./git push",
         "/usr/lib/git-core/git-push origin main", "git-push origin main", "git-subtree push -P lib origin main",
+        "git-lfs push origin main",
         # refspecs and history rewriting
         "git push origin +main", "git push origin +HEAD:refs/heads/main", "git push origin :main",
         "git push --mirror", "git push --all", "git push --tags", "git push -fu origin x",
@@ -527,6 +528,8 @@ class GuardBypassBattery(unittest.TestCase):
         "gh release view v1", "gh repo create x --private", "gh repo create x --push=false", "git lfs ls-files",
         "git svn fetch", "git p4 sync", "find . -name '*.py' -exec grep -n push {} +", "watch -n 5 git status",
         "strace -f git status", "git commit -m 'feat(x): explain git push --force'", "cat <<'X'\ngit push\nX",
+        # third-party git-* programs are not git: SKIP= here is the tool's own variable
+        "SKIP=changelog git-cliff -o CHANGELOG.md", "git-crypt unlock",
     ]
 
     @classmethod
