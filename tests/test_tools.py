@@ -168,6 +168,23 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             "FAIL docs/links.org:8: broken link [[*Nowhere]]: no heading 'Nowhere' in docs/links.org",
         ])
 
+    def test_validate_checks_subagent_effort_and_turn_limit(self):
+        # Claude Code's effort levels are low, medium, high, xhigh and max; maxTurns is a
+        # positive whole number (code.claude.com/docs/en/sub-agents).
+        scout = self.repo / "home/.agents/agents/scout.md"
+        original = scout.read_text()
+        for field, problem in (("effort: extreme", "effort 'extreme'"), ("maxTurns: 0", "maxTurns '0'"),
+                               ("maxTurns: many", "maxTurns 'many'")):
+            with self.subTest(field=field):
+                key = field.split(":")[0]
+                lines = [line for line in original.splitlines() if not line.startswith(key + ":")]
+                scout.write_text("\n".join(lines[:2] + [field] + lines[2:]) + "\n")
+                result = self.run_tool("validate.py")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(f"FAIL home/.agents/agents/scout.md: {problem}", result.stdout)
+        scout.write_text(original)
+        self.assertEqual(self.run_tool("validate.py").returncode, 0)
+
     def test_validate_catches_broken_skills_and_dashes(self):
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"
         text = skill.read_text()

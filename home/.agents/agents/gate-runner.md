@@ -4,6 +4,7 @@ description: "Runs build, test, sanitizer, lint, format and docs gates and retur
 tools: Bash, Read, Grep
 model: haiku
 effort: low
+maxTurns: 200
 omitClaudeMd: true
 color: yellow
 ---

@@ -726,6 +726,27 @@ class Install(unittest.TestCase):
                 for copy in (self.home / ".gemini/agents" / f"{name}.md", self.home / ".copilot/agents" / f"{name}.agent.md"):
                     self.assertNotIn("effort", self.frontmatter_keys(copy.read_text()), copy)
 
+    def test_turn_limits_have_one_source(self):
+        # Claude Code stops a subagent at maxTurns and returns its output marked partial,
+        # which Claude can resume (code.claude.com/docs/en/sub-agents, v2.1.246 or later).
+        # Gemini CLI's max_turns comes from the same field; Codex custom agents and Copilot
+        # CLI agent profiles have no turn limit field, so their copies carry none.
+        self.install("--tools", "claude,codex,gemini,copilot")
+        for name, meta in self.source_agents().items():
+            with self.subTest(agent=name):
+                self.assertRegex(meta.get("maxTurns", ""), r"^[1-9][0-9]*$")
+                claude = (self.home / ".claude/agents" / f"{name}.md").read_text()
+                self.assertIn(f"\nmaxTurns: {meta['maxTurns']}\n", claude)
+                gemini = (self.home / ".gemini/agents" / f"{name}.md").read_text()
+                self.assertIn(f"\nmax_turns: {meta['maxTurns']}\n", gemini)
+                self.assertNotIn("maxTurns", gemini)
+                codex = (self.home / ".codex/agents" / f"{name}.toml").read_text()
+                keys = re.findall(r"^(\w+) = ", codex, re.M)
+                self.assertIn("developer_instructions", keys)
+                self.assertEqual([key for key in keys if "turn" in key.lower()], [])
+                copilot = (self.home / ".copilot/agents" / f"{name}.agent.md").read_text()
+                self.assertNotIn("maxTurns", self.frontmatter_keys(copilot))
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")

@@ -15,8 +15,9 @@ Checks:
   (about the 5,000 tokens of a skill that Claude Code keeps after compaction);
 - each override in claude-ai/overrides.json names a local skill and has a description
   of 1 to 200 characters without angle brackets;
-- subagents carry name, description, tools and model, the name matches the file, and
-  the body has no ''' (the Codex copy holds it in a TOML literal string);
+- subagents carry name, description, tools and model, the name matches the file, an
+  effort is one of Claude Code's levels, a maxTurns is a positive whole number, and the
+  body has no ''' (the Codex copy holds it in a TOML literal string);
 - no em dash or en dash in any text file git tracks or would track (every file
   outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
@@ -52,6 +53,7 @@ CLAUDE_AI_LIMIT = 200
 SKILL_BODY_LIMIT = 20000
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
+EFFORTS = {"low", "medium", "high", "xhigh", "max"}  # Claude Code's subagent effort levels
 DASHES = ("\u2014", "\u2013")
 ORG_LINK = re.compile(r"\[\[([^\[\]\n]+)\](?:\[[^\]]*\])?\]")
 ORG_BLOCK = re.compile(r"^[ \t]*#\+begin_(src|example)\b.*?^[ \t]*#\+end_\1\b", re.I | re.M | re.S)
@@ -140,6 +142,10 @@ def check_agent(path: Path, errors: list[str]) -> None:
         errors.append(f"{rel}: missing fields {sorted(missing)}")
     if fields.get("name") != path.stem:
         errors.append(f"{rel}: name differs from file name")
+    if "effort" in fields and fields["effort"] not in EFFORTS:
+        errors.append(f"{rel}: effort {fields['effort']!r} is not one of {', '.join(sorted(EFFORTS))}")
+    if "maxTurns" in fields and not re.fullmatch(r"[1-9][0-9]*", str(fields["maxTurns"])):
+        errors.append(f"{rel}: maxTurns {fields['maxTurns']!r} is not a positive whole number")
     if "'''" in body:
         errors.append(f"{rel}: body contains ''', which ends the TOML literal string of the Codex copy")
 
