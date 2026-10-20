@@ -8,7 +8,8 @@ Usage in a hook config:
   python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|antigravity|copilot|cursor>
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
-wrappers such as sudo, env, xargs, time, nice, timeout):
+wrappers such as sudo, env, xargs, time, nice, timeout, watch, strace, chroot, in a
+find -exec, and for a git command run as its own program, such as git-push):
   - git commit|push|merge|rebase|am|pull|cherry-pick --no-verify (or a prefix git accepts
     for it), git commit -n and git am -n (skip hooks);
   - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0|false, LEFTHOOK=0|false,
@@ -16,9 +17,11 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - hooks disabled through core.hooksPath: git config [--]unset core.hooksPath, git config
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
-  - every git push, git subtree push, gh pr create (or gh pr new), gh pr merge, gh
-    release create and gh repo sync, in every agent: the maintainer reviews everything before it leaves the machine, so
-    pushing and publishing are the maintainer's. A push that also rewrites or deletes
+  - every git push, git subtree push, git send-pack, git http-push, git lfs push, git svn
+    dcommit, git p4 submit, gh pr create (or gh pr new), gh pr merge, gh release create
+    (or gh release new), gh repo create --push and gh repo sync, in every agent: the
+    maintainer reviews everything before it leaves the machine, so pushing and
+    publishing are the maintainer's. A push that also rewrites or deletes
     published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
     --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
     required checks) are named as such.
@@ -69,18 +72,33 @@ WRAPPERS = {
     "ionice": ("cnpPu", ("--class", "--classdata", "--pgid", "--pid", "--uid"), 0),
     "nice": ("n", ("--adjustment",), 0),
     "nohup": ("", (), 0),
+    "pkexec": ("", ("--user",), 0),
+    "proxychains": ("f", (), 0),
+    "proxychains4": ("f", (), 0),
+    "runuser": ("cgGsuw", ("--command", "--group", "--shell", "--supp-group", "--user",
+                           "--whitelist-environment"), 0),
+    "chroot": ("", ("--groups", "--userspec"), 1),
+    "ltrace": ("aADeFlnopsuwx", ("--align", "--config", "--debug", "--indent", "--library",
+                                 "--output", "--where"), 0),
     "setsid": ("", (), 0),
     "stdbuf": ("eio", ("--error", "--input", "--output"), 0),
+    "strace": ("abeEIoOpPsSuUX", ("--attach", "--columns", "--env", "--output", "--string-limit",
+                                  "--summary-sort-by", "--trace", "--trace-path", "--user"), 0),
     "sudo": ("CDghpRrTtUu", ("--chdir", "--chroot", "--close-from", "--command-timeout",
                              "--group", "--host", "--other-user", "--prompt", "--role",
                              "--type", "--user"), 0),
     "taskset": ("", (), 1),
     "time": ("fo", ("--format", "--output"), 0),
     "timeout": ("ks", ("--kill-after", "--signal"), 1),
+    "torsocks": ("aPpu", ("--address", "--pass", "--port", "--user"), 0),
+    "unbuffer": ("", (), 0),
+    "watch": ("nqs", ("--equexit", "--interval", "--shotsdir"), 0),
     "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--max-args", "--max-chars",
                            "--max-procs", "--process-slot-var"), 0),
 }
 HOOK_RUNNERS = {"git", "pre-commit"}
+# find runs the command after each of these up to a ";" or "+" word.
+FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
 ROUGH_PROGRAMS = HOOK_RUNNERS | {"gh"}
 
 GIT_VALUE_OPTIONS = {"-C", "-c", "--attr-source", "--config-env", "--git-dir", "--namespace",
@@ -105,8 +123,19 @@ PR_CREATE_REASON = "gh pr create publishes a branch as a pull request"
 PR_MERGE_REASON = "gh pr merge merges into a published branch"
 RELEASE_REASON = "gh release create publishes a release"
 REPO_SYNC_REASON = "gh repo sync pushes to a repository"
+REPO_CREATE_PUSH_REASON = "gh repo create --push pushes commits to a new repository"
+# git commands that publish other than push: {subcommand: (its action, reason)}; an action
+# of None means the subcommand itself publishes.
+GIT_PUBLISHERS = {
+    "send-pack": (None, "git send-pack publishes commits to a remote"),
+    "http-push": (None, "git http-push publishes commits to a remote"),
+    "lfs": ("push", "git lfs push publishes objects to a remote"),
+    "svn": ("dcommit", "git svn dcommit publishes commits to a Subversion repository"),
+    "p4": ("submit", "git p4 submit publishes commits to a Perforce depot"),
+}
 PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON,
-                   RELEASE_REASON, REPO_SYNC_REASON}
+                   RELEASE_REASON, REPO_SYNC_REASON, REPO_CREATE_PUSH_REASON,
+                   *(reason for _, reason in GIT_PUBLISHERS.values())}
 PUBLISH_ADVICE = ("Pushing and publishing are the maintainer's: they review every change before "
                   "it leaves this machine. Do not push or publish another way; stop and tell the "
                   "user the work is ready for their review.")
@@ -421,6 +450,32 @@ def program_of(words: list) -> str:
     return name[:-4] if name.lower().endswith(".exe") else name  # git.exe from WSL
 
 
+def as_git(words: list) -> list:
+    """A git command run as its own program (git-push, git-subtree, from git --exec-path)
+    as the git subcommand it is."""
+    program = program_of(words)
+    if program.startswith("git-") and len(program) > len("git-"):
+        return ["git", program[len("git-"):], *words[1:]]
+    return words
+
+
+def find_commands(words: list) -> list:
+    """The commands a find runs with -exec, -execdir, -ok or -okdir."""
+    if program_of(words) != "find":
+        return []
+    found, current = [], None
+    for word in words[1:]:
+        if current is None:
+            if word in FIND_ACTIONS:
+                current = []
+        elif word in (";", "+"):
+            found.append(current)
+            current = None
+        else:
+            current.append(word)
+    return found + ([current] if current else [])
+
+
 def abbreviates(name: str, option: str, shortest: int) -> bool:
     """True when name is option or a prefix of it at least shortest characters long
     (git accepts any unique prefix of a long option)."""
@@ -545,6 +600,11 @@ def git_reasons(words: list) -> list:
             reasons.append(SUBTREE_PUSH_REASON)
     if sub == "config":
         reasons.append(config_reason(args))
+    if sub in GIT_PUBLISHERS:
+        action, reason = GIT_PUBLISHERS[sub]
+        first = skip_options(args, 0, "", ())
+        if action is None or (first < len(args) and args[first] == action):
+            reasons.append(reason)
     return [reason for reason in reasons if reason]
 
 
@@ -559,10 +619,14 @@ def gh_reasons(words: list) -> list:
             operands.append(word)
     if operands[:2] in (["pr", "create"], ["pr", "new"]):
         return [PR_CREATE_REASON]
-    if operands[:2] == ["release", "create"]:
+    if operands[:2] in (["release", "create"], ["release", "new"]):
         return [RELEASE_REASON]
     if operands[:2] == ["repo", "sync"]:
         return [REPO_SYNC_REASON]
+    if operands[:2] in (["repo", "create"], ["repo", "new"]) and any(
+            word.partition("=")[0] == "--push" and word.partition("=")[2].lower() not in ("false", "0")
+            for word in words[1:]):
+        return [REPO_CREATE_PUSH_REASON]
     if operands[:2] != ["pr", "merge"]:
         return []
     reasons = [PR_MERGE_REASON]
@@ -577,7 +641,11 @@ def gh_reasons(words: list) -> list:
 def command_reasons(commands: list) -> dict:
     """Return {reason: True when only commands that push or publish gave it}."""
     reasons = {}
-    split = [split_command(words) for words in commands]
+    split = []
+    for words in commands:
+        assignments, rest = split_command(words)
+        split.append((assignments, as_git(rest)))
+        split.extend(([], as_git(split_command(inner)[1])) for inner in find_commands(rest))
     runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
     for assignments, rest in split:
         program = program_of(rest)

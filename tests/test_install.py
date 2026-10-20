@@ -569,8 +569,9 @@ class Install(unittest.TestCase):
             for part in fields["pattern"]:
                 prefixes = [p + [word] for p in prefixes for word in (part if isinstance(part, list) else [part])]
             forbidden |= {" ".join(p) for p in prefixes}
-        self.assertEqual(forbidden, {"git push", "git subtree push", "gh pr create", "gh pr new", "gh pr merge",
-                                     "gh release create", "gh repo sync"})
+        self.assertEqual(forbidden, {"git push", "git subtree push", "git send-pack", "git http-push", "git lfs push",
+                                     "git svn dcommit", "git p4 submit", "gh pr create", "gh pr new", "gh pr merge",
+                                     "gh release create", "gh release new", "gh repo sync"})
 
     @unittest.skipUnless(shutil.which("codex"), "codex not installed")
     def test_codex_reads_the_rules_as_written(self):

@@ -107,12 +107,17 @@ GEMINI_HOOKS = {
 # Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts
 # with its pattern, without prompting. They hold even while Codex skips the hooks, which
 # it does until the user trusts them. A pattern part that is a list matches any of its words.
+# A prefix cannot see a flag, so gh repo create --push is left to the guard.
 CODEX_RULES = (
     (["git", "push"], "git push publishes commits to a remote."),
     (["git", "subtree", "push"], "git subtree push publishes commits to a remote."),
+    (["git", ["send-pack", "http-push"]], "git send-pack and git http-push publish commits to a remote."),
+    (["git", "lfs", "push"], "git lfs push publishes objects to a remote."),
+    (["git", "svn", "dcommit"], "git svn dcommit publishes commits to a Subversion repository."),
+    (["git", "p4", "submit"], "git p4 submit publishes commits to a Perforce depot."),
     (["gh", "pr", ["create", "new"]], "gh pr create publishes a branch as a pull request."),
     (["gh", "pr", "merge"], "gh pr merge merges into a published branch."),
-    (["gh", "release", "create"], "gh release create publishes a release."),
+    (["gh", "release", ["create", "new"]], "gh release create publishes a release."),
     (["gh", "repo", "sync"], "gh repo sync pushes to a repository."),
 )
 CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "

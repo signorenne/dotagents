@@ -187,7 +187,8 @@ installer runs again.
   files (backed up first) and backs up those the source dropped. The other
   tools get none yet.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
-  =prefix_rule= entries forbid every push and publish the guard blocks. Codex
+  =prefix_rule= entries forbid every push and publish the guard blocks but
+  =gh repo create --push=, whose flag a prefix cannot see. Codex
   writes =default.rules= itself, and the installer leaves it alone.
 - /skillOverrides/ : claude.ai syncs its copy of each uploaded skill into
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
@@ -218,15 +219,19 @@ against it (events, matchers, tool names, timeouts).
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
-tool: =git push=, =git subtree push=, =gh pr create=, =gh pr merge=,
-=gh release create= and =gh repo sync= ([[#no-agent-push][no-agent-push]]). A push that also
-rewrites or deletes published history (=--force= and its variants,
-=+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and =gh pr merge --admin=
-are named as such. The after-edit hook flags em and en dashes in the text just
-written and runs clang-format, when the project has a =.clang-format=, on the
-lines of a C or C++ file that the edit changed (a newly written file whole),
-and checks the syntax of an edited Python, JSON or TOML file with the
-standard library (TOML from Python 3.11, which brought =tomllib=).
+tool: =git push=, =git subtree push=, =git send-pack=, =git http-push=,
+=git lfs push=, =git svn dcommit=, =git p4 submit=, =gh pr create=,
+=gh pr merge=, =gh release create=, =gh repo create --push= and
+=gh repo sync= ([[#no-agent-push][no-agent-push]]), also run through =find -exec=, wrappers
+such as =sudo=, =watch= or =strace=, or git's own programs (=git-push=). A
+push that also rewrites or deletes published history (=--force= and its
+variants, =+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and
+=gh pr merge --admin= are named as such. The after-edit hook flags em and en
+dashes in the text just written and runs clang-format, when the project has
+a =.clang-format=, on the lines of a C or C++ file that the edit changed (a
+newly written file whole), and checks the syntax of an edited Python, JSON
+or TOML file with the standard library (TOML from Python 3.11, which
+brought =tomllib=).
 The session refresh reminds the agent that its picture of the code is a
 summary (after a compaction, also to invoke its workflow skill again, since
 Claude Code keeps only the start of each skill through one), prints the real
@@ -296,7 +301,9 @@ The hooks share one failure model:
   falls back to a rough split when it does not parse, so a parse error never
   lets a forbidden command through; commands passed as one string (=bash -c=,
   =env -S=, =flock -c=, =git submodule foreach=), =eval=, aliases, scripts and
-  =gh api= are not inspected.
+  =gh api= are not inspected, nor programs it does not know that run their
+  arguments (=parallel=, =systemd-run=, =firejail=, =ssh= and others).
+  =tests/test_hooks.py= holds a battery of the forms it does catch.
 
 * Documentation and skill design
 

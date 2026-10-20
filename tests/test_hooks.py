@@ -458,6 +458,101 @@ class GuardBash(unittest.TestCase):
                 self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
 
 
+class GuardBypassBattery(unittest.TestCase):
+    """Ways to push, publish or skip the gates, as git, gh and the shell accept them. Out
+    of scope, as DESIGN.org says: one string run by bash -c, sh -c or su -c, eval,
+    aliases, scripts, and gh api; those forms are not listed here."""
+
+    BLOCKED = [
+        # git's global options before the subcommand
+        "git -C /tmp/repo push origin main", "git -C repo -C sub push", "git -c user.name=x push",
+        "git -c a.b=c -C repo push --force", "git --git-dir=.git --work-tree=. push", "git --namespace=x push",
+        "git --bare push", "git -P push", "git --no-pager -C r push", "git --exec-path=/usr/lib/git-core push",
+        "git --literal-pathspecs push", "git --no-optional-locks push", "git --config-env=user.name=U push",
+        # assignments and env before the command
+        "GIT_DIR=.git git push", "GIT_TRACE=1 GIT_SSH_COMMAND='ssh -v' git push", "env GIT_DIR=.git git push",
+        "env -C /tmp git push", "env --chdir=/tmp git push", "env -u HOME -i git push", "/usr/bin/env -- git push",
+        # quoting and escapes
+        "'git' push", '"git" push', "gi''t push", "git p''ush", 'git "push"', "$'git' $'push'", "\\git push",
+        "g\\it pu\\sh", "git push \\\n  --force origin main",
+        # chaining, newlines and pipes
+        "true; git push", "true && git push", "false || git push", "echo | git push", "true & git push",
+        "git status;git push", "git status&&git push", "git status|git push", "true\ngit push", "true\r\ngit push",
+        # subshells, groups and substitutions
+        "(git push)", "( cd repo && git push )", "{ git push; }", "echo $(git push)", "echo `git push`",
+        "cat <(git push)", "x=$(git push)", 'echo "$(git push -f)"',
+        # keywords
+        "if git push; then :; fi", "while git push; do break; done", "until git push; do :; done",
+        "case x in x) git push;; esac", "[[ -n x ]] && git push", "! git push", "time git push",
+        # wrappers
+        "sudo git push", "sudo -E git push", "sudo -u root -H git push", "sudo -- git push", "doas -u me git push",
+        "command git push", "command -p git push", "builtin command git push", "exec git push",
+        "exec -a name git push", "nohup git push &", "nohup sudo git push", "env sudo git push",
+        "nice -n 10 git push", "timeout -s KILL 10 git push", "timeout -k 5 10 git push", "xargs -n1 git push",
+        "setsid -w git push", "flock -w 5 /tmp/lock git push", "find . -maxdepth 0 -exec git push \\;",
+        "find . -execdir git push {} +", "watch -n 5 git push", "strace -f -o /tmp/trace git push",
+        "ltrace git push", "chroot / git push", "pkexec --user root git push", "runuser -u me -- git push",
+        "unbuffer git push", "torsocks git push", "proxychains4 -q -f /etc/p.conf git push",
+        # absolute paths and git's own programs
+        "/usr/bin/git push", "/usr/local/bin/git push origin main", "./git push",
+        "/usr/lib/git-core/git-push origin main", "git-push origin main", "git-subtree push -P lib origin main",
+        # refspecs and history rewriting
+        "git push origin +main", "git push origin +HEAD:refs/heads/main", "git push origin :main",
+        "git push --mirror", "git push --all", "git push --tags", "git push -fu origin x",
+        "git push --force-with-lease=main:abc origin main", "git push --prune origin", "git push -d origin x",
+        # other git commands that publish
+        "git send-pack origin main", "git http-push https://example.com/r.git main", "git lfs push origin main",
+        "git svn dcommit", "git p4 submit",
+        # gh
+        "gh pr create --fill", "gh pr new", "gh --repo o/r pr create", "gh pr create -R o/r",
+        "gh pr --repo=o/r create", "GH_REPO=o/r gh pr create", "gh pr merge 1 --squash", "gh pr merge --admin 1",
+        "gh release create v1", "gh release new v1", "gh repo sync", "gh repo create x --source=. --push",
+        "gh repo new x --push",
+        # gate bypasses
+        "git commit --no-verify -m x", "git commit --no-verif -m x", "git commit -n -m x", "git commit -qn -m x",
+        "git commit --amend --no-edit -n", "git -C r commit -n -m x", "git merge --no-verify x",
+        "git rebase --no-verify main", "git pull --no-verify", "git am --no-verify a.patch",
+        "git cherry-pick --no-verify x", "git push --no-verify", "git -c core.hooksPath=/dev/null commit -m x",
+        "git -c CORE.HOOKSPATH= commit -m x", "git --config-env=core.hooksPath=V commit -m x",
+        "git config core.hooksPath /dev/null", "git config --unset core.hooksPath",
+        "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/x git commit -m x",
+        "HUSKY=0 git commit -m x", "export HUSKY=0; git commit -m x", "env HUSKY=0 git commit -m x",
+        "LEFTHOOK=0 git commit -m x", "SKIP=lint git commit -m x", "PRE_COMMIT_SKIP_HOOKS=1 git commit -m x",
+        "git-commit --no-verify -m x",
+    ]
+    NEAR_MISSES = [
+        "git status", "git log --grep push", 'echo "git push"', "printf '%s\\n' 'git push'", "git stash push -m wip",
+        "git -C push status", "git remote set-url --push origin x", "git config push.default current",
+        "git help push", "man git-push", "git log -- push.c", "grep -rn 'gh pr create' docs", "gh pr view 1",
+        "gh release view v1", "gh repo create x --private", "gh repo create x --push=false", "git lfs ls-files",
+        "git svn fetch", "git p4 sync", "find . -name '*.py' -exec grep -n push {} +", "watch -n 5 git status",
+        "strace -f git status", "git commit -m 'feat(x): explain git push --force'", "cat <<'X'\ngit push\nX",
+    ]
+
+    @classmethod
+    def setUpClass(cls):
+        spec = importlib.util.spec_from_file_location("guard_under_test", HOOKS / "guard_bash.py")
+        cls.guard = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(cls.guard)
+
+    def exit_code(self, command: str) -> int:
+        """main() in-process, as Claude Code runs it, so the battery stays fast."""
+        with mock.patch.object(sys, "argv", ["guard_bash.py", "--tool", "claude"]), \
+                mock.patch.object(sys, "stdin", io.StringIO(json.dumps(bash(command)))), \
+                contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            return self.guard.main()
+
+    def test_every_bypass_is_blocked(self):
+        self.assertGreaterEqual(len(self.BLOCKED), 90)
+        for command in self.BLOCKED:
+            with self.subTest(command=command):
+                self.assertEqual(self.exit_code(command), 2)
+
+    def test_near_misses_pass(self):
+        for command in self.NEAR_MISSES:
+            with self.subTest(command=command):
+                self.assertEqual(self.exit_code(command), 0)
+
 class AfterEdit(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
