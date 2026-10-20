@@ -455,7 +455,15 @@ After-edit hook (=after_edit.py=):
    its =multi_replace_file_content= is skipped too, because its docs give no
    fields for the chunks.
 2. Report each line of the new text that holds an em or en dash (up to eight).
-3. For a C or C++ file in a project with a =.clang-format=, when a clang-format
+3. Check the syntax of each edited =.py=, =.json= or =.toml= file, whole, with
+   the standard library in milliseconds: =compile()=, =json= (JSON with
+   comments by convention, such as =tsconfig.json= and =.vscode/=, is
+   skipped, and so is a file that parses once its =//= and =/*= comments
+   outside strings, and then its trailing commas, are blanked out, since more
+   tools read JSON with comments than a list can hold) and, from Python 3.11,
+   =tomllib=. A Python report names the
+   Python version, since code for a newer one may not compile.
+4. For a C or C++ file in a project with a =.clang-format=, when a clang-format
    binary is found, format in place only the lines the edit changed
    (=clang-format --lines=), within 50 s of the 60 s timeout. The lines come
    from the payload when it carries them (Claude Code's patch of the edit,
@@ -463,10 +471,11 @@ After-edit hook (=after_edit.py=):
    stands in the file; a file written in full without such a patch, a new
    file among them, is formatted whole, and an edit whose lines cannot be
    located is not formatted.
-4. A dash or a clang-format failure is exit 2 with the report on stderr,
-   which the agent sees; Copilot CLI shows that only to the user, so there the
-   report goes to the model as =additionalContext= with exit 0. Antigravity CLI
-   documents only ={}= as the reply, so there the hook prints ={}= with exit 0
-   and the report goes to stderr, which its docs do not say reaches the agent.
+5. A dash, a syntax error or a clang-format failure is exit 2 with the report
+   on stderr, which the agent sees; Copilot CLI shows that only to the user,
+   so there the report goes to the model as =additionalContext= with exit 0.
+   Antigravity CLI documents only ={}= as the reply, so there the hook prints
+   ={}= with exit 0 and the report goes to stderr, which its docs do not say
+   reaches the agent.
    A reformat adds a notice to re-read the file before the next edit (on
    Antigravity CLI, on stderr too).

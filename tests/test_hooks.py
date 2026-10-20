@@ -757,6 +757,116 @@ class AfterEdit(unittest.TestCase):
         self.assertEqual(run("after_edit.py", payload).returncode, 0)
         self.assertEqual(source.read_text(), "int   g( ){return 0;}\n")
 
+    def edited(self, name: str, content: str) -> tuple:
+        """Write content to name in the project; return (its path, a Claude Code Edit payload)."""
+        path = self.tmp / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(content, encoding="utf-8")
+        return path, {"tool_name": "Edit", "tool_input": {"file_path": str(path), "old_string": "x",
+                                                          "new_string": "y"}}
+
+    BROKEN = {"bad.py": ("def f(:\n    return 1\n", "Python syntax error in {path}:1"),
+              "bad.json": ('{"a": 1\n "b": 2}\n', "JSON syntax error in {path}:2:2"),
+              # // and /* inside a string are text, not comments.
+              "links.json": ('{"url": "https://example.com/*", "a": "\\"//"\n "b": 2}\n',
+                             "JSON syntax error in {path}:2:2"),
+              # A string that never closes: the // of a later URL is not a comment, and
+              # the error is reported where it is, past the stripped text.
+              "package.json": ('{\n  "name": "x",\n  "homepage": https://example.com",\n  "a": 1\n}\n',
+                               "JSON syntax error in {path}:3:15"),
+              "oneline.json": ('{"name": "x, "homepage": "https://example.com"}\n', "JSON syntax error in {path}:1:"),
+              # Without a comment, a trailing comma is an error of strict JSON.
+              "trailing.json": ('{"a": [1, 2],\n "b": 3,\n}\n', "JSON syntax error in {path}:"),
+              "bad.toml": ('[tool]\nname = "x\n', "TOML syntax error in {path}")}
+
+    def test_reports_a_syntax_error_in_the_edited_file(self):
+        # The whole file is checked, since an edit can break code around the new text.
+        for name, (content, report) in self.BROKEN.items():
+            if name.endswith(".toml") and sys.version_info < (3, 11):
+                continue  # tomllib arrived in Python 3.11
+            with self.subTest(name=name):
+                path, payload = self.edited(name, content)
+                result = run("after_edit.py", payload)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(report.format(path=path), result.stderr)
+        self.assertIn(f"(checked with Python {sys.version_info[0]}.{sys.version_info[1]})",
+                      run("after_edit.py", self.edited("bad.py", "def f(:\n")[1]).stderr)
+
+    def test_valid_files_and_files_with_comments_by_convention_pass(self):
+        cases = {"good.py": "def f(x):\n    return '\\d'  # an invalid escape only warns\n",
+                 "good.json": '\ufeff{"a": [1, 2]}\n',  # a byte order mark
+                 "good.toml": '[tool]\nname = "x"\n',
+                 "tsconfig.json": '{\n  // comments are allowed here\n  "compilerOptions": {},\n}\n',
+                 "tsconfig.base.json": "{ /* allowed */ }\n",
+                 ".vscode/settings.json": '{\n  // allowed\n  "a": 1,\n}\n',
+                 # The dev container spec's file at the project root.
+                 ".devcontainer.json": '{\n  "image": "x", // allowed\n}\n',
+                 # Other tools read comments too (turbo, cspell...): a comment marks such a file.
+                 "turbo.json": '{\n  // allowed\n  "tasks": {},\n}\n',
+                 "cspell.json": '{ "words": ["a"], /* allowed */ }\n',
+                 "biome.json": '{\n  "files": ["a", "b",], // trailing commas too\n  "x": "http://y",\n}\n',
+                 "notes.txt": "{not json",
+                 "missing.json": None}
+        for name, content in cases.items():
+            with self.subTest(name=name):
+                path, payload = self.edited(name, content or "")
+                if content is None:
+                    path.unlink()
+                result = run("after_edit.py", payload)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def test_a_broken_json_file_is_checked_quickly_whatever_its_strings(self):
+        # Escaped quotes in a string that never closes: a pattern that backtracks takes
+        # minutes on this file (quadratic), past the 60 s hook timeout.
+        path, payload = self.edited("quotes.json", '{"a": "' + '\\"' * 20000 + "\n}\n")
+        start = time.monotonic()
+        result = run("after_edit.py", payload)
+        self.assertLess(time.monotonic() - start, 2)
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertIn(f"JSON syntax error in {path}", result.stderr)
+
+    def test_syntax_errors_reach_each_agent(self):
+        path, _ = self.edited("bad.json", "[1,,2]")
+        target = str(path)
+        cases = {
+            "gemini": {"tool_name": "replace", "tool_input": {"file_path": target, "new_string": "x"}},
+            "codex": {"tool_name": "apply_patch", "cwd": str(self.tmp),
+                      "tool_input": {"command": "*** Begin Patch\n*** Update File: bad.json\n@@\n-[1]\n+[1,,2]\n"
+                                                "*** End Patch\n"}},
+            "cursor": {"file_path": target, "edits": [{"old_string": "a", "new_string": "b"}]},
+        }
+        for tool, payload in cases.items():
+            with self.subTest(tool=tool):
+                result = run("after_edit.py", payload, tool)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn(f"JSON syntax error in {target}:1:4", result.stderr)
+        copilot = run("after_edit.py", {"toolName": "edit", "toolArgs": json.dumps({"path": target, "new_str": "x"})},
+                      "copilot")
+        self.assertEqual((copilot.returncode, copilot.stderr), (0, ""))
+        self.assertIn("JSON syntax error", json.loads(copilot.stdout)["additionalContext"])
+        agy = run("after_edit.py", {"toolCall": {"name": "replace_file_content",
+                                                 "args": {"TargetFile": target, "ReplacementContent": "x"}}},
+                  "antigravity")
+        self.assertEqual((agy.returncode, agy.stdout.strip()), (0, "{}"))
+        self.assertIn("JSON syntax error", agy.stderr)
+
+    def test_toml_is_skipped_without_tomllib(self):
+        # Python 3.9 and 3.10 (CI runs 3.9) have no tomllib: TOML goes unchecked, the rest
+        # is still checked. In-process, with the module hidden as it is on those versions.
+        toml, toml_payload = self.edited("bad.toml", self.BROKEN["bad.toml"][0])
+        _, json_payload = self.edited("bad.json", self.BROKEN["bad.json"][0])
+        with mock.patch.dict(sys.modules, {"tomllib": None}):
+            spec = importlib.util.spec_from_file_location("after_edit_without_tomllib", HOOKS / "after_edit.py")
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+        self.assertIsNone(module.tomllib)
+        for payload, code in ((toml_payload, 0), (json_payload, 2)):
+            stderr = io.StringIO()
+            with mock.patch.object(sys, "argv", ["after_edit.py", "--tool", "claude"]), \
+                    mock.patch.object(sys, "stdin", io.StringIO(json.dumps(payload))), \
+                    contextlib.redirect_stderr(stderr), contextlib.redirect_stdout(io.StringIO()):
+                self.assertEqual(module.main(), code, stderr.getvalue())
+
 
 class SessionRefresh(unittest.TestCase):
     def refresh_with(self, payload, env: dict = None) -> subprocess.CompletedProcess:
