@@ -1,0 +1,101 @@
+#!/usr/bin/env python3
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Nicolò Plebani (nexenne)
+"""commit-msg hook of this repository: the message must be the one line that
+CONTRIBUTING.org (Commit messages) describes, type(scope): description, in lower case,
+with no body and no AI trailer (looked for below the subject, so a subject may name
+one).
+
+Enable it once per clone: git config core.hooksPath .githooks
+git runs it with the path of the message file; exit 1 aborts the commit. Comment lines
+and everything below the scissors line of git commit -v are not part of the message.
+fixup! and squash! commits, which an autosquash rebase folds away, pass when the
+subject after the marker does.
+"""
+
+import re
+import sys
+
+TYPES = ("feat", "fix", "refactor", "test", "docs", "ci", "chore")
+SUBJECT = re.compile(r"^(?P<type>[^(:\s]*)(?:\((?P<scope>[^)]*)\))?(?P<colon>:?)(?P<space> ?)(?P<description>.*)$")
+SCOPE = re.compile(r"^[a-z0-9][a-z0-9._/-]*$")
+SCISSORS = "# ------------------------ >8 ------------------------"
+AUTOSQUASH = ("fixup! ", "squash! ")
+AI_TRAILER = re.compile(r"co-authored-by|generated (with|by)|assisted-by|noreply@anthropic\.com|\U0001f916",
+                        re.IGNORECASE)
+DASHES = ("\u2014", "\u2013")
+ADVICE = """Write the whole message as one line, type(scope): description, for example:
+  feat(hooks): add a stop hook that checks the progress log
+  fix(install): retire the old review copy and its claude code link
+type is one of {types}; scope names the area in lower case (skills, agents,
+hooks, install, validate, docs, design, workflow, github, project, repo); the
+description is one sentence, lower case (file names and identifiers too),
+imperative, without a trailing period or an em or en dash. Leave out any body and
+any AI trailer: split a change that needs more than one sentence into smaller
+commits. The rejected message is in {path}; commit again with the fixed line."""
+
+
+def message_lines(text: str) -> list:
+    lines = []
+    for line in text.replace("\r\n", "\n").split("\n"):
+        if line.rstrip() == SCISSORS:
+            break
+        if not line.startswith("#"):
+            lines.append(line.rstrip())
+    while lines and not lines[0]:
+        lines.pop(0)
+    while lines and not lines[-1]:
+        lines.pop()
+    return lines
+
+
+def problems(lines: list) -> list:
+    found = []
+    subject, body = lines[0], [line for line in lines[1:] if line.strip()]
+    if any(AI_TRAILER.search(line) for line in body):  # a trailer sits below the subject
+        found.append("an AI attribution: commits carry none (AI_DISCLAIMER.org)")
+    if body:
+        found.append("a body below the subject line: the subject is the whole message")
+    for marker in AUTOSQUASH:
+        if subject.startswith(marker):
+            subject = subject[len(marker):]
+            break
+    parts = SUBJECT.match(subject)
+    if parts["type"] not in TYPES:
+        found.append(f"the type {parts['type']!r} is not one of {', '.join(TYPES)}")
+    if parts["scope"] is None or not SCOPE.match(parts["scope"]):
+        found.append("the scope is missing or not lower case: type(scope)")
+    if not parts["colon"] or not parts["space"]:
+        found.append("the subject does not read type(scope): description")
+    description = parts["description"]
+    if not description.strip():
+        found.append("the description is empty")
+    if any(char.isupper() for char in subject):
+        found.append("upper case letters: write the subject in lower case")
+    if description.endswith("."):
+        found.append("a trailing period")
+    if any(dash in subject for dash in DASHES):
+        found.append("an em or en dash")
+    return found
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print("usage: commit-msg <message file>", file=sys.stderr)
+        return 1
+    path = sys.argv[1]
+    with open(path, encoding="utf-8", errors="replace") as handle:
+        lines = message_lines(handle.read())
+    if not lines:
+        return 0  # git aborts an empty message itself
+    found = problems(lines)
+    if not found:
+        return 0
+    print("commit-msg: this message does not follow CONTRIBUTING.org (Commit messages):", file=sys.stderr)
+    print("\n".join(f"  - {problem}" for problem in found), file=sys.stderr)
+    print(ADVICE.format(types=", ".join(TYPES), path=path), file=sys.stderr)
+    return 1
+
+
+if __name__ == "__main__":
+    sys.exit(main())
