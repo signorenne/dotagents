@@ -25,6 +25,9 @@ end
 user -> tool : request or /name
 tool -> model : the request
 model -> skills : body of the matching\nSKILL.md
+opt Claude Code, a file that matches a path rule
+  tool -> model : dotagents-<skill>.md:\nuse that skill
+end
 model -> sub : delegate: scout,\ngate-runner or reviewer
 note right of sub : fresh context, its own\ninstructions and tools
 sub --> model : brief, gate table\nor findings
@@ -33,10 +36,21 @@ sub --> model : brief, gate table\nor findings
 model -> tool : shell command
 tool -> hooks : before it: guard_bash.py
 hooks --> tool : allow, or block\nwith the reason
+opt Claude Code, the command failed
+  tool -> hooks : repeated_failure.py
+  hooks --> tool : on the third identical\nfailure: change approach
+end
 model -> tool : file edit
 tool -> hooks : after it: after_edit.py
-hooks --> tool : dash report or\nformat notice
+hooks --> tool : dash or syntax report,\nformat notice
 tool --> model : results, reasons\nand notices
+
+== End of the turn ==
+model -> tool : done
+opt Claude Code and Codex
+  tool -> hooks : progress_check.py
+  hooks --> tool : once, if the progress log\nmisses a commit: update it
+end
 
 legend right
   Solid arrow: a read or a call

@@ -6,9 +6,10 @@ participant "Agent tool" as tool
 participant "compact_brief.py" as brief
 participant "session_refresh.py" as refresh
 participant "guard_bash.py" as guard
+participant "repeated_failure.py" as failure
 participant "after_edit.py" as edit
+participant "progress_check.py" as progress
 participant "git" as git
-participant "clang-format" as format
 collections ".private/" as notes
 
 == Claude Code: before a compaction ==
@@ -19,29 +20,42 @@ brief --> tool : exit 0 always: what\nthe summary must keep
 
 == Claude Code and Codex: after a compaction or resume ==
 tool -> refresh : payload (cwd, source)
-refresh -> notes : newest progress\nand handoff files
-refresh -> git : branch, status,\nlast 5 commits
+refresh -> notes : newest progress\nand handoff files\n(a worktree: the main\ncheckout's)
+refresh -> git : branch, status,\nlast 5 commits,\nother worktrees
 refresh --> tool : stale-memory reminder,\nafter a compaction "invoke\nthe workflow skill again",\ngit state, notes and\n"re-read the progress log"
 
 == Before a shell command ==
 tool -> guard : payload with the command
 guard -> guard : split into\nsimple commands
-alt a gate bypass, any git push or\ngit subtree push, gh pr create,\ngh pr merge, gh release create\nor gh repo sync (every tool)
+alt a gate bypass, any push or publish\n(git push, gh pr create, gh release\ncreate and the like, every tool)
   guard --> tool : exit 2, reason on stderr;\nCopilot CLI: also a deny\ndecision as JSON on stdout;\nAntigravity CLI: exit 0\nand a deny decision
 else nothing to block
   guard --> tool : exit 0 (Antigravity CLI:\nan allow decision)
 end
+note over tool, guard : Claude Code: a guard that\ncannot run blocks the command
+
+== Claude Code: after a shell command fails ==
+tool -> failure : payload (session, command, error)
+failure -> failure : count it per session\nby command and first\nlines of the error
+opt the third identical failure or later
+  failure --> tool : context: stop, restate the\nevidence, change approach
+end
 
 == After an edit ==
 tool -> edit : payload with the file\nand the new text
-edit -> edit : find em and en dashes\nin the new text
-opt C or C++ file with a .clang-format
-  edit -> format : format the lines the edit\nchanged (a new file whole)
-end
-alt a dash, or clang-format failed
+edit -> edit : dashes in the new text;\nsyntax of a .py, .json\nor .toml file; clang-format\non a C or C++ file
+alt a dash, a syntax error or\na clang-format failure
   edit --> tool : exit 2, report on stderr;\nCopilot CLI: exit 0, report\nas additionalContext;\nAntigravity CLI: exit 0, {},\nreport on stderr only
 else nothing wrong
   edit --> tool : exit 0, notice if reformatted
+end
+
+== Claude Code and Codex: when the agent ends its turn ==
+tool -> progress : payload (cwd, stop_hook_active)
+progress -> git : branch <type>/<slug>,\nits own commits
+progress -> notes : progress/<slug>.*
+opt not yet continued, and a commit\nnewer than the log or not in it
+  progress --> tool : block once: record each\nstep, its commit and check
 end
 
 legend right
