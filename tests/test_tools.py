@@ -135,6 +135,39 @@ class Tools(unittest.TestCase):
         self.assertNotIn(".private", out)
         self.assertNotIn("dist/", out)
 
+    def test_validate_reports_broken_org_links(self):
+        # Org links: [[file:path]] and [[file:path][text]] name a file relative to the
+        # linking file; ::#id after it, or #id alone, a CUSTOM_ID; ::*Heading or *Heading
+        # a heading by its title (orgmode.org/manual, Internal links, Search options).
+        (self.repo / "docs/links.org").write_text("""#+TITLE: links
+* A real heading :tag:
+:PROPERTIES:
+:CUSTOM_ID: here
+:END:
+[[file:no-such.org][missing file]]
+[[file:../DESIGN.org::#no-such-rule][missing id]] and [[file:../DESIGN.org::*No such heading]]
+[[#nowhere][missing local id]], [[*Nowhere][missing local heading]]
+[[file:../DESIGN.org::#one-source][ok]] [[file:../DESIGN.org::*Install   model][ok]]
+[[file:diagrams/arch_parts.svg]] [[#here][ok]] [[*A real heading][ok]] [[https://example.com/x][web]]
+[[file:../VISION.org::some words][a text search, not checked]]
+Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
+#+BEGIN_SRC org
+[[file:inside-a-block.org]]
+#+END_SRC
+""")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        broken = [line for line in result.stdout.splitlines() if "docs/links.org" in line]
+        self.assertEqual(broken, [
+            "FAIL docs/links.org:6: broken link [[file:no-such.org]]: docs/no-such.org does not exist",
+            "FAIL docs/links.org:7: broken link [[file:../DESIGN.org::#no-such-rule]]: "
+            "no CUSTOM_ID no-such-rule in DESIGN.org",
+            "FAIL docs/links.org:7: broken link [[file:../DESIGN.org::*No such heading]]: "
+            "no heading 'No such heading' in DESIGN.org",
+            "FAIL docs/links.org:8: broken link [[#nowhere]]: no CUSTOM_ID nowhere in docs/links.org",
+            "FAIL docs/links.org:8: broken link [[*Nowhere]]: no heading 'Nowhere' in docs/links.org",
+        ])
+
     def test_validate_catches_broken_skills_and_dashes(self):
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"
         text = skill.read_text()
