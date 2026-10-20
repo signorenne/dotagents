@@ -179,6 +179,13 @@ installer runs again.
 - /COPILOT_HOME/ : when it is set, Copilot CLI's files go to
   =$COPILOT_HOME= instead of =~/.copilot=, since it replaces that whole path;
   a relative value is refused with a note.
+- /Path rules/ : =home/.agents/path-rules.json= maps a skill to the file
+  globs that call for it (QML to qt-quick, PlantUML to plantuml-diagrams,
+  tests to trustworthy-tests). For Claude Code the installer writes one
+  =~/.claude/rules/dotagents-<skill>.md= per entry, whose =paths= make it
+  load only with a matching file; it replaces only its own =dotagents-*.md=
+  files (backed up first) and backs up those the source dropped. The other
+  tools get none yet.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
   =prefix_rule= entries forbid every push and publish the guard blocks. Codex
   writes =default.rules= itself, and the installer leaves it alone.

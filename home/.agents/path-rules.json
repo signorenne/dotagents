@@ -1,0 +1,21 @@
+{
+  "rules": {
+    "qt-quick": ["**/*.qml", "**/qmldir"],
+    "plantuml-diagrams": ["**/*.puml", "**/*.plantuml", "**/*.iuml"],
+    "trustworthy-tests": [
+      "**/test_*.py",
+      "**/*_test.py",
+      "**/conftest.py",
+      "**/tests/**",
+      "**/test/**",
+      "**/__tests__/**",
+      "**/test_*.{c,cc,cpp,cxx}",
+      "**/*_test.{c,cc,cpp,cxx}",
+      "**/tst_*.cpp",
+      "**/*_test.go",
+      "**/*.{test,spec}.{js,jsx,mjs,cjs,ts,tsx}",
+      "**/*_spec.rb",
+      "**/*{Test,Tests}.{java,kt,cs}"
+    ]
+  }
+}

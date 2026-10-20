@@ -747,6 +747,75 @@ class Install(unittest.TestCase):
                 copilot = (self.home / ".copilot/agents" / f"{name}.agent.md").read_text()
                 self.assertNotIn("maxTurns", self.frontmatter_keys(copilot))
 
+    @staticmethod
+    def glob_regex(pattern: str) -> list:
+        """Regexes for a path glob as Claude Code's rules read it: braces expand, ** spans
+        folders (none too), * and ? stay inside one name."""
+        match = re.search(r"\{([^{}]*)\}", pattern)
+        if match:
+            return [r for option in match.group(1).split(",")
+                    for r in Install.glob_regex(pattern[:match.start()] + option + pattern[match.end():])]
+        out, i = "", 0
+        while i < len(pattern):
+            if pattern.startswith("**/", i):
+                out, i = out + "(?:.*/)?", i + 3
+            elif pattern.startswith("**", i):
+                out, i = out + ".*", i + 2
+            elif pattern[i] == "*":
+                out, i = out + "[^/]*", i + 1
+            elif pattern[i] == "?":
+                out, i = out + "[^/]", i + 1
+            else:
+                out, i = out + re.escape(pattern[i]), i + 1
+        return [out]
+
+    def test_claude_path_rules_load_the_matching_skill(self):
+        # Claude Code loads ~/.claude/rules/*.md with a paths list of globs, relative to the
+        # session's primary working directory, only when it works with a matching file;
+        # paths is the only field it reads (code.claude.com/docs/en/memory).
+        rules = self.home / ".claude/rules"
+        rules.mkdir()
+        mine = rules / "my-rule.md"
+        mine.write_text("Mine.\n")
+        (rules / "dotagents-qt-quick.md").write_text("edited by hand\n")
+        (rules / "dotagents-retired-skill.md").write_text("an old rule of ours\n")
+        source = json.loads((ROOT / "home/.agents/path-rules.json").read_text())["rules"]
+        self.install("--tools", "claude")
+        self.assertEqual(mine.read_text(), "Mine.\n")
+        self.assertFalse((rules / "dotagents-retired-skill.md").exists())
+        backups = {p.name: p.read_text() for p in (self.home / ".agents-backup").rglob("dotagents-*.md")}
+        self.assertEqual(backups, {"dotagents-qt-quick.md": "edited by hand\n",
+                                   "dotagents-retired-skill.md": "an old rule of ours\n"})
+        self.assertEqual(sorted(p.name for p in rules.iterdir()),
+                         sorted(["my-rule.md"] + [f"dotagents-{skill}.md" for skill in source]))
+        for skill, globs in source.items():
+            with self.subTest(skill=skill):
+                text = (rules / f"dotagents-{skill}.md").read_text()
+                head, body = text[len("---\n"):].split("\n---\n", 1)
+                self.assertEqual(head.splitlines()[0], "paths:")
+                self.assertEqual([json.loads(line[len("  - "):]) for line in head.splitlines()[1:]], globs)
+                self.assertEqual(body.strip(), f"Use the {skill} skill for work on these files. If it is not in "
+                                               f"your skill list, read ~/.agents/skills/{skill}/SKILL.md and follow it.")
+        # Which skill each kind of file calls for.
+        expected = {"src/ui/Main.qml": "qt-quick", "imports/App/qmldir": "qt-quick",
+                    "docs/diagrams/flow.puml": "plantuml-diagrams", "a.plantuml": "plantuml-diagrams",
+                    "docs/palette.iuml": "plantuml-diagrams", "test_cli.py": "trustworthy-tests",
+                    "pkg/io_test.py": "trustworthy-tests", "tests/data/input.json": "trustworthy-tests",
+                    "src/net/socket_test.cpp": "trustworthy-tests", "tests/tst_model.cpp": "trustworthy-tests",
+                    "cmd/app/main_test.go": "trustworthy-tests", "web/a.test.ts": "trustworthy-tests",
+                    "web/b.spec.ts": "trustworthy-tests", "web/__tests__/c.jsx": "trustworthy-tests",
+                    "src/main.py": None, "README.md": None, "src/ui/Main.cpp": None, "web/testing.ts": None}
+        for path, skill in expected.items():
+            with self.subTest(path=path):
+                found = sorted(s for s, globs in source.items()
+                               if any(re.fullmatch(r, path) for g in globs for r in self.glob_regex(g)))
+                self.assertEqual(found, [skill] if skill else [])
+        self.assertIn(str(mine), self.install("--audit"))
+        self.assertIn("0 change(s).", self.install("--tools", "claude").splitlines())
+        self.install("--tools", "codex")
+        self.assertEqual(sorted(p.name for p in rules.iterdir()),
+                         sorted(["my-rule.md"] + [f"dotagents-{skill}.md" for skill in source]))
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")

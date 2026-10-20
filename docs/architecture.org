@@ -20,8 +20,9 @@ What the repository holds, and what each part produces.
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
-  (=agents/=) and the six hook scripts (=hooks/=). =install.py= copies all of
-  it to =~/.agents=.
+  (=agents/=), the six hook scripts (=hooks/=) and the path rules
+  (=path-rules.json=, each skill with the file globs that call for it).
+  =install.py= copies all of it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
   upload guide (=README.md=). =install.py= reads the overrides to turn off
@@ -84,7 +85,11 @@ What =python3 install.py= does, in order, and what each tool receives.
    to the backup); back up the =learn= and =handoff= skill copies and the hook
    copies in =~/.claude/hooks= that older versions left; link each skill
    folder in =~/.claude/skills= to =~/.agents/skills/<name>=; copy the
-   subagent files unchanged to =~/.claude/agents=; merge the adapter into
+   subagent files unchanged to =~/.claude/agents=; write a rule
+   =~/.claude/rules/dotagents-<skill>.md= per path rule, whose =paths= list
+   holds the globs and whose text says to use the skill (or to read
+   =~/.agents/skills/<skill>/SKILL.md= when it is not listed), and back up a
+   =dotagents-*.md= rule the repository no longer has; merge the adapter into
    =~/.claude/settings.json=, adding =skillOverrides= that turn off the synced
    copy (=anthropic-skills:<name>=) of every skill also uploaded to claude.ai,
    and removing from =ask= every rule the adapter denies.
@@ -188,11 +193,16 @@ demand.
    the task needs. In Claude Code and Codex, after a compaction or a resume the
    tool runs the session refresh, which adds a stale-memory reminder, the real
    git state and the newest task notes to the context.
-5. Subagents. A skill step delegates to a subagent, which starts in a fresh
+5. Path rules (Claude Code). When the agent reads or edits a file that
+   matches a rule's globs (QML, PlantUML, tests), the rule loads and points
+   it to qt-quick, plantuml-diagrams or trustworthy-tests. The globs are
+   relative to the session's primary working directory, so a session meant
+   for a sibling worktree starts in that worktree.
+6. Subagents. A skill step delegates to a subagent, which starts in a fresh
    context with its own file as instructions and its own tool list, and
    returns a compact result instead of the files or logs it read. Without
    subagents, the skill follows =~/.agents/agents/<name>.md= itself.
-6. Hooks. The tool, not the model, runs the guard before each shell command
+7. Hooks. The tool, not the model, runs the guard before each shell command
    and the after-edit hook after each edit, and passes their replies on to
    the model (the hooks section below).
 
