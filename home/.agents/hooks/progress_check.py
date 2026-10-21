@@ -85,7 +85,8 @@ def reason(branch: str, log: Path, missing: list) -> str:
         f"The progress log {log.as_posix()} is behind branch {branch}: it misses commit(s) "
         f"{shown}, made after its last change or not named in it.",
         "Before ending the turn, record in it each step those commits made, with its commit "
-        "hash and the check you ran and its result.",
+        "hash and the check you ran and its result; if a rebase only changed their hashes, "
+        "replacing each old hash with its new one is enough.",
         "Then end the turn.",
     ])
 

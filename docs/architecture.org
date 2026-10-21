@@ -418,8 +418,9 @@ Progress check (=progress_check.py=):
 3. When one of them is newer than the log's last change, or no prefix of its
    hash of at least 7 characters is in the log, answer
    ={"decision": "block", "reason": ...}=: three lines that name the log and
-   the commits, ask to record each step with its commit and check, and then
-   to end the turn.
+   the commits, ask to record each step with its commit and check (after a
+   rebase that only changed the hashes, replacing each old hash with its new
+   one is enough), and then to end the turn.
 4. Anything else, an error or a git slower than 8 s lets the stop through,
    and its command ends in =|| true=, since exit 2 from a Stop hook keeps the
    agent going.
