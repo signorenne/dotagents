@@ -8,9 +8,9 @@ Usage in a hook config:
   python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|antigravity|copilot|cursor>
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
-wrappers such as sudo, env, xargs, time, nice, timeout, watch, strace, chroot, in a
-find -exec, also nested, and for a git command run as its own program, such as
-git-push):
+wrappers such as sudo, env, xargs, time, nice, timeout, watch, strace, chroot, parallel,
+systemd-run, firejail, unshare, nsenter, in a find -exec, also nested, in the remote
+command of an ssh, and for a git command run as its own program, such as git-push):
   - git commit|push|merge|rebase|am|pull|cherry-pick --no-verify (or a prefix git accepts
     for it), git commit -n and git am -n (skip hooks);
   - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0|false, LEFTHOOK=0|false,
@@ -36,8 +36,8 @@ is a shift) and here-documents, whose body is text, not commands. So a commit me
 flag. Text that does not parse (an unbalanced quote) is checked by a rough split that
 ignores quoting, so a parse error never lets a forbidden command through. This guards
 the usual forms; it is not a security boundary (commands passed as one string, as to
-bash -c, env -S, flock -c or git submodule foreach, and eval, aliases and scripts are
-not inspected).
+bash -c, env -S, flock -c, git submodule foreach or after parallel's :::, and eval,
+aliases and scripts are not inspected).
 
 Blocking: exit 2 with the reason on stderr (Claude Code, Codex, Gemini CLI, Cursor).
 Copilot denies on exit 2 but shows stderr only to the user, so it also gets
@@ -72,10 +72,29 @@ WRAPPERS = {
     "doas": ("Cu", (), 0),
     "env": ("CSu", ("--chdir", "--split-string", "--unset"), 0),
     "exec": ("a", (), 0),
+    # firejail takes every option value glued (--net=none).
+    "firejail": ("", (), 0),
     "flock": ("Ew", ("--conflict-exit-code", "--timeout", "--wait"), 1),
     "ionice": ("cnpPu", ("--class", "--classdata", "--pgid", "--pid", "--uid"), 0),
     "nice": ("n", ("--adjustment",), 0),
     "nohup": ("", (), 0),
+    "nsenter": ("GNStW", ("--net-socket", "--setgid", "--setuid", "--target", "--wdns"), 0),
+    # GNU parallel runs the command before its ::: arguments; a command given as one of
+    # those arguments is a string and is not inspected.
+    "parallel": ("aCdEIjJLnNPsS", (
+        "--arg-file", "--arg-file-sep", "--arg-sep", "--basefile", "--basenameextensionreplace",
+        "--basenamereplace", "--bf", "--bin", "--block", "--block-size", "--block-timeout", "--bner",
+        "--bnr", "--bt", "--colsep", "--combine-executable", "--combineexec", "--compress-program",
+        "--ctagstring", "--decompress-program", "--delay", "--delimiter", "--dirnamereplace", "--dnr",
+        "--env", "--er", "--extensionreplace", "--filter", "--group-by", "--halt", "--halt-on-error",
+        "--header", "--id", "--jl", "--joblog", "--jobs", "--limit", "--load", "--match", "--max-args",
+        "--max-chars", "--max-procs", "--max-replace-args", "--memfree", "--memsuspend", "--milestone",
+        "--minversion", "--nice", "--parens", "--process-slot-var", "--profile", "--recend",
+        "--recstart", "--res", "--results", "--retries", "--return", "--rpl", "--rsync-opts",
+        "--semaphore-name", "--semaphore-timeout", "--seqreplace", "--shard", "--shell-completion",
+        "--slf", "--slotreplace", "--ssh", "--ssh-delay", "--sshlogin", "--sshloginfile", "--st",
+        "--tagstring", "--term-seq", "--tf", "--timeout", "--tmpdir", "--total", "--total-jobs",
+        "--transferfile", "--trc", "--wd", "--workdir"), 0),
     "pkexec": ("", ("--user",), 0),
     "proxychains": ("f", (), 0),
     "proxychains4": ("f", (), 0),
@@ -86,6 +105,12 @@ WRAPPERS = {
                                  "--output", "--where"), 0),
     "setsid": ("", (), 0),
     "stdbuf": ("eio", ("--error", "--input", "--output"), 0),
+    "systemd-run": ("CEHMpu", (
+        "--background", "--capsule", "--description", "--expand-environment", "--gid", "--host",
+        "--job-mode", "--json", "--machine", "--nice", "--on-active", "--on-boot", "--on-calendar",
+        "--on-startup", "--on-unit-active", "--on-unit-inactive", "--output", "--path-property",
+        "--property", "--root-directory", "--service-type", "--setenv", "--slice", "--socket-property",
+        "--timer-property", "--uid", "--unit", "--working-directory"), 0),
     "strace": ("abeEIoOpPsSuUX", ("--attach", "--columns", "--env", "--output", "--string-limit",
                                   "--summary-sort-by", "--trace", "--trace-path", "--user"), 0),
     "sudo": ("CDghpRrTtUu", ("--chdir", "--chroot", "--close-from", "--command-timeout",
@@ -96,6 +121,9 @@ WRAPPERS = {
     "timeout": ("ks", ("--kill-after", "--signal"), 1),
     "torsocks": ("aPpu", ("--address", "--pass", "--port", "--user"), 0),
     "unbuffer": ("", (), 0),
+    "unshare": ("GlRSw", ("--boottime", "--load-interp", "--map-group", "--map-groups", "--map-user",
+                          "--map-users", "--monotonic", "--owner", "--propagation", "--root",
+                          "--setgid", "--setgroups", "--setuid", "--wd"), 0),
     "watch": ("nqs", ("--equexit", "--interval", "--shotsdir"), 0),
     "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--max-args", "--max-chars",
                            "--max-procs", "--process-slot-var"), 0),
@@ -103,10 +131,15 @@ WRAPPERS = {
 HOOK_RUNNERS = {"git", "pre-commit"}
 # find runs the command after each of these up to a ";" or "+" word.
 FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
-# Commands that other commands run (a find -exec in a find -exec) are followed this many
-# levels deep; the text below that level gets the rough split, which still finds git and
-# gh, so nesting costs linear time and hides nothing.
+# ssh's short options that take a value (OpenSSH has no long options).
+SSH_VALUE_OPTIONS = "BbcDEeFIiJLlmOoPpQRSWw"
+# Commands that other commands run (a find -exec in a find -exec, an ssh's remote
+# command) are followed this many levels deep; the text below that level gets the rough
+# split, which still finds git and gh, so nesting costs linear time and hides nothing.
 MAX_NESTING = 8
+# The remote commands of ssh calls are parsed in full up to this many characters in all;
+# past that they get the rough split, so nested ssh calls also cost linear time.
+MAX_REMOTE_TEXT = 100_000
 ROUGH_PROGRAMS = HOOK_RUNNERS | {"gh"}
 
 GIT_VALUE_OPTIONS = {"-C", "-c", "--attr-source", "--config-env", "--git-dir", "--namespace",
@@ -511,6 +544,20 @@ def find_commands(words: list) -> list:
     return found + ([current] if current else [])
 
 
+def remote_command(words: list) -> str:
+    """The command line an ssh runs on the remote host, or "": its words after the
+    destination, joined with spaces as ssh sends them to the remote shell. ssh reads
+    options after the destination too, unless -- came before it."""
+    if program_of(words) != "ssh":
+        return ""
+    index = skip_options(words, 1, SSH_VALUE_OPTIONS, ())
+    terminated = index > 1 and words[index - 1] == "--"
+    index += 1  # the destination
+    if not terminated:
+        index = skip_options(words, index, SSH_VALUE_OPTIONS, ())
+    return " ".join(words[index:])
+
+
 def abbreviates(name: str, option: str, shortest: int) -> bool:
     """True when name is option or a prefix of it at least shortest characters long
     (git accepts any unique prefix of a long option)."""
@@ -673,17 +720,32 @@ def command_reasons(commands: list) -> dict:
     """Return {reason: True when only commands that push or publish gave it}."""
     reasons = {}
     split = []
+    # Each command, then the commands it runs: those of a find -exec, and the remote
+    # command of an ssh, split as the remote shell splits it. Past MAX_NESTING levels or
+    # MAX_REMOTE_TEXT characters, the rest of the text gets the rough split, which shows
+    # every git and gh word in it, and its pieces are not followed further.
+    rough = MAX_NESTING + 1
     queue = [(words, 0) for words in commands]
-    index = 0
+    index = remote_text = 0
     while index < len(queue):  # grows with the commands that the commands run
         words, depth = queue[index]
         index += 1
         assignments, rest = split_command(words)
         rest = as_git(rest)
         split.append((assignments, rest))
-        inner = find_commands(rest) if depth <= MAX_NESTING else []
-        if inner and depth == MAX_NESTING:
-            inner = rough_commands(" ".join(rest))
+        if depth == rough:
+            continue
+        inner = find_commands(rest)
+        remote = remote_command(rest)
+        if (inner or remote) and (depth == MAX_NESTING or remote_text + len(remote) > MAX_REMOTE_TEXT):
+            queue.extend((command, rough) for command in rough_commands(" ".join(rest)))
+            continue
+        remote_text += len(remote)
+        if remote:
+            try:
+                inner.extend(parse_commands(remote))
+            except (ParseError, RecursionError):
+                queue.extend((command, rough) for command in rough_commands(remote))
         queue.extend((command, depth + 1) for command in inner)
     runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
     for assignments, rest in split:

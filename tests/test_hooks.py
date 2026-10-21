@@ -514,6 +514,17 @@ class GuardBypassBattery(unittest.TestCase):
         "unbuffer git push", "torsocks git push", "proxychains4 -q -f /etc/p.conf git push",
         "find . -exec find . -exec git push {} + \\;", "find . -execdir sudo find . -ok git push \\; \\;",
         "find . -exec env HUSKY=0 git commit -m x \\;",
+        "parallel git push ::: origin", "parallel -j 4 git -C {} push ::: a b",
+        "parallel --jobs 2 --halt now,fail=1 git push", "parallel -j4 -k gh pr create --fill ::: x",
+        "systemd-run --user --wait git push", "systemd-run -p Nice=5 --unit x -- git push",
+        "systemd-run --user --property=CPUQuota=10% git push", "firejail git push",
+        "firejail --noprofile --net=none git push", "firejail -- git push", "unshare -r git push",
+        "unshare --map-root-user --wd /tmp git push", "unshare -m --propagation private git push",
+        "nsenter -t 1 -m git push", "nsenter --target 1 --mount -- git push", "nsenter -t 1 -S 0 -G 0 git push",
+        # ssh runs its words after the destination as one command line on the remote host
+        "ssh host git push", "ssh -p 2222 user@host 'cd repo && git push -f'", "ssh host -t git push origin main",
+        "ssh -o BatchMode=yes host gh pr create --fill", "ssh -i ~/.ssh/k -- host git push", "ssh host sudo git push",
+        "ssh a ssh b git push", 'ssh host "git commit --no-verify -m x"', "ssh host 'git push; echo \"unterminated'",
         # absolute paths and git's own programs
         "/usr/bin/git push", "/usr/local/bin/git push origin main", "./git push",
         "/usr/lib/git-core/git-push origin main", "git-push origin main", "git-subtree push -P lib origin main",
@@ -558,6 +569,10 @@ class GuardBypassBattery(unittest.TestCase):
         "gh pr view 12 --comments", "gh pr checks 12", "gh issue list", "gh issue view 3", "gh gist list",
         "gh gist view abc", "gh workflow list", "gh workflow view ci.yml", "gh release download v1",
         "git format-patch -1", "git log --grep send-email",
+        "ssh host git status", "ssh -T git@github.com", "ssh host 'git log --grep push'",
+        "ssh -N -L 8080:localhost:80 host", "ssh host echo git push", "ssh -p 2222 host", "parallel gzip ::: a b",
+        "systemd-run --user --wait make test", "firejail --net=none curl https://example.com", "unshare -r id",
+        "nsenter -t 1 -m ls",
     ]
 
     @classmethod
@@ -580,13 +595,21 @@ class GuardBypassBattery(unittest.TestCase):
                 self.assertEqual(self.exit_code(command), 2)
 
     def test_deep_nesting_is_checked_quickly(self):
-        # Each nested find would scan the rest of the text again (quadratic time); past a
-        # few levels the rest is split roughly at git and gh, so a push still shows.
+        # Each nested find or ssh would read the rest of the text again (quadratic time);
+        # past a few levels, or past a budget of remote text, the rest is split roughly at
+        # git and gh, so a push still shows.
         for depth in (3, 20000):
             with self.subTest(depth=depth):
                 start = time.monotonic()
                 self.assertEqual(self.exit_code("find . -exec " * depth + "git push"), 2)
                 self.assertLess(time.monotonic() - start, 2)
+        # Following nested ssh calls costs less than parsing the text once more.
+        start = time.monotonic()
+        commands = self.guard.parse_commands("ssh a " * 40000 + "git push")
+        parse = time.monotonic() - start
+        start = time.monotonic()
+        self.assertIn(self.guard.PUSH_REASON, self.guard.command_reasons(commands))
+        self.assertLess(time.monotonic() - start, parse)
 
     def test_near_misses_pass(self):
         for command in self.NEAR_MISSES:
