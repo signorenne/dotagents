@@ -1379,6 +1379,18 @@ class ProgressCheck(unittest.TestCase):
         log.write_text("* Steps\n")
         self.assert_lets_stop(self.check(self.stop(folder), env))
 
+    def test_commits_a_remote_branch_holds_are_not_asked_for(self):
+        # A commit the maintainer already pushed (a remote-tracking branch holds it) is
+        # not a step of the open task, whether or not the log names it.
+        repo, folder, env, log = self.task()
+        full, _ = commit(folder, env, "feat(x): step one")
+        log.write_text("* Steps\n")
+        os.utime(log, (1, 1))
+        self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
+        subprocess.run(["git", "-C", str(folder), "update-ref", "refs/remotes/origin/feat/task", "HEAD"],
+                       check=True, env=env)
+        self.assert_lets_stop(self.check(self.stop(folder), env))
+
     def test_lets_the_stop_through_once_continued_or_without_the_flag(self):
         repo, folder, env, log = self.task()
         commit(folder, env, "feat(x): step one")
@@ -1542,6 +1554,10 @@ class RepeatedFailure(unittest.TestCase):
         (state,) = list(self.tmp.iterdir())
         self.assertEqual(len(json.loads(state.read_text())), module.MAX_KEYS)
         self.assertLess(state.stat().st_size, 20000)
+        with mock.patch.object(module.tempfile, "gettempdir", return_value=str(self.tmp)):
+            # The oldest keys left: test60 is the oldest kept, test59 the newest dropped.
+            self.assertEqual(module.count(self.failure(command="make test60"))[0], 2)
+            self.assertEqual(module.count(self.failure(command="make test59"))[0], 1)
         # A file that is not ours or not readable starts the count again instead of failing.
         for junk in ("[1, 2]", "{not json", "x" * 100000, json.dumps({"k": "v"})):
             with self.subTest(junk=junk[:20]):
