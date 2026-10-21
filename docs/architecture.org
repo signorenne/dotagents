@@ -34,8 +34,10 @@ What the repository holds, and what each part produces.
   =git rev-parse= and =git branch --show-current=, the CMake (=--preset=,
   =--build=, =-B=), CTest, clang-format and clang-tidy commands (also their
   =-20= names) and =./build/*=; ask before =git reset --hard=, =git clean=,
-  =git rebase=, =git update-ref= and =git branch -D= (the last three also
-  as =git -C <dir> ...=), the commands that land a branch, and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
+  =git rebase=, =git update-ref=, =git merge=, =git branch -f= and a forced
+  =git branch= delete (=-D= and each other spelling of =--delete --force=)
+  (all but the first two also as =git -C <dir> ...=), the commands that land
+  a branch, and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
   reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
   =engineering@synced= turned off; the six hook entries.
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
