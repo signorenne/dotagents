@@ -444,7 +444,8 @@ Guard (=guard_bash.py=):
 
 1. Find the command in the tool's payload and split it the way a shell does
    (quotes, operators, substitutions, here-documents, wrappers such as =sudo=,
-   =env=, =timeout=, =watch= and =strace=, the command of a =find -exec=, and
+   =env=, =timeout=, =watch= and =strace=, the command of a =find -exec=, also
+   nested, and
    git's own programs such as =git-push=). Text that does not parse is split
    roughly, ignoring quotes, so a parse error never lets a command through.
 2. Block, in every tool, the gate bypasses: =--no-verify= on =git commit=,

@@ -9,7 +9,8 @@ Usage in a hook config:
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
 wrappers such as sudo, env, xargs, time, nice, timeout, watch, strace, chroot, in a
-find -exec, and for a git command run as its own program, such as git-push):
+find -exec, also nested, and for a git command run as its own program, such as
+git-push):
   - git commit|push|merge|rebase|am|pull|cherry-pick --no-verify (or a prefix git accepts
     for it), git commit -n and git am -n (skip hooks);
   - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0|false, LEFTHOOK=0|false,
@@ -99,6 +100,10 @@ WRAPPERS = {
 HOOK_RUNNERS = {"git", "pre-commit"}
 # find runs the command after each of these up to a ";" or "+" word.
 FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
+# Commands that other commands run (a find -exec in a find -exec) are followed this many
+# levels deep; the text below that level gets the rough split, which still finds git and
+# gh, so nesting costs linear time and hides nothing.
+MAX_NESTING = 8
 ROUGH_PROGRAMS = HOOK_RUNNERS | {"gh"}
 
 GIT_VALUE_OPTIONS = {"-C", "-c", "--attr-source", "--config-env", "--git-dir", "--namespace",
@@ -645,10 +650,18 @@ def command_reasons(commands: list) -> dict:
     """Return {reason: True when only commands that push or publish gave it}."""
     reasons = {}
     split = []
-    for words in commands:
+    queue = [(words, 0) for words in commands]
+    index = 0
+    while index < len(queue):  # grows with the commands that the commands run
+        words, depth = queue[index]
+        index += 1
         assignments, rest = split_command(words)
-        split.append((assignments, as_git(rest)))
-        split.extend(([], as_git(split_command(inner)[1])) for inner in find_commands(rest))
+        rest = as_git(rest)
+        split.append((assignments, rest))
+        inner = find_commands(rest) if depth <= MAX_NESTING else []
+        if inner and depth == MAX_NESTING:
+            inner = rough_commands(" ".join(rest))
+        queue.extend((command, depth + 1) for command in inner)
     runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
     for assignments, rest in split:
         program = program_of(rest)
