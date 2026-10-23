@@ -79,22 +79,35 @@ WRAPPERS = {
     "nice": ("n", ("--adjustment",), 0),
     "nohup": ("", (), 0),
     "nsenter": ("NtW", ("--net-socket", "--target", "--wdns"), 0),
-    # GNU parallel runs the command before its ::: arguments; a command given as one of
-    # those arguments is a string and is not inspected.
-    "parallel": ("aCdEIjJLnNPsS", (
-        "--arg-file", "--arg-file-sep", "--arg-sep", "--basefile", "--basenameextensionreplace",
-        "--basenamereplace", "--bf", "--bin", "--block", "--block-size", "--block-timeout", "--bner",
-        "--bnr", "--bt", "--colsep", "--combine-executable", "--combineexec", "--compress-program",
-        "--ctagstring", "--decompress-program", "--delay", "--delimiter", "--dirnamereplace", "--dnr",
-        "--env", "--er", "--extensionreplace", "--filter", "--group-by", "--halt", "--halt-on-error",
-        "--header", "--id", "--jl", "--joblog", "--jobs", "--limit", "--load", "--match", "--max-args",
-        "--max-chars", "--max-procs", "--max-replace-args", "--memfree", "--memsuspend", "--milestone",
-        "--minversion", "--nice", "--parens", "--process-slot-var", "--profile", "--recend",
-        "--recstart", "--res", "--results", "--retries", "--return", "--rpl", "--rsync-opts",
-        "--semaphore-name", "--semaphore-timeout", "--seqreplace", "--shard", "--shell-completion",
-        "--slf", "--slotreplace", "--ssh", "--ssh-delay", "--sshlogin", "--sshloginfile", "--st",
-        "--tagstring", "--term-seq", "--tf", "--timeout", "--tmpdir", "--total", "--total-jobs",
-        "--transferfile", "--trc", "--wd", "--workdir"), 0),
+    # GNU parallel (option table of parallel 20261022, src/parallel: bundling, require_order)
+    # runs the command up to its first argument separator; a command given as one of the
+    # arguments is a string and is not inspected.
+    "parallel": ("BCDEHIJLNPSUWadjns", (
+        "--arg-file", "--arg-file-sep", "--arg-sep", "--argfile", "--argfilesep", "--argsep",
+        "--basefile", "--basenameextensionreplace", "--basenamereplace", "--bf", "--bin",
+        "--block", "--block-size", "--block-timeout", "--blocksize", "--blocktimeout", "--bner",
+        "--bnr", "--bt", "--col-sep", "--colsep", "--combine-exec", "--combine-executable",
+        "--combineexec", "--combineexecutable", "--compress-program", "--compressprogram",
+        "--ctag-string", "--ctagstring", "--debug", "--decompress-program",
+        "--decompressprogram", "--delay", "--delimiter", "--dirnamereplace", "--dnr", "--env",
+        "--er", "--extensionreplace", "--filter", "--group-by", "--groupby", "--halt",
+        "--halt-on-error", "--haltonerror", "--header", "--id", "--jl", "--joblog", "--jobs",
+        "--limit", "--linkinputsource", "--load", "--match", "--max-args", "--max-chars",
+        "--max-procs", "--max-replace-args", "--maxargs", "--maxchars", "--maxprocs",
+        "--maxreplaceargs", "--memfree", "--memsuspend", "--milestone", "--min-version",
+        "--minversion", "--ms", "--nice", "--parens", "--process-slot-var", "--processslotvar",
+        "--profile", "--recend", "--recstart", "--res", "--result", "--results", "--retries",
+        "--return", "--rpl", "--rsync-opts", "--rsyncopts", "--semaphore-name",
+        "--semaphore-timeout", "--semaphorename", "--semaphoretimeout", "--seqreplace",
+        "--shard", "--shell-completion", "--shellcompletion", "--slf", "--slotreplace", "--sql",
+        "--sql-and-worker", "--sql-master", "--sql-worker", "--sqlandworker", "--sqlmaster",
+        "--sqlworker", "--ssh", "--ssh-delay", "--sshdelay", "--sshlogin", "--sshloginfile",
+        "--st", "--tag-string", "--tagstring", "--tempdir", "--template", "--term-seq",
+        "--termseq", "--tf", "--timeout", "--tmpdir", "--tmpl", "--total", "--total-jobs",
+        "--totaljobs", "--transfer-file", "--transfer-files", "--transferfile",
+        "--transferfiles", "--trc", "--trim", "--use-compress-program",
+        "--use-decompress-program", "--usecompressprogram", "--usedecompressprogram", "--wd",
+        "--work-dir", "--workdir", "--xapplyinputsource"), 0),
     "pkexec": ("", ("--user",), 0),
     "proxychains": ("f", (), 0),
     "proxychains4": ("f", (), 0),
@@ -132,6 +145,8 @@ WRAPPERS = {
 # when it is a number (nsenter -S and -G, glued and optional in util-linux 2.42, a
 # separate uid or gid before it).
 NUMERIC_VALUES = {"nsenter": ("GS", ("--setgid", "--setuid"))}
+# GNU parallel's argument separators: its command ends before the first one.
+PARALLEL_SEPARATORS = {":::", "::::", ":::+", "::::+"}
 HOOK_RUNNERS = {"git", "pre-commit"}
 # find runs the command after each of these up to a ";" or "+" word.
 FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
@@ -495,7 +510,7 @@ def skip_options(words: list, index: int, short_values: str, long_values, numeri
 
 def split_command(words: list) -> tuple:
     """Return (assignments before the program, the program and its arguments)."""
-    assignments, index = [], 0
+    assignments, index, end = [], 0, len(words)
     while index < len(words):
         word = words[index]
         match = ASSIGNMENT.match(word)
@@ -516,9 +531,11 @@ def split_command(words: list) -> tuple:
             while name == "env" and index < len(words) and words[index] == "-":
                 index += 1
             index += operands
+            if name == "parallel":
+                end = next((at for at in range(index, end) if words[at] in PARALLEL_SEPARATORS), end)
         else:
             break
-    return assignments, words[index:]
+    return assignments, words[index:end]
 
 
 def program_of(words: list) -> str:
