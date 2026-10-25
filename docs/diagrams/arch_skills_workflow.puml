@@ -37,7 +37,7 @@ spec -[hidden]right- gates
 gates -[hidden]right- review
 
 legend right
-  Second line: the subagents it delegates to
+  Second line: the subagents it may delegate to
   Solid arrow: calls in the same session
   Dashed arrow: a file read by a fresh session
 endlegend

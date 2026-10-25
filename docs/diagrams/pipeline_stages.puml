@@ -54,7 +54,9 @@ the pending decisions;
 :go;
 |Agent|
 :land: rebase, gate the pinned
-commit, fast-forward;
+commit (skipped when the rebase
+left a logged pass unchanged),
+fast-forward;
 :remove the worktree and the branch;
 |Maintainer|
 :push;
