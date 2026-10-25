@@ -42,9 +42,10 @@ once before it reaches any tool.
 - /Subagent/ : an agent with a fresh context and one narrow job (=scout=,
   =gate-runner=, =reviewer=), written in Claude Code format in
   =home/.agents/agents/= and generated for every other tool.
-- /Hook/ : a script the tool runs around a tool call, outside the model: the
-  guard before a shell command, the after-edit check after a file edit, and,
-  in Claude Code, the session refresh after a compaction.
+- /Hook/ : a script the tool runs around the agent's work, outside the
+  model: the guard before a shell command, the after-edit check after a file
+  edit, and, in Claude Code and Codex, the session refresh after a
+  compaction or a resume and the progress check when the agent ends its turn.
 - /Installer/ : =install.py=, which copies the source to =~/.agents=, links or
   generates each tool's files from it, and backs up whatever it replaces.
 - /claude.ai set/ : the skills under =claude-ai/skills/= that also run in chat,

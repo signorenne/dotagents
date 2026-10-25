@@ -22,17 +22,21 @@ What it gives every session, in chat or in a repository:
   it tries to refute its own assumptions with checks that could fail.
 - A repository workflow as skills (spec, implement, branch-review, gates,
   session-close, decide, project-setup), and skills for documentation, design,
-  code quality, coordination and Qt; the full list is under [[*Skills][Skills]].
+  code quality, coordination and Qt; the full list is under [[*Skills][Skills]]. In
+  Claude Code, path rules point QML, PlantUML and test files to their skills.
 - Three subagents that keep the main context small: =scout= (read-only
   mapping), =gate-runner= (builds and tests, returns only verdicts) and
   =reviewer= (independent review).
 - Hooks that block git gate bypasses and every push or publish (no agent
-  pushes: the maintainer reviews and pushes), flag em and en dashes, run
-  clang-format on the C and C++ lines an edit changed, and, in Claude Code,
-  tell the compaction summary what resuming the task needs; after a compaction
-  or a resume, in Claude Code and Codex, they remind the agent that its memory
-  of the code may be stale and point it to the task's progress log and
-  handoff.
+  pushes: the maintainer reviews and pushes), flag em and en dashes, check
+  Python, JSON and TOML syntax and run clang-format on the C and C++ lines an
+  edit changed. In Claude Code they also tell the compaction summary what
+  resuming the task needs and remind the agent to change approach when a
+  shell command fails the same way three times; in Claude Code and Codex,
+  after a compaction or a resume, they remind the agent that its memory of
+  the code may be stale and point it to the task's progress log and handoff,
+  and they send it back once to a progress log that misses a commit of its
+  branch.
 - A claude.ai skill set (decide, tutor, debugging, verification, tests,
   scoping, editing, research, decisions, handoffs, prompts), installed locally
   from this repository for every agent too.
