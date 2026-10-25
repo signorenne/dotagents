@@ -103,6 +103,19 @@ fix(hooks): block every push and publish in every tool
 docs(design): record that no agent pushes or publishes
 #+END_SRC
 
+Once a clone enables it (=git config core.hooksPath .githooks=, as
+[[file:README.org][README.org]] says), =.githooks/commit-msg= checks each message and rejects one
+whose type is not in the table, whose scope is missing or not in lower case,
+whose subject does not read =type(scope): description=, or whose description
+is empty; a subject with an upper case letter (identifiers too), a trailing
+period or an em or en dash; any line below the subject; and, below the
+subject, an AI trailer (=Co-Authored-By=, =Generated with= or =by=,
+=Assisted-by=, the Anthropic noreply address). So a merge or revert message
+is rejected too: write a revert as a typed subject. A =fixup!= or =squash!=
+subject passes when the rest of it does, and comment lines are not part of
+the message. On a rejection it says what to write instead. The imperative
+mood stays the author's to keep.
+
 * AI code assistants
 
 Allowed, with full accountability for every line submitted. Agent and human

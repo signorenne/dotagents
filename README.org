@@ -112,7 +112,12 @@ settings file.
 
 To change the setup itself, run Claude Code (or any agent) in this repository:
 [[file:AGENTS.md][AGENTS.md]] says where each change goes and which checks to run, and
-[[file:CONTRIBUTING.org][CONTRIBUTING.org]] holds the full workflow.
+[[file:CONTRIBUTING.org][CONTRIBUTING.org]] holds the full workflow. Enable the commit message check
+once per clone, before the first commit:
+
+#+BEGIN_SRC sh
+git config core.hooksPath .githooks   # .githooks/commit-msg checks each message
+#+END_SRC
 
 * Layout
 
@@ -127,7 +132,8 @@ dotagents/
 |-- CLAUDE.md           Claude Code bridge that imports AGENTS.md
 |-- GEMINI.md           Gemini CLI bridge that imports AGENTS.md
 |-- .github/            CI workflow and the Copilot bridge
-|-- home/.agents/       the installed source: AGENTS.md, skills/, agents/, hooks/
+|-- .githooks/          commit-msg: checks each commit message (enabled per clone)
+|-- home/.agents/       the installed source: AGENTS.md, skills/, agents/, hooks/, path-rules.json
 |-- claude-ai/          skills uploaded to claude.ai, and overrides for local skills uploaded too
 |-- adapters/claude/    Claude Code settings: permissions, hooks, no AI attribution
 |-- install.py          cross-agent installer
