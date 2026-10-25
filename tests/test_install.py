@@ -576,12 +576,30 @@ class Install(unittest.TestCase):
             for part in fields["pattern"]:
                 prefixes = [p + [word] for p in prefixes for word in (part if isinstance(part, list) else [part])]
             forbidden |= {" ".join(p) for p in prefixes}
-        self.assertEqual(forbidden, {"git push", "git subtree push", "git send-pack", "git http-push", "git lfs push",
-                                     "git svn dcommit", "git p4 submit", "git send-email", "gh pr create", "gh pr new",
-                                     "gh pr merge", "gh pr ready", "gh pr comment", "gh pr review", "gh pr edit",
-                                     "gh release create", "gh release new", "gh release upload", "gh release edit",
-                                     "gh repo sync", "gh gist create", "gh gist new", "gh issue create",
-                                     "gh issue new", "gh workflow run"})
+        self.assertEqual({p for p in forbidden if p.startswith("git ")},
+                         {"git push", "git subtree push", "git send-pack", "git http-push", "git lfs push",
+                          "git svn dcommit", "git p4 submit", "git send-email"})
+        # gh: only read-only commands run. A prefix rule cannot allow some commands and
+        # forbid the rest, so the rules forbid every other command of gh 2.100.0's tree,
+        # aliases included (gh help, 25 Oct 2026); a command gh adds later is the guard's.
+        def forbids(command):
+            return any(command == prefix or command.startswith(prefix + " ") for prefix in forbidden)
+        for command in ("gh pr create", "gh pr new", "gh pr merge 1", "gh pr checkout 1", "gh pr co 1",
+                        "gh pr comment 1", "gh pr ready 1", "gh issue create", "gh issue new", "gh issue close 1",
+                        "gh release create v1", "gh release upload v1 a", "gh release download v1",
+                        "gh repo create x", "gh repo new x", "gh repo sync", "gh repo fork", "gh repo autolink create",
+                        "gh gist create a", "gh gist new a", "gh label clone o/r", "gh workflow run ci",
+                        "gh secret set X", "gh variable get X", "gh auth login", "gh cs create", "gh codespace ports",
+                        "gh ext install x", "gh completion -s bash"):
+            with self.subTest(command=command):
+                self.assertTrue(forbids(command))
+        for command in ("gh pr view 1", "gh pr list", "gh pr ls", "gh pr diff 1", "gh pr checks 1", "gh pr status",
+                        "gh issue list", "gh issue view 1", "gh run view 1 --log", "gh repo view",
+                        "gh repo clone o/r", "gh gist clone a", "gh repo license view mit", "gh repo autolink list",
+                        "gh auth status", "gh search issues x", "gh status", "gh browse -n", "gh api repos/o/r",
+                        "gh --version", "gh cs list"):
+            with self.subTest(command=command):
+                self.assertFalse(forbids(command))
 
     @unittest.skipUnless(shutil.which("codex"), "codex not installed")
     def test_codex_reads_the_rules_as_written(self):
@@ -590,8 +608,10 @@ class Install(unittest.TestCase):
         env = {**os.environ, "HOME": str(self.home), "CODEX_HOME": str(self.home / ".codex")}
         cases = {("git", "push", "--force", "origin", "main"): "forbidden", ("gh", "pr", "new"): "forbidden",
                  ("gh", "repo", "sync"): "forbidden", ("gh", "pr", "comment", "7", "--body", "x"): "forbidden",
-                 ("git", "send-email", "a.patch"): "forbidden", ("git", "status"): None,
-                 ("gh", "pr", "view", "7"): None, ("gh", "issue", "list"): None}
+                 ("git", "send-email", "a.patch"): "forbidden", ("gh", "pr", "checkout", "7"): "forbidden",
+                 ("gh", "label", "clone", "o/r"): "forbidden", ("git", "status"): None,
+                 ("gh", "pr", "view", "7"): None, ("gh", "issue", "list"): None,
+                 ("gh", "run", "view", "7", "--log"): None, ("gh", "repo", "clone", "o/r"): None}
         for command, decision in cases.items():
             with self.subTest(command=command):
                 result = subprocess.run(["codex", "execpolicy", "check", "--rules", str(rules), "--", *command],

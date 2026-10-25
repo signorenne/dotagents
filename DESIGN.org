@@ -221,11 +221,11 @@ against it (events, matchers, tool names, timeouts).
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
 tool: =git push=, =git subtree push=, =git send-pack=, =git http-push=,
-=git lfs push=, =git svn dcommit=, =git p4 submit=, =git send-email=,
-=gh pr create=, =gh pr merge=, =gh pr ready=, =comment=, =review= and
-=edit=, =gh release create=, =upload= and =edit=, =gh repo create --push=,
-=gh repo sync=, =gh gist create=, =gh issue create= and =gh workflow run=
-([[#no-agent-push][no-agent-push]]), also run through =find -exec= (nested too), wrappers
+=git lfs push=, =git svn dcommit=, =git p4 submit=, =git send-email= and
+every =gh= command but the read-only ones (=view=, =list=, =diff=,
+=status= and =checks= in any group, =repo= and =gist clone=, =search=,
+=auth status=, =browse -n=, help), so a write command =gh= adds later is
+blocked too ([[#no-agent-push][no-agent-push]]), also run through =find -exec= (nested too), wrappers
 such as =sudo=, =watch=, =strace=, =parallel=, =systemd-run= or =nsenter=, the
 remote command of =ssh=, or git's own programs (=git-push=). A
 push that also rewrites or deletes published history (=--force= and its
