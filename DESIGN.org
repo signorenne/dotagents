@@ -188,8 +188,10 @@ installer runs again.
   files (backed up first) and backs up those the source dropped. The other
   tools get none yet.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
-  =prefix_rule= entries forbid every push and publish the guard blocks but
-  =gh repo create --push=, whose flag a prefix cannot see. Codex
+  =prefix_rule= entries forbid the git commands that push or publish and
+  every command of gh 2.100.0 that is not read-only. A prefix rule cannot
+  forbid all but a list, so a =gh= command added later, and one with a flag
+  before its subcommand (=gh -R o/r pr create=), are the guard's alone. Codex
   writes =default.rules= itself, and the installer leaves it alone.
 - /skillOverrides/ : claude.ai syncs its copy of each uploaded skill into
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
@@ -293,15 +295,17 @@ The hooks share one failure model:
   model as additional context in each tool's documented format.
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
-  (8 s for the notes listing and the git calls of the session refresh and of
-  the compaction brief, clang-format under 60 s); the brief also stays under
-  the 10,000 characters past which Claude Code cuts it.
+  (8 s for the notes listing and the git calls of the session refresh, of
+  the compaction brief and of the progress check, clang-format under 60 s);
+  the brief also stays under the 10,000 characters past which Claude Code
+  cuts it.
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
   prompt never offers it. In Codex, =~/.codex/rules/dotagents.rules= forbids
-  the same commands and holds even while Codex skips hooks the user has not
-  trusted yet; Codex calls its rules experimental, and a prefix rule cannot
-  see =git -C <dir> push=, which the guard catches.
+  the same git commands and the =gh= commands that are not read-only, and
+  holds even while Codex skips hooks the user has not trusted yet; Codex
+  calls its rules experimental, and a prefix rule cannot see
+  =git -C <dir> push=, which the guard catches.
 - /Not a security boundary/ : the guard splits the command as a shell does and
   falls back to a rough split when it does not parse, so a parse error never
   lets a forbidden command through; commands passed as one string (=bash -c=,
@@ -309,7 +313,8 @@ The hooks share one failure model:
   =parallel='s =:::=), =eval=, aliases, scripts and =gh api= are not
   inspected, nor programs it does not know that run their arguments (such as
   =numactl= or =faketime=). It reads the remote command of =ssh= as shell
-  text.
+  text, but not one given as =-o RemoteCommand=, nor the command of =autossh=
+  or =mosh=.
   =tests/test_hooks.py= holds a battery of the forms it does catch.
 
 * Documentation and skill design
@@ -358,36 +363,35 @@ sensor, the check that catches a breach. The reviewer checks every change
 against all of them (conflicts with Accepted decisions, in
 =home/.agents/agents/reviewer.md=), so the table names only the sensors
 specific to each rule: "none: the model only" means that, apart from that
-review, only the agent's own care keeps the rule. "Planned" marks a check that
-is designed but not merged yet.
+review, only the agent's own care keeps the rule.
 
-| Rule                        | Guide                                                                              | Sensor                                                                                                                                                    |
-|-----------------------------+------------------------------------------------------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| =refute-first=              | global rules (Refute before you rely), session-close (lessons)                     | the reviewer's attack on a change's central claims                                                                                                        |
-| =stop-on-plan-change=       | global rules (Refute before you rely, Grounding)                                   | none: the model only                                                                                                                                      |
-| =grouped-questions=         | decide, global rules (Decisions)                                                   | none: the model only                                                                                                                                      |
-| =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); planned: a Stop hook for a branch commit newer than its log or missing from it |
-| =tests-attacked=            | implement (section 7), trustworthy-tests                                           | the reviewer's attack on each new or changed test                                                                                                         |
-| =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                      |
-| =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                        |
-| =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                     |
-| =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                               | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                              |
-| =skills-from-real-runs=     | =docs/skill-authoring.org=                                                         | none: the model only                                                                                                                                      |
-| =light-scripts=             | =AGENTS.md= (Where changes go)                                                     | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                       |
-| =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                                       | none: the model only                                                                                                                                      |
-| =tutor-name=                | this rule                                                                          | none: the model only                                                                                                                                      |
-| =as-built-session-model=    | as-built-docs                                                                      | none: the model only                                                                                                                                      |
-| =clean-architecture-layers= | clean-architecture                                                                 | in a project, the layer checks the skill adds to the gates                                                                                                |
-| =ui-never-blocks=           | event-driven-ui                                                                    | in a project, the owning-thread assertions and platform detectors the skill turns on                                                                      |
-| =diagram-palette=           | plantuml-diagrams                                                                  | none: the model only                                                                                                                                      |
-| =as-built-for-people=       | as-built-docs                                                                      | in a project, the skill's checks 1 to 7, each seen catching a planted error, and its fact-check                                                           |
-| =as-built-pictures=         | as-built-docs                                                                      | in a project, the skill's check 7 (a legend entry for each marker)                                                                                        |
-| =confirmed-audit-findings=  | code-audit                                                                         | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                        |
-| =no-agent-push=             | global rules (Agentic work, Git)                                                   | the guard in every tool (=tests/test_hooks.py=), Claude Code's deny rules, the Codex rules file; planned: onFailure block on the guard                    |
-| =main-commits-here=         | =AGENTS.md= (Hard rules)                                                           | the maintainer's review before every push                                                                                                                 |
-| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, implement (section 4) | Claude Code asks before =git rebase=; planned: before =git -C <dir> rebase=, =git update-ref=, =git branch -D=                                            |
-| =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                       | Claude Code's empty attribution settings; planned: this repository's commit-msg hook (AI trailers, subject format)                                        |
-| =mit-license=               | =AGENTS.md= (Hard rules)                                                           | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                               |
+| Rule                        | Guide                                                                              | Sensor                                                                                                                                                            |
+|-----------------------------+------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =refute-first=              | global rules (Refute before you rely), session-close (lessons)                     | the reviewer's attack on a change's central claims                                                                                                                |
+| =stop-on-plan-change=       | global rules (Refute before you rely, Grounding)                                   | none: the model only                                                                                                                                              |
+| =grouped-questions=         | decide, global rules (Decisions)                                                   | none: the model only                                                                                                                                              |
+| =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); the progress check in Claude Code and Codex (a branch commit missing from its log)     |
+| =tests-attacked=            | implement (section 7), trustworthy-tests                                           | the reviewer's attack on each new or changed test                                                                                                                 |
+| =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                              |
+| =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
+| =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
+| =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                               | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
+| =skills-from-real-runs=     | =docs/skill-authoring.org=                                                         | none: the model only                                                                                                                                              |
+| =light-scripts=             | =AGENTS.md= (Where changes go)                                                     | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
+| =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                                       | none: the model only                                                                                                                                              |
+| =tutor-name=                | this rule                                                                          | none: the model only                                                                                                                                              |
+| =as-built-session-model=    | as-built-docs                                                                      | none: the model only                                                                                                                                              |
+| =clean-architecture-layers= | clean-architecture                                                                 | in a project, the layer checks the skill adds to the gates                                                                                                        |
+| =ui-never-blocks=           | event-driven-ui                                                                    | in a project, the owning-thread assertions and platform detectors the skill turns on                                                                              |
+| =diagram-palette=           | plantuml-diagrams                                                                  | none: the model only                                                                                                                                              |
+| =as-built-for-people=       | as-built-docs                                                                      | in a project, the skill's checks 1 to 7, each seen catching a planted error, and its fact-check                                                                   |
+| =as-built-pictures=         | as-built-docs                                                                      | in a project, the skill's check 7 (a legend entry for each marker)                                                                                                |
+| =confirmed-audit-findings=  | code-audit                                                                         | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                                |
+| =no-agent-push=             | global rules (Agentic work, Git)                                                   | the guard in every tool (=tests/test_hooks.py=, with its bypass battery) and its =onFailure= block in Claude Code, Claude Code's deny rules, the Codex rules file |
+| =main-commits-here=         | =AGENTS.md= (Hard rules)                                                           | the maintainer's review before every push                                                                                                                         |
+| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, implement (section 4) | Claude Code asks before =git rebase=, =git merge=, =git update-ref= and a forced =git branch= move, rename, copy or delete, each also after =git -C <dir>=        |
+| =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                       | Claude Code's empty attribution settings; this repository's =.githooks/commit-msg= once enabled (an AI trailer, the subject format)                               |
+| =mit-license=               | =AGENTS.md= (Hard rules)                                                           | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                                       |
 
 ** Working method
 
