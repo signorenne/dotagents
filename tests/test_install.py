@@ -276,12 +276,13 @@ class Install(unittest.TestCase):
         # Claude Code asks first, also in the git -C form. Claude Code evaluates deny, then
         # ask, then allow, and matches the words before a rule's first * as written
         # (code.claude.com/docs/en/permissions), so each spelling of a forced delete
-        # needs its own rule; those that start with -f fall under the branch -f rule.
+        # needs its own rule; those that start with -f or --force fall under the rules for
+        # a forced move.
         self.install("--tools", "claude")
         permissions = json.loads((self.home / ".claude/settings.json").read_text())["permissions"]
-        forced_deletes = ["-D", "-df", "-fd", "-d -f", "-d --force", "--delete -f", "--delete --force",
-                          "--force -d", "--force --delete"]
-        landing = ["rebase", "update-ref", "merge", "branch -f"] + [f"branch {flags}" for flags in forced_deletes]
+        forced_deletes = ["-D", "-df", "-fd", "-d -f", "-d --force", "--delete -f", "--delete --force"]
+        landing = (["rebase", "update-ref", "merge", "branch -f", "branch --force"]
+                   + [f"branch {flags}" for flags in forced_deletes])
         for command in landing:
             for rule in (f"Bash(git {command} *)", f"Bash(git -C * {command} *)"):
                 with self.subTest(rule=rule):
