@@ -281,7 +281,8 @@ class Install(unittest.TestCase):
         self.install("--tools", "claude")
         permissions = json.loads((self.home / ".claude/settings.json").read_text())["permissions"]
         forced_deletes = ["-D", "-df", "-fd", "-d -f", "-d --force", "--delete -f", "--delete --force"]
-        landing = (["rebase", "update-ref", "merge", "branch -f", "branch --force"]
+        # A forced rename (-M) or copy (-C) overwrites the target branch too.
+        landing = (["rebase", "update-ref", "merge", "branch -f", "branch --force", "branch -M", "branch -C"]
                    + [f"branch {flags}" for flags in forced_deletes])
         for command in landing:
             for rule in (f"Bash(git {command} *)", f"Bash(git -C * {command} *)"):
