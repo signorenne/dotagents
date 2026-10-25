@@ -35,8 +35,8 @@ What it gives every session, in chat or in a repository:
   shell command fails the same way three times; in Claude Code and Codex,
   after a compaction or a resume, they remind the agent that its memory of
   the code may be stale and point it to the task's progress log and handoff,
-  and they send it back once to a progress log that misses a commit of its
-  branch.
+  and, when the agent ends its turn, they send it back once if the progress
+  log misses a commit of its branch.
 - A claude.ai skill set (decide, tutor, debugging, verification, tests,
   scoping, editing, research, decisions, handoffs, prompts), installed locally
   from this repository for every agent too.

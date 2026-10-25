@@ -173,7 +173,7 @@ add the skill, the subagents and where a fresh session starts.
   rebase left the commit unchanged and the gates already passed on it);
   fast-forward the target to it; confirm the target now points there. A merge
   commit only when the project's documented convention asks for one. In
-  Claude Code each command that lands or moves a branch (=git rebase=,
+  Claude Code each of these commands that land or move a branch (=git rebase=,
   =git merge=, =git update-ref=, a forced =git branch= move, rename, copy or
   delete, each also after =git -C <dir>=) asks the maintainer first, so a
   landing prompts at each of those steps.
@@ -224,8 +224,8 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
   command behind wrappers (=sudo=, =env=, =find -exec=, the remote command
   of =ssh= and the like); [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]]
   lists them. In Claude Code the settings also deny =git push=, and in Codex
-  a rules file forbids the same git commands and the =gh= commands that are
-  not read-only. The guard does not inspect a command passed as one string
+  a rules file forbids the same git commands and the =gh= commands that
+  write. The guard does not inspect a command passed as one string
   (=bash -c=, =eval=), aliases, scripts, =gh api= or =ssh -o RemoteCommand=,
   nor a program it does not know that runs its arguments; there the rule
   rests on the agent. In Claude Code a guard that cannot run (it cannot

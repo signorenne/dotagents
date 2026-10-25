@@ -36,7 +36,7 @@ docs/                         Org docs: docs map, architecture, pipeline, workfl
 - A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: install.py, with a test in tests/test_install.py.
 - A new check: tools/validate.py, with a test in tests/test_tools.py.
-- A path rule (a skill an agent should use on matching files): home/.agents/path-rules.json, checked by tools/validate.py; install.py writes each tool's rule files from it, with a test in tests/test_install.py.
+- A path rule (a skill an agent should use on matching files): home/.agents/path-rules.json, checked by tools/validate.py; install.py writes Claude Code's rule files (~/.claude/rules/dotagents-<skill>.md) from it, with a test in tests/test_install.py.
 - A check on this repository's commit messages: .githooks/commit-msg, with tests in tests/test_tools.py.
 
 ## Hard rules
