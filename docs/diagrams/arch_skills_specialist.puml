@@ -27,26 +27,26 @@ component "spec" as spec
 component "trustworthy-tests" as tests
 component "implement" as implement
 
-archdoc --> puml : diagrams
-asbuilt --> puml : diagrams
-asbuilt --> preciseui : pictures
+archdoc --> puml
+asbuilt --> puml
+asbuilt --> preciseui
 asbuilt --> audit : list for the audit
 archdoc --> spec : build order
 archdoc -- clean : layers
 audit --> implement : fixes
-preciseui --> tests : behavior test
+preciseui --> tests
 
 parallel -- mech : split
 mech --> implement : as a task
 parallel --> implement : from section 5
 parallel ---> isolated : each writer
-isolated --> implement : works through
+isolated --> implement
 mech -[hidden]down- isolated
 
-clean -- qt : in Qt
-clean --> events : threads
-qt -- events : threads
-events -- debug : freezes
+clean -- qt
+clean --> events
+qt -- events
+events -- debug
 clean --> spec : plan steps
 clean ---> implement : plan steps
 

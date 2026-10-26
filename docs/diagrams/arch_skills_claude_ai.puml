@@ -28,6 +28,7 @@ debug -- tests : failing test
 debug --> verify : before fixed
 tests --> verify : before done
 
+verify -[hidden]down- local
 scoping --> local : spec,\narchitecture-doc
 decide --> local : spec
 prompt --> local : project-setup
