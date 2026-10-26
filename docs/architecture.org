@@ -18,6 +18,10 @@ What the repository holds, and what each part produces.
 
 [[file:diagrams/arch_parts.svg]]
 
+The diagram draws the three sources (=home/.agents/=, =claude-ai/= and
+=adapters/claude/=) as one package, Source; the items below say what each of
+them gives =install.py= and =tools/build.py=.
+
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
   (=agents/=), the six hook scripts (=hooks/=) and the path rules
@@ -25,10 +29,13 @@ What the repository holds, and what each part produces.
   =install.py= copies all of it to =~/.agents=.
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
-  upload guide (=README.md=). =install.py= reads the overrides to turn off
-  Claude Code's synced copy of each uploaded skill; =tools/build.py= reads
-  them for the local skills to zip and their short descriptions.
-- =adapters/claude/settings.json= is the adapter for Claude Code: no
+  upload guide (=README.md=). =install.py= copies the claude.ai set to
+  =~/.agents/skills= next to the local skills and reads the overrides to turn
+  off Claude Code's synced copy of each uploaded skill; =tools/build.py= zips
+  the claude.ai set and reads the overrides for the local skills to zip and
+  their short descriptions.
+- =adapters/claude/settings.json= is the adapter for Claude Code, which
+  =install.py= merges into =~/.claude/settings.json=: no
   attribution in commits and pull requests; permission rules that allow
   =git status=, =git diff=, =git log=, =git show=, =git merge-base=,
   =git rev-parse= and =git branch --show-current=, the CMake (=--preset=,
