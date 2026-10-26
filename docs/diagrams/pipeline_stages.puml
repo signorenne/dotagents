@@ -38,11 +38,17 @@ repeat while (more steps?) is (yes)
 repeat
   :gates (gate-runner)
   and review (reviewer);
-  note right : results and their commit in the progress log
-  if (the changed approach failed,\na blocker or major finding\non the second review pass,\nor a SKIP or INCOMPLETE gate\nthe code cannot fix?) then (yes)
+  note right : results and their commit\nin the progress log
+  if (blocked?) then (yes)
     :stop and report
     to the maintainer;
-    note right : the evidence in the progress log and the handoff
+    note right
+      blocked: the changed approach failed, a
+      blocker or major finding on the second review
+      pass, or a SKIP or INCOMPLETE gate the code
+      cannot fix; the evidence in the progress log
+      and the handoff
+    end note
     end
   endif
 repeat while (FAIL, INCOMPLETE, SKIP\nor a blocker?) is (fix)
