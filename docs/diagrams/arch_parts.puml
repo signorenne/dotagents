@@ -16,34 +16,32 @@ package "Shared source" as source {
     file "Overrides\noverrides.json" as overrides
   }
 }
-package "Programs" {
-  component "install.py" as install
-  component "tools/build.py" as build
-}
+component "install.py" as install
+component "tools/build.py" as build
 
 package "Outputs" {
   folder "&#126;/.agents and\neach tool's folder" as installed
   folder "dist/\nzips" as dist
 }
 
-package "Checks" {
-  node "CI\nci.yml" as ci
-  component "tools/validate.py" as validate
-  folder "tests/" as tests
-}
+node "CI\nci.yml" as ci
+component "tools/validate.py" as validate
+folder "tests/" as tests
 
-adapters --> install : merged
-source --> install : parts\ncopied
-source --> build : parts\nzipped
+adapters --> install
+source --> install
+source --> build
 install -[hidden]right- build
-install --> installed : writes
-build --> dist : writes
+install ..> installed
+build ..> dist
 
-ci --> validate : runs
-ci --> tests : runs
-ci -up-> build : runs
+ci -[dotted]-> validate
+ci -[dotted]-> tests
+ci -[dotted]up-> build
 
 legend right
-  Solid arrow: input, output or run
+  Solid arrow: read as input
+  Dashed arrow: written as output
+  Dotted arrow: run by CI
 endlegend
 @enduml
