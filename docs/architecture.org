@@ -365,6 +365,26 @@ Where the skills of the claude.ai set hand work on.
 
 [[file:diagrams/arch_skills_claude_ai.svg]]
 
+What each edge carries; a plain line names both skills, so its row reads both
+ways:
+
+| From                    | To                             | What passes                                                                                                                          |
+|-------------------------+--------------------------------+--------------------------------------------------------------------------------------------------------------------------------------|
+| scoping-before-building | decide                         | the user's choices                                                                                                                   |
+| decide                  | decision-analysis              | outside products to compare (plain line)                                                                                             |
+| decision-analysis       | efficient-research             | the facts (plain line)                                                                                                               |
+| efficient-research      | verifying-before-claiming-done | its answer, checked before it is settled                                                                                             |
+| prompt-optimizer        | minimal-editing                | a single requested change                                                                                                            |
+| systematic-debugging    | minimal-editing                | the fix (to minimal-editing); the fix of a failure, to diagnose first (to systematic-debugging) (plain line)                         |
+| systematic-debugging    | trustworthy-tests              | a failing test that reproduces the failure (to trustworthy-tests); a flaky or unclear failure (to systematic-debugging) (plain line) |
+| systematic-debugging    | verifying-before-claiming-done | the fix, checked before saying it is fixed                                                                                           |
+| trustworthy-tests       | verifying-before-claiming-done | the tests, checked before saying they are done                                                                                       |
+| scoping-before-building | Local skills                   | open work in a repository, to spec; a new system, to architecture-doc                                                                |
+| decide                  | Local skills                   | a decision too large, to spec                                                                                                        |
+| prompt-optimizer        | Local skills                   | a repository's =AGENTS.md=, to project-setup                                                                                         |
+| context-handoff         | Local skills                   | a handoff inside a repository, to session-close                                                                                      |
+| systematic-debugging    | Local skills                   | a fix of more than one sentence, to implement; work that blocks a UI thread, to event-driven-ui                                      |
+
 The set is the ten skills of =claude-ai/skills/= plus decide, uploaded through
 its override. The installer puts all of them in every local agent too, so the
 same hand-offs work in chat and in a repository; a hand-off to a local skill
