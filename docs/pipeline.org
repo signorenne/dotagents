@@ -32,7 +32,11 @@ The global rules size the work first (Agentic work, in
 [[file:diagrams/pipeline_stages.svg]]
 
 The diagram's notes name what each stage leaves and where; the sections below
-add the skill, the subagents and where a fresh session starts.
+add the skill, the subagents and where a fresh session starts. In the gates
+and review loop, blocked means the changed approach failed, the second review
+pass still finds a blocker or major finding, or a SKIP or INCOMPLETE gate
+stands that the code cannot fix: the agent stops and reports to the
+maintainer.
 
 ** 1. Set up a new repository
 
