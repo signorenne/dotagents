@@ -19,14 +19,14 @@ package "On request" {
 component "Close: session-close" as close
 component "Land and clean up: isolated-work\ngate-runner" as isolated
 
-setup --> decide : open points
-spec -right-> decide : design choices
-spec ..> implement : spec file
-implement -up-> decide : user's choices
-implement --> tests : test first
-implement --> debug : two failed fixes
-close .left.> implement : handoff
-implement ---> isolated : worktree,\nlanding
+setup --> decide
+spec -right-> decide
+spec ..> implement
+implement -up-> decide
+implement --> tests
+implement --> debug
+close .up.> implement
+implement ---> isolated
 spec -[hidden]right- gates
 gates -[hidden]right- review
 
