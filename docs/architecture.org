@@ -295,6 +295,31 @@ Where the specialist skills hand work on.
 
 [[file:diagrams/arch_skills_specialist.svg]]
 
+What each edge carries; a plain line names both skills, so its row reads both
+ways:
+
+| From               | To                   | What passes                                                                                                                         |
+|--------------------+----------------------+-------------------------------------------------------------------------------------------------------------------------------------|
+| architecture-doc   | plantuml-diagrams    | its diagrams, to draw and check                                                                                                     |
+| as-built-docs      | plantuml-diagrams    | its diagrams, to draw and check                                                                                                     |
+| as-built-docs      | precise-ui-changes   | its screen pictures, made repeatable                                                                                                |
+| as-built-docs      | code-audit           | a list of suspicious behavior                                                                                                       |
+| architecture-doc   | spec                 | a build order whose every step is ready for spec                                                                                    |
+| architecture-doc   | clean-architecture   | clean-architecture's layers, for an application (plain line)                                                                        |
+| code-audit         | implement            | a finding the user wants fixed                                                                                                      |
+| precise-ui-changes | trustworthy-tests    | a behavior test for a visual bug that plays out over time                                                                           |
+| parallel-agents    | mechanical-changes   | shards to spread over several agents (to parallel-agents); a one-rule change across many files (to mechanical-changes) (plain line) |
+| mechanical-changes | implement            | the change, as a task with its shards as plan steps                                                                                 |
+| parallel-agents    | implement            | each agent's approved plan steps, run from section 5                                                                                |
+| parallel-agents    | isolated-work        | each writer's worktree, created and later landed                                                                                    |
+| isolated-work      | implement            | its change, run through implement                                                                                                   |
+| clean-architecture | qt-quick             | the layers, applied in Qt (plain line)                                                                                              |
+| clean-architecture | event-driven-ui      | the threads                                                                                                                         |
+| qt-quick           | event-driven-ui      | the threads, applied in Qt (plain line)                                                                                             |
+| event-driven-ui    | systematic-debugging | a freeze whose cause is not yet measured (to systematic-debugging); a blocked UI thread (to event-driven-ui) (plain line)           |
+| clean-architecture | spec                 | a feature's steps, as the plan's steps                                                                                              |
+| clean-architecture | implement            | a feature's steps, as the plan's steps                                                                                              |
+
 - Documents and audits. architecture-doc and as-built-docs draw their diagrams
   with plantuml-diagrams. architecture-doc ends with a build order whose every
   step is ready for spec. as-built-docs makes its screen pictures repeatable
