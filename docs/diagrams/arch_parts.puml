@@ -30,7 +30,9 @@ folder "tests/" as tests
 
 adapters --> install
 source --> install
-source --> build
+skills --> build
+webskills --> build
+overrides --> build
 install -[hidden]right- build
 install ..> installed
 build ..> dist
