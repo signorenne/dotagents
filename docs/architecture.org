@@ -366,7 +366,8 @@ Where the skills of the claude.ai set hand work on.
 [[file:diagrams/arch_skills_claude_ai.svg]]
 
 What each edge carries; a plain line names both skills, so its row reads both
-ways:
+ways. The rows to Local skills are handoffs to the skills of the other maps,
+which the diagram leaves out so that no line crosses the whole map:
 
 | From                    | To                             | What passes                                                                                                                          |
 |-------------------------+--------------------------------+--------------------------------------------------------------------------------------------------------------------------------------|
