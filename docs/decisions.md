@@ -111,3 +111,27 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The maintainer reviews every choice, his and the agent's, in one place, and a later session resumes from facts instead of memory.
 - Rejected: Progress only in commits and the final handoff (agent decisions scattered, nothing between steps if a session dies).
 - Revisit if: the log duplicates what commits and the decision log already show.
+
+## D-0010: Refute before you rely is the core method of every agent
+
+- Status: Accepted
+- Proposed by: maintainer (Socratic core, recording refuted assumptions, lessons as proposed rules, checking the maintainer's premises), agent (checks over rereading, placement and wording)
+- Decided by: maintainer
+- Date: 2026-10-30
+- Rule in: home/.agents/AGENTS.md (Refute before you rely); implement, spec, decide, review and session-close skills; home/.agents/agents/reviewer.md; claude-ai/skills/context-handoff
+- Decision: Every agent treats each claim its work depends on (its own, the maintainer's factual premises, a document's, a subagent's, a test's) as a hypothesis and tries to break the ones that would change the result with the cheapest check that could fail; rereading its own reasoning is not a check. Refuted assumptions go into the progress log and the handoff, and session-close drafts a rule change for each one a rule or skill should have prevented. The rule lives in the always-loaded global instructions (about 1.8 KB, roughly 450 tokens per session); the workflow skills and the reviewer apply it at fixed points.
+- Why: Every problem caught on feat/workflow-upgrade came from an external check or an independent agent, never from rereading; a method that loads only when triggered would be absent when an unexamined assumption slips through.
+- Rejected: A standalone challenge skill on top (overlaps reviewer and spec verification; without subagents the author attacks its own work); a skill only (acts only when triggered); self-refutation with no record, no lessons and no premise checks.
+- Revisit if: the global instructions approach the 200-line limit, or sessions show over-questioning or checks that do not change outcomes.
+
+## D-0011: Tests are written by the implementer and attacked by the reviewer
+
+- Status: Accepted
+- Proposed by: maintainer (a test skill against false positives, its name), agent (author and attack model, test edit rule)
+- Decided by: maintainer
+- Date: 2026-10-30
+- Rule in: claude-ai/skills/trustworthy-tests/SKILL.md, home/.agents/AGENTS.md (Agentic work), home/.agents/skills/implement/SKILL.md, home/.agents/agents/reviewer.md
+- Decision: The trustworthy-tests skill (claude.ai set, installed for every agent) covers every automated test, unit tests first. The implementing agent writes each test first and sees it fail for the right reason; the reviewer, in a fresh context, names a wrong implementation or mutation that would still pass each new or changed test. An existing test's expected value changes only with cited evidence from the spec, the docs or a fact established independently of the code under test; deleting, skipping or loosening a test needs the maintainer's approval, except deleting the test of a behavior an approved spec or plan removes.
+- Why: An independent attack on every test with no extra agent per step and one flow in all five tools; clearly wrong values get fixed without an interruption while weakening stays blocked.
+- Rejected: A fresh agent writing tests from the spec before implementation (an extra agent per step, loops when tests do not fit the real interface, only where subagents exist); approval for every test change (more interruptions); unit tests only (implement's test-first step is often an integration test); local-only placement (no test help in claude.ai chat).
+- Revisit if: reviews keep finding false-positive tests that passed the implementer's failing-run check, or misreadings of the spec end up encoded in tests.
