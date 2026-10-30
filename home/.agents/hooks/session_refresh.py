@@ -36,7 +36,8 @@ def git(*args: str, cwd: str, deadline: float) -> str | None:
         return None
     except OSError:
         return ""
-    return result.stdout.strip() if result.returncode == 0 else ""
+    # Only trailing newlines: a leading space is the index column of git status --short.
+    return result.stdout.rstrip("\n") if result.returncode == 0 else ""
 
 
 def main() -> int:

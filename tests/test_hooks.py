@@ -162,6 +162,23 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Session restarted from compact", result.stdout)
         self.assertIn("Current branch: work", result.stdout)
 
+    def test_status_keeps_the_index_column(self):
+        # " M" (changed, not staged) must not lose its space and read as "M " (staged).
+        repo = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, repo)
+        git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
+               "-c", "commit.gpgsign=false"]
+        subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True)
+        (repo / "tracked.txt").write_text("one\n")
+        subprocess.run([*git, "add", "tracked.txt"], check=True)
+        subprocess.run([*git, "commit", "-q", "-m", "init"], check=True)
+        (repo / "tracked.txt").write_text("two\n")
+        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
+                                input=json.dumps({"cwd": str(repo), "source": "resume"}),
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Uncommitted changes:\n M tracked.txt\n", result.stdout)
+
     def test_slow_git_stays_within_hook_timeout(self):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
