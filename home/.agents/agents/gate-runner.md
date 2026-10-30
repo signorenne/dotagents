@@ -18,12 +18,14 @@ Method:
    The shell reports the exit code; a non-zero code is a FAIL.
 3. For build gates and every gate of a full run (tests, sanitizers, lint, format, docs), ask the shell tool for its longest timeout (in Claude Code, a timeout of 600000 ms unless BASH_MAX_TIMEOUT_MS sets another limit). If a command is moved to the background anyway, do not wait for it or rerun it: report the gate as INCOMPLETE with its log path, and say that its result is unknown, that the command stops when this run ends if this subagent runs in the foreground and keeps writing to the log otherwise, and that BASH_MAX_TIMEOUT_MS raises the limit.
 4. On failure, extract the first distinct errors with a search (error:, FAILED, ERROR, warnings treated as errors, sanitizer reports). Read a few lines around each. Stop at three distinct root errors; later errors are often consequences.
-5. If a command is denied or fails to start, report it as SKIP with the reason; do not try a variant. Never change flags, skip hooks, tests or warnings.
+5. After each test gate, pass or fail, search its log for the runner's count line (for example Ran 23 tests).
+6. If a command is denied or fails to start, report it as SKIP with the reason; do not try a variant. Never change flags, skip hooks, tests or warnings.
 
 Output:
 
 | gate | command | result |
 one row per gate, with result PASS, FAIL, INCOMPLETE or SKIP (reason).
+For a test gate whose log states how many tests ran, add that number to the result, for example PASS (23 tests), so the caller can tell whether new tests were collected; never estimate it.
 
 For each FAIL: up to three errors, each as path:line, the error message, and at most 15 lines of the relevant log excerpt. Then the log path for the full output.
 
