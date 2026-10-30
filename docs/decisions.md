@@ -135,3 +135,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: An independent attack on every test with no extra agent per step and one flow in all five tools; clearly wrong values get fixed without an interruption while weakening stays blocked.
 - Rejected: A fresh agent writing tests from the spec before implementation (an extra agent per step, loops when tests do not fit the real interface, only where subagents exist); approval for every test change (more interruptions); unit tests only (implement's test-first step is often an integration test); local-only placement (no test help in claude.ai chat).
 - Revisit if: reviews keep finding false-positive tests that passed the implementer's failing-run check, or misreadings of the spec end up encoded in tests.
+
+## D-0012: Stop and report only when a refuted claim changes the plan
+
+- Status: Accepted
+- Proposed by: agent (from the third review of the socratic core work)
+- Decided by: maintainer
+- Date: 2026-10-30
+- Rule in: home/.agents/AGENTS.md (Refute before you rely; Grounding in the current state)
+- Decision: A refuted claim, or a difference between reality and memory or a document, stops the work for a report only when it changes an approved plan, a requirement or a decision. Any other refuted assumption is corrected and recorded; any other difference is corrected and named.
+- Why: Grounding stopped on every difference from memory or a document, and the Refute section sent refuted claims from those sources to the same stop, so a slip in the agent's own recollection, or a stale detail no step relies on, would interrupt routine work inside an approved plan. The maintainer still hears first about every change to what was approved.
+- Rejected: Narrowing only the Refute sentence (it would contradict Grounding's stop on memory); a list of document types that stop (misses a refuted assumption of the agent's own that changes the plan); leaving both rules as they were.
+- Revisit if: a session changes course on a refuted claim the maintainer wanted to hear about first, or sessions still stop for differences that change nothing.
