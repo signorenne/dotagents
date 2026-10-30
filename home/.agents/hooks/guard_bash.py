@@ -19,15 +19,24 @@ command of an ssh, and for a git command run as its own program, such as git-pus
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
   - every git push, git subtree push, git send-pack, git http-push, git lfs push, git svn
-    dcommit, git p4 submit and git send-email, and every gh command but the read-only
-    ones (view, list, diff, status and checks in any group, repo and gist clone, search,
-    status, auth status, browse -n, help; gh api is not inspected), so a write command gh
-    adds later is blocked too, in every agent: the maintainer reviews everything before
-    it leaves the machine, so pushing and publishing are the maintainer's; the text of a
-    post (a comment, review, issue, discussion, gist or patch) goes to the user instead. A push that also rewrites or deletes
+    dcommit, git p4 submit and git send-email, and every gh command but the read-only or
+    local ones (view, list, diff, status and checks in any group, repo and gist clone, pr
+    checkout, run watch and download, release download, config and variable get, repo
+    read-file and read-dir, ruleset check, attestation verify, search, status, browse,
+    completion, licenses, help; gh api is not inspected; a flag other than -R or --repo
+    before the subcommand makes a command unknown, since gh takes the flag's next word as
+    its value), so a write command gh adds later is blocked too, in every agent: the
+    maintainer reviews everything before it leaves the
+    machine, so pushing and publishing are the maintainer's; the text of a post (a comment,
+    review, issue, discussion, gist or patch) goes to the user instead. A push that also rewrites or deletes
     published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
     --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
-    required checks) are named as such.
+    required checks) are named as such;
+  - the gh commands that print the authentication token, which would stay in the session's
+    transcript: gh auth token, gh auth git-credential, gh auth status with -t or
+    --show-token (in any position, also in a cluster such as -at or as -t=true, the last
+    value winning), and gh config get oauth_token, the subcommand found among all the
+    operands after the group.
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
 ; & | ( ), redirections, command substitutions, arithmetic ($((...)), ((...)), whose <<
@@ -219,18 +228,29 @@ POST_REASONS = {GIST_REASON, ISSUE_REASON, GIT_PUBLISHERS["send-email"][1],
                 *(GH_PUBLISHERS[key] for key in (("pr", "comment"), ("pr", "review"), ("pr", "edit"),
                                                  ("release", "edit"), ("issue", "comment"),
                                                  ("discussion", "create"), ("discussion", "comment")))}
-# GitHub: only read-only gh commands run (gh 2.100.0's command tree), and every other gh
-# command is blocked, so a write command gh adds later is blocked too; gh api is not
-# inspected. Read-only: the subcommands below in any group (ls is gh's alias of list),
-# the top-level commands below, repo and gist clone (gh label clone copies labels into a
-# repository), the read subcommands of repo's nested groups, browse with -n or
-# --no-browser (it prints the address), and help.
+# GitHub: only read-only or local gh commands run (gh 2.100.0's command tree), and every
+# other gh command is blocked, so a write command gh adds later is blocked too; gh api is
+# not inspected. Read-only or local: the subcommands below in any group (ls is gh's alias
+# of list), the top-level commands below, the group and subcommand pairs below (gh label
+# clone copies labels into a repository, so only repo and gist clone; co is pr's alias of
+# checkout, rs and at the group aliases of ruleset and attestation; gh co is a user alias,
+# so it is not one), the read subcommands of repo's nested groups, and help.
 GH_READ_SUBCOMMANDS = {"checks", "diff", "list", "ls", "status", "view"}
-GH_READ_COMMANDS = {"api", "help", "search", "status", "version"}
-GH_CLONES = {("repo", "clone"), ("gist", "clone")}
+GH_READ_COMMANDS = {"api", "browse", "completion", "help", "licenses", "search", "status", "version"}
+GH_READ_PAIRS = {("repo", "clone"), ("gist", "clone"), ("pr", "checkout"), ("pr", "co"), ("run", "watch"),
+                 ("run", "download"), ("release", "download"), ("config", "get"), ("variable", "get"),
+                 ("repo", "read-file"), ("repo", "read-dir"), ("ruleset", "check"), ("rs", "check"),
+                 ("attestation", "verify"), ("at", "verify")}
 GH_READ_GROUPS = {("repo", "autolink"), ("repo", "deploy-key"), ("repo", "gitignore"), ("repo", "license")}
 GH_NOT_READ_ONLY = "is not one of the read-only gh commands (view, list, diff, status, checks, clone, search)"
 GH_ADVICE = "Run only read-only gh commands, and ask the user to run any other."
+# gh commands that print the authentication token (gh auth git-credential get prints it as
+# the password; gh config get oauth_token prints one stored in plain text). A token in the
+# output stays in the transcript, which leaves the machine with every model request.
+TOKEN_PRINTS = "prints the authentication token"
+TOKEN_ADVICE = ("A token printed here stays in this session's transcript. Check the login with gh auth "
+                "status without -t, and ask the user to run any command that needs the token.")
+FALSE_VALUES = {"0", "f", "false"}  # what Go's strconv.ParseBool reads as false, lower-cased
 # git's own programs that the guard inspects, run by their own name (git-push from git
 # --exec-path, git-lfs); other git-* programs (git-cliff, git-crypt) are not git.
 GIT_PROGRAMS = HOOK_SUBCOMMANDS | {"config", "subtree"} | set(GIT_PUBLISHERS)
@@ -730,30 +750,88 @@ def git_reasons(words: list) -> list:
     return [reason for reason in reasons if reason]
 
 
-def gh_read_only(words: list, operands: list) -> bool:
-    """True for a gh command that only reads (see GH_READ_SUBCOMMANDS). -h is help only as
-    the last word, since gh auth reads it as --hostname."""
-    if not operands or "--help" in words or words[-1] == "-h":
-        return True  # gh alone, gh --version and help
+def gh_help(words: list, operands: list) -> bool:
+    """gh alone, gh --version and help. -h is help only as the last word, since gh auth and
+    gh config get read it as --hostname; after "--", --help and -h are arguments."""
+    if "--" in words:
+        return not operands or "--help" in words[:words.index("--")]
+    return not operands or "--help" in words or words[-1] == "-h"
+
+
+def repository_flag(word: str) -> bool:
+    """-R or --repo with its value glued (-Ro/r, --repo=o/r)."""
+    return word.startswith("--repo=") or (word.startswith("-R") and len(word) > 2)
+
+
+def gh_read_only(operands: list) -> bool:
+    """True for a gh command that only reads or works locally (see GH_READ_SUBCOMMANDS)."""
     if operands[0] in GH_READ_COMMANDS:
         return True
-    if operands[0] == "browse":
-        return any(word in ("-n", "--no-browser") for word in words)
-    if len(operands) > 1 and (operands[1] in GH_READ_SUBCOMMANDS or tuple(operands[:2]) in GH_CLONES):
+    if len(operands) > 1 and (operands[1] in GH_READ_SUBCOMMANDS or tuple(operands[:2]) in GH_READ_PAIRS):
         return True
     return tuple(operands[:2]) in GH_READ_GROUPS and len(operands) > 2 and operands[2] in GH_READ_SUBCOMMANDS
 
 
+def shows_token(words: list) -> bool:
+    """True when gh auth status gets -t or --show-token: also in a cluster of short flags
+    (-at), with a value (-t=true, --show-token=1; a false value turns it off, the last one
+    wins); in a cluster, -h takes the rest of the word as its value (-ht names host t)."""
+    shown = False
+    for word in words:
+        if word == "--":
+            break
+        name, equals, value = word.partition("=")
+        if name == "--show-token":
+            shown = not equals or value.lower() not in FALSE_VALUES
+        elif word.startswith("-") and not word.startswith("--"):
+            for position, letter in enumerate(word[1:], start=2):
+                if letter == "t":
+                    rest = word[position:]
+                    shown = not rest.startswith("=") or rest[1:].lower() not in FALSE_VALUES
+                if letter != "a":
+                    break  # -t=value or -h value ends the cluster; -a is the other flag
+    return shown
+
+
+def gh_token_reason(words: list, operands: list) -> str:
+    """Why a gh command prints the authentication token, or "". The subcommand is looked
+    for in every operand after the group, since a flag before it can move it along."""
+    group, rest = operands[0], operands[1:]
+    for name in ("token", "git-credential"):
+        if group == "auth" and name in rest:
+            return f"gh auth {name} {TOKEN_PRINTS}"
+    if group == "auth" and "status" in rest and shows_token(words):
+        return f"gh auth status --show-token {TOKEN_PRINTS}"
+    if group == "config" and "get" in rest and "oauth_token" in rest:
+        return f"gh config get oauth_token {TOKEN_PRINTS}"
+    return ""
+
+
 def gh_reasons(words: list) -> list:
-    operands, index = [], 1
+    # flag_at: how many operands came before the first flag other than the repository
+    # flag. gh's parser takes an unknown flag's next word as its value while it looks for
+    # the subcommand, so a flag before the subcommand hides which command runs.
+    operands, flag_at, index = [], None, 1
     while index < len(words):
         word = words[index]
         index += 1
         if word in ("-R", "--repo"):
             index += 1  # gh takes the repository flag before or after the subcommand
+        elif word.startswith("-") and not repository_flag(word):
+            flag_at = len(operands) if flag_at is None else flag_at
         elif not word.startswith("-"):
             operands.append(word)
-    if gh_read_only(words, operands):
+    if gh_help(words, operands):
+        return []
+    token = gh_token_reason(words, operands)
+    if token:
+        return [token]
+    # The operands that make a command read-only: a top-level command, a group and its
+    # subcommand, or repo, a nested group and its subcommand.
+    named = 1 if operands[0] in GH_READ_COMMANDS else 3 if tuple(operands[:2]) in GH_READ_GROUPS else 2
+    if flag_at is not None and flag_at < named:
+        return [f"gh {operands[0]} with a flag before its subcommand {GH_NOT_READ_ONLY}"]
+    if gh_read_only(operands):
         return []
     if tuple(operands[:2]) in GH_PUBLISHERS:
         return [GH_PUBLISHERS[tuple(operands[:2])]]
@@ -872,7 +950,9 @@ def main() -> int:
         advice.append(POST_ADVICE)
     if any(reason.endswith(GH_NOT_READ_ONLY) for reason in reasons):
         advice.append(GH_ADVICE)
-    if not all(reasons.values()):
+    if any(reason.endswith(TOKEN_PRINTS) for reason in reasons):
+        advice.append(TOKEN_ADVICE)
+    if not all(publishes or reason.endswith(TOKEN_PRINTS) for reason, publishes in reasons.items()):
         advice.append(GATE_ADVICE)
     message = "Blocked: " + "; ".join(reasons) + ". " + " ".join(advice)
     if tool == "antigravity":

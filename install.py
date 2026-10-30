@@ -108,10 +108,11 @@ GEMINI_HOOKS = {
 # with its pattern, without prompting. They hold even while Codex skips the hooks, which
 # it does until the user trusts them. A pattern part that is a list matches any of its words.
 # A prefix cannot see a flag, so gh repo create --push is left to the guard. gh: the guard
-# runs only read-only commands and a prefix cannot say "all but these", so the rules forbid
-# every other command of gh 2.100.0's tree (gh help, aliases included); a command gh adds
-# later is the guard's alone. gh browse (read-only with -n) and gh api (not inspected)
-# have no rule.
+# runs only read-only or local commands and a prefix cannot say "all but these", so the
+# rules forbid every other command of gh 2.100.0's tree (gh help, aliases included); a
+# command gh adds later is the guard's alone. gh api (not inspected) has no rule. The gh
+# commands that print the token get their own rules, as far as a prefix can say them:
+# gh auth status with the flag right after it, gh config get oauth_token without -h.
 CODEX_RULES = (
     (["git", "push"], "git push publishes commits to a remote."),
     (["git", "subtree", "push"], "git subtree push publishes commits to a remote."),
@@ -123,45 +124,52 @@ CODEX_RULES = (
     *((["gh", groups if len(groups) > 1 else groups[0], *nested, subcommands],
        "Only read-only gh commands run (view, list, diff, status, checks, clone, search); this one is not.")
       for groups, nested, subcommands in (
-          (["auth"], [], ["login", "logout", "refresh", "setup-git", "switch", "token"]),
+          (["auth"], [], ["login", "logout", "refresh", "setup-git", "switch"]),
           (["codespace", "cs"], [], ["code", "cp", "create", "delete", "edit", "jupyter", "logs", "ports",
                                      "rebuild", "ssh", "stop"]),
           (["discussion"], [], ["comment", "create", "edit"]),
           (["gist"], [], ["create", "delete", "edit", "new", "rename"]),
           (["issue"], [], ["close", "comment", "create", "delete", "develop", "edit", "lock", "new", "pin",
                            "reopen", "transfer", "unlock", "unpin"]),
-          (["pr"], [], ["checkout", "close", "co", "comment", "create", "edit", "lock", "merge", "new", "ready",
-                        "reopen", "revert", "review", "unlock", "update-branch"]),
+          (["pr"], [], ["close", "comment", "create", "edit", "lock", "merge", "new", "ready", "reopen", "revert",
+                        "review", "unlock", "update-branch"]),
           (["project"], [], ["close", "copy", "create", "delete", "edit", "field-create", "field-delete",
                              "field-list", "item-add", "item-archive", "item-create", "item-delete", "item-edit",
                              "item-list", "link", "mark-template", "unlink"]),
-          (["release"], [], ["create", "delete", "delete-asset", "download", "edit", "new", "upload", "verify",
-                             "verify-asset"]),
-          (["repo"], [], ["archive", "create", "delete", "edit", "fork", "new", "read-dir", "read-file", "rename",
-                          "set-default", "sync", "unarchive"]),
+          (["release"], [], ["create", "delete", "delete-asset", "edit", "new", "upload", "verify", "verify-asset"]),
+          (["repo"], [], ["archive", "create", "delete", "edit", "fork", "new", "rename", "set-default", "sync",
+                          "unarchive"]),
           (["repo"], ["autolink"], ["create", "delete"]),
           (["repo"], ["deploy-key"], ["add", "delete"]),
           (["skill", "skills"], [], ["add", "install", "preview", "publish", "search", "show", "update"]),
           (["cache"], [], ["delete"]),
-          (["run"], [], ["cancel", "delete", "download", "rerun", "watch"]),
+          (["run"], [], ["cancel", "delete", "rerun"]),
           (["workflow"], [], ["disable", "enable", "run"]),
           (["agent-task", "agent-tasks", "agent", "agents"], [], ["create"]),
           (["alias"], [], ["delete", "import", "set"]),
-          (["attestation", "at"], [], ["download", "trusted-root", "verify"]),
-          (["config"], [], ["clear-cache", "get", "set"]),
+          (["attestation", "at"], [], ["download", "trusted-root"]),
+          (["config"], [], ["clear-cache", "set"]),
           (["extension", "extensions", "ext"], [], ["browse", "create", "exec", "install", "remove", "search",
                                                      "uninstall", "upgrade"]),
           (["gpg-key"], [], ["add", "delete"]),
           (["label"], [], ["clone", "create", "delete", "edit"]),
-          (["ruleset", "rs"], [], ["check"]),
           (["secret"], [], ["delete", "remove", "set"]),
           (["ssh-key"], [], ["add", "delete"]),
-          (["variable"], [], ["delete", "get", "remove", "set"]))),
-    (["gh", ["completion", "copilot", "licenses", "preview"]],
+          (["variable"], [], ["delete", "remove", "set"]))),
+    (["gh", ["copilot", "preview"]],
      "Only read-only gh commands run (view, list, diff, status, checks, clone, search); this one is not."),
 )
 CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "
                       "leaves this machine: stop and tell the user the work is ready for review.")
+CODEX_TOKEN_RULES = (
+    (["gh", "auth", ["token", "git-credential"]],
+     "gh auth token (and gh auth git-credential get) prints the authentication token."),
+    (["gh", "auth", "status", ["-t", "--show-token", "-at", "-ta", "-t=true", "--show-token=true"]],
+     "gh auth status --show-token prints the authentication token."),
+    (["gh", "config", "get", "oauth_token"], "gh config get oauth_token prints the authentication token."),
+)
+CODEX_TOKEN_ADVICE = ("A token printed here stays in this session's transcript: check the login with gh auth status "
+                      "without -t, and ask the user to run any command that needs the token.")
 # Antigravity CLI (agy), which replaced Gemini CLI for most users, reads global hooks from
 # ~/.gemini/config/hooks.json: an object that maps a hook name to its events. PreToolUse
 # and PostToolUse matchers are regexes on the tool name (run_command runs a shell command;
@@ -252,15 +260,17 @@ def codex_agent(meta: dict, body: str) -> str:
 
 
 def codex_rules() -> str:
-    """The Starlark rules file that forbids pushing and publishing in Codex."""
+    """The Starlark rules file that forbids pushing and publishing, and printing the gh
+    token, in Codex."""
     lines = ["# Written by dotagents install.py: change the dotagents repository and run it again.",
              "# No agent pushes or publishes (DESIGN.org, no-agent-push)."]
-    for pattern, reason in CODEX_RULES:
-        lines += ["prefix_rule(",
-                  f"    pattern = {json.dumps(pattern)},",
-                  '    decision = "forbidden",',
-                  f"    justification = {json.dumps(reason + ' ' + CODEX_RULES_ADVICE)},",
-                  ")"]
+    for rules, advice in ((CODEX_RULES, CODEX_RULES_ADVICE), (CODEX_TOKEN_RULES, CODEX_TOKEN_ADVICE)):
+        for pattern, reason in rules:
+            lines += ["prefix_rule(",
+                      f"    pattern = {json.dumps(pattern)},",
+                      '    decision = "forbidden",',
+                      f"    justification = {json.dumps(reason + ' ' + advice)},",
+                      ")"]
     return "\n".join(lines) + "\n"
 
 

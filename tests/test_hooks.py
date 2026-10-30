@@ -283,9 +283,11 @@ class GuardBash(unittest.TestCase):
     OTHER_PUBLISHES = ["gh release upload v1 dist/a.zip", "gh pr ready 12", "gh pr ready --undo",
                        "gh workflow run ci.yml"]
 
-    # gh 2.100.0's help (25 Oct 2026): only read-only commands run, any other gh command is
-    # blocked, so a write command gh adds later is blocked too. list has the alias ls; -h is
-    # --hostname under gh auth; gh label clone copies labels into a repository.
+    # gh 2.100.0's help (25 Oct 2026): only read-only or local commands run, any other gh
+    # command is blocked, so a write command gh adds later is blocked too. list has the alias
+    # ls, pr checkout the alias co, ruleset rs and attestation at; -h is --hostname under gh
+    # auth; gh label clone copies labels into a repository. gh co is a user alias (gh's
+    # default one, redefinable with gh alias set), so it is not read as pr checkout.
     GH_READS = ["gh pr view 12", "gh pr diff 12", "gh pr checks 12 --watch", "gh pr status", "gh pr ls",
                 "gh issue list --state open", "gh issue view 3 --comments", "gh issue status",
                 "gh run view 7 --log", "gh run list", "gh repo view", "gh repo clone owner/repo",
@@ -293,21 +295,82 @@ class GuardBash(unittest.TestCase):
                 "gh auth status", "gh search issues bug --repo o/r", "gh status", "gh browse -n",
                 "gh browse 12 --no-browser", "gh pr create --help", "gh issue close 3 -h", "gh help pr",
                 "gh --version", "gh version", "gh", "gh api repos/o/r", "gh release list", "gh label list",
-                "gh skills ls", "gh cs list"]
-    GH_OTHERS = ["gh pr checkout 12", "gh pr co 12", "gh release download v1", "gh repo create x --private",
-                 "gh repo create x --push=false", "gh repo fork", "gh repo delete o/r --yes", "gh label clone o/r",
-                 "gh issue close 1", "gh secret set X", "gh browse", "gh browse 12", "gh extension install o/gh-x",
-                 "gh some-new-command", "gh auth login -h github.com", "gh run rerun 7",
-                 "gh repo autolink create x", "gh codespace ports", "gh cs create"]
+                "gh skills ls", "gh cs list",
+                # read or local, by the maintainer's decision on D-v
+                "gh pr checkout 12", "gh pr co 12 --detach", "gh run watch 7 --exit-status",
+                "gh run download 7 -D out", "gh release download v1 -p '*.zip'", "gh config get editor",
+                "gh config get -h github.com git_protocol", "gh variable get X", "gh repo read-file README.md",
+                "gh repo read-dir src --ref main", "gh ruleset check main", "gh rs check --default",
+                "gh attestation verify a.tgz -R o/r", "gh at verify a.tgz --owner o", "gh completion -s bash",
+                "gh licenses", "gh browse", "gh browse 12 --settings", "gh auth status -a",
+                "gh auth status -h github.com"]
+    GH_OTHERS = ["gh co 12", "gh repo create x --private", "gh repo create x --push=false", "gh repo fork",
+                 "gh repo delete o/r --yes", "gh label clone o/r", "gh issue close 1", "gh secret set X",
+                 "gh extension install o/gh-x", "gh some-new-command", "gh auth login -h github.com",
+                 "gh run rerun 7", "gh repo autolink create x", "gh codespace ports", "gh cs create",
+                 "gh config set editor vim", "gh variable set X", "gh attestation download a.tgz",
+                 "gh release delete v1", "gh run cancel 7"]
 
     def test_only_read_only_gh_commands_run(self):
         self.assert_allowed(self.GH_READS)
         for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
             self.assert_blocked(self.GH_OTHERS, tool)
-        stderr = run("guard_bash.py", bash("gh pr checkout 12")).stderr
-        self.assertIn("gh pr checkout is not one of the read-only gh commands", stderr)
+        stderr = run("guard_bash.py", bash("gh repo fork")).stderr
+        self.assertIn("gh repo fork is not one of the read-only gh commands", stderr)
         self.assertIn("Pushing and publishing are the maintainer's", stderr)
         self.assertIn("ask the user to run any other", stderr)
+
+    def test_a_flag_before_the_subcommand_makes_a_gh_command_unknown(self):
+        # gh's parser takes an unknown flag's next word as the flag's value while it looks
+        # for the subcommand, so gh pr -b checkout merge 5 runs gh pr merge 5. A flag other
+        # than -R or --repo before the word that makes a command read-only blocks it.
+        shifted = ["gh pr -b checkout merge 5", "gh pr -t view merge 5", "gh -x y pr merge 5", "gh pr -- view 1",
+                   "gh repo -x autolink list", "gh repo autolink -x list create", "gh -L 5 search x pr merge 1"]
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(shifted, tool)
+        stderr = run("guard_bash.py", bash("gh pr -b checkout merge 5")).stderr
+        self.assertIn("gh pr with a flag before its subcommand is not one of the read-only gh commands", stderr)
+        self.assertIn("Pushing and publishing are the maintainer's", stderr)
+        # The repository flag, in each spelling, and flags after the subcommand are fine.
+        self.assert_allowed(["gh --repo=o/r pr list", "gh -Ro/r pr view 3", "gh pr --repo o/r view 3",
+                             "gh pr list -L 5", "gh search issues -L 5 bug", "gh repo autolink list -R o/r",
+                             "gh pr view 3 -- 4", "gh api -X GET repos/o/r"])
+
+    # gh 2.100.0: gh auth token prints the token, gh auth status prints it with -t or
+    # --show-token (a flag pflag also reads in a cluster such as -at, or as -t=true), gh auth
+    # git-credential get prints it as the password, and gh config get oauth_token prints a
+    # token stored in plain text (checked on a scratch GH_CONFIG_DIR with a fake token).
+    TOKEN_PRINTS = ["gh auth token", "gh auth token -h github.com", "gh auth token --user me", "gh auth status -t",
+                    "gh auth status --show-token", "gh auth status -a -t", "gh auth status -at", "gh auth status -ta",
+                    "gh auth status -h github.com -t", "gh auth status -th github.com",
+                    "gh auth status --hostname github.com --show-token", "gh auth status --show-token=true",
+                    "gh auth status -t=1", "gh auth git-credential get", "gh config get oauth_token",
+                    "gh config get -h github.com oauth_token", "gh config get --host=github.com oauth_token",
+                    "gh config get -hgithub.com oauth_token",
+                    # the last value wins: a first-wins reading would let this one through
+                    "gh auth status --show-token=false -t",
+                    # gh's parser takes an unknown flag's next word as its value while it looks
+                    # for the subcommand, so a flag before it moves the subcommand along
+                    "gh auth -h status token -h github.com", "gh auth -h view status -h github.com -t",
+                    "gh config -h view get -h github.com oauth_token",
+                    # after "--", --help is an argument, not help
+                    "gh auth token -- --help"]
+
+    def test_commands_that_print_a_token_are_blocked(self):
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(self.TOKEN_PRINTS, tool)
+        for command in self.TOKEN_PRINTS:
+            with self.subTest(command=command):
+                stderr = run("guard_bash.py", bash(command)).stderr
+                self.assertIn("prints the authentication token", stderr)
+                self.assertIn("stays in this session's transcript", stderr)
+                self.assertIn("ask the user to run any command that needs the token", stderr)
+                for other in ("Pushing and publishing", "Gates and published history", "read-only gh commands"):
+                    self.assertNotIn(other, stderr)
+        # A false value turns the flag off; -h takes the rest of a cluster as its value; help
+        # prints help.
+        self.assert_allowed(["gh auth status --show-token=false", "gh auth status -t=false", "gh auth status -ah x",
+                             "gh auth token --help", "gh auth status -t --help", "gh config get -h github.com user"])
 
     def test_posts_and_other_publish_forms_are_blocked(self):
         for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
@@ -586,8 +649,18 @@ class GuardBypassBattery(unittest.TestCase):
         "gh pr --repo=o/r create", "GH_REPO=o/r gh pr create", "gh pr merge 1 --squash", "gh pr merge --admin 1",
         "gh release create v1", "gh release new v1", "gh repo sync", "gh repo create x --source=. --push",
         "gh repo new x --push",
-        "gh pr checkout 12", "gh repo create x --private", "gh repo create x --push=false", "gh release download v1",
+        "gh co 12", "gh repo create x --private", "gh repo create x --push=false", "gh release delete v1",
         "gh label clone o/r", "gh -R o/r issue close 1", "gh codespace create", "gh new-subcommand-of-tomorrow",
+        # commands that print the authentication token, also behind wrappers and in substitutions
+        "gh auth token", "sudo gh auth token", "echo $(gh auth token)", "GH_TOKEN=$(gh auth token) make",
+        "gh auth token | wl-copy", "ssh host gh auth token", "gh auth status -t", "gh auth status --show-token",
+        "gh auth status -a -t", "gh auth status -at", "gh auth status -ta", "gh auth status -th github.com",
+        "gh auth status --show-token=True", "env GH_HOST=x gh auth status -t", "gh auth git-credential get",
+        "gh config get oauth_token", "gh config get -h github.com oauth_token", "gh config get -hgithub.com oauth_token",
+        "gh auth status --show-token=false -t", "gh auth token -- --help",
+        # a flag before the subcommand: gh takes the next word as its value (verified: exit 0 before)
+        "gh auth -h status token -h github.com", "gh auth -h view status -h github.com -t",
+        "gh config -h view get -h github.com oauth_token", "gh pr -b checkout merge 5", "gh pr -t view merge 5",
         "gh gist create a.md", "gh -R o/r issue create -t x -b y", "gh pr --repo o/r comment 1 -b x",
         "gh release upload v1 a.zip --clobber", "gh workflow run ci.yml -f x=1", "gh pr ready",
         "git send-email a.patch", "git -C repo send-email --annotate a.patch", "git-send-email a.patch",
@@ -621,6 +694,15 @@ class GuardBypassBattery(unittest.TestCase):
         "ssh -N -L 8080:localhost:80 host", "ssh host echo git push", "ssh -p 2222 host", "parallel gzip ::: a b",
         "systemd-run --user --wait make test", "firejail --net=none curl https://example.com", "unshare -r id",
         "nsenter -t 1 -m ls",
+        # read or local gh commands (the maintainer's decision on D-v), and token near misses
+        "gh pr checkout 12", "gh pr co 12 --force", "gh -R o/r pr checkout 3 --worktree ../pr3",
+        "gh run watch 7", "gh run download 7 -n dist", "gh release download v1 -O -", "gh config get git_protocol",
+        "gh variable get X -e prod", "gh repo read-file README.md -R o/r", "gh repo read-dir", "gh ruleset check",
+        "gh rs check main", "gh attestation verify a.tgz -o org", "gh at verify a.tgz -R o/r", "gh completion -s fish",
+        "gh licenses", "gh browse", "gh browse main.go:12 --blame", "gh auth status", "gh auth status -a",
+        "gh auth status -h github.com", "gh auth status --show-token=false", "gh auth status -ah github.com",
+        "gh auth token --help", "gh config get -h github.com user", "gh config list",
+        "gh --repo=o/r pr checkout 3", "gh -Ro/r run watch 7", "gh pr --repo o/r view 3", "gh pr view 3 -- 4",
     ]
 
     @classmethod
