@@ -14,6 +14,7 @@ repository is the source: edit skills here, never on claude.ai.
 | scoping-before-building | Ask only the question that changes the result before building |
 | systematic-debugging | Diagnose from evidence before any fix |
 | verifying-before-claiming-done | Report what was verified and what was not |
+| trustworthy-tests | Write and review tests that can fail, never weakened to pass |
 | minimal-editing | Smallest complete change, show only the change |
 | efficient-research | When and how much to search, primary sources first |
 | decision-analysis | Compare options and commit to a recommendation |
