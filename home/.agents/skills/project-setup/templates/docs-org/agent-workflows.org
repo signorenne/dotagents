@@ -79,10 +79,10 @@ the exit criteria.>
 * Review workflow
 
 Review starts with findings, not summary. Check behavior and edge cases, calls
-to symbols that no longer exist, missing tests or examples, docs drift, build
-wiring, dependency policy, conflicts with accepted decisions, and validation
-commands that were skipped. When there are no findings, say so and name the
-residual risk.
+to symbols that no longer exist, missing tests or examples, tests a wrong
+implementation would still pass, docs drift, build wiring, dependency policy,
+conflicts with accepted decisions, and validation commands that were skipped.
+When there are no findings, say so and name the residual risk.
 
 * Parallel work
 
@@ -100,6 +100,7 @@ Open questions:
 Commands run:
 Commands still needed:
 Risks:
+Refuted assumptions (assumed, check that broke it, what changed):
 Verify before use (files and symbols the next session depends on):
 #+END_EXAMPLE
 
@@ -116,6 +117,7 @@ Plan approval: (by the maintainer on <date>, or not required: <reason>)
 
 Steps:
 1. <step> | status: todo, in progress or done | commit: <hash> <subject> | check: <command> -> <result>
+   failing runs (new or changed tests): <command> -> <failing line>
 
 Decisions (newest last):
 P1 <date> by maintainer | by agent: <decision>
@@ -124,6 +126,7 @@ P1 <date> by maintainer | by agent: <decision>
    Decision log: <id and status, or below the recording bar>
    Review: pending, kept, or changed (by P<n>)
 
+Refuted assumptions (assumed, check that broke it, what changed):
 Deviations from the spec or plan:
 Open questions:
 #+END_EXAMPLE
