@@ -35,7 +35,14 @@ any change that spans modules. Skip it when the diff fits in one sentence.
    commands.
 4. Record each new decision that meets the bar in "When to record" of
    [[file:decisions.org][decisions.org]], following its authority rules.
-5. Stop. Implement from the spec in a fresh session in the same checkout.
+5. Verify the spec before handing it over: a subagent that did not write it,
+   told not to edit anything, checks every file, symbol, signature, command and
+   external fact the spec names against the current code and the cited
+   documentation, and reports each claim that is wrong or unverifiable with its
+   evidence (without subagents, do the check yourself after re-reading each
+   source). Fix the spec; before keeping any change to a requirement or
+   decision already settled, show it to the maintainer.
+6. Stop. Implement from the spec in a fresh session in the same checkout.
    =.private/= is untracked, so the spec does not follow into a new worktree or
    clone; pass it by absolute path there.
 
