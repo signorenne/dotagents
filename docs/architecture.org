@@ -19,8 +19,9 @@ What the repository holds, and what each part produces.
 [[file:diagrams/arch_parts.svg]]
 
 The diagram groups =home/.agents/= and =claude-ai/= as the shared source,
-which =install.py= reads as a whole; =tools/build.py= reads three of its
-boxes, and the adapter feeds =install.py= only. What each edge carries:
+which feeds both programs: =install.py= reads it as a whole, =tools/build.py=
+the members its rows name below; the adapter feeds =install.py= only. What
+each edge carries:
 
 | From                                   | To                                 | What passes                                                                                                                       |
 |----------------------------------------+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------|
