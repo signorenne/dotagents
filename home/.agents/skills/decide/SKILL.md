@@ -36,7 +36,7 @@ B) <option>: consequence in one line.
 If you say "decide": I will take A.
 ```
 
-Use the tool's multiple-choice question interface when it has one, otherwise plain text. Group questions only when they are independent and low stakes, at most four, each with its default.
+Use the tool's multiple-choice question interface when it has one, otherwise plain text. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Group questions only when they are independent and low stakes, at most four, each with its default.
 
 After each answer, update the established list in one line. If the answer contradicts an earlier answer, an Accepted decision or a fact, show both sides and ask which one holds; never resolve a contradiction silently.
 
@@ -52,7 +52,7 @@ Rejected: each alternative and the reason.
 Revisit if: the condition that would reopen it.
 ```
 
-Ask for explicit confirmation of this text. A confirmation is a yes to this decision; an "ok" given to a different question is not one.
+Ask for explicit confirmation of this text. Show the full text in the conversation before asking, or include it in the question, so it is visible when the user confirms. A confirmation is a yes to this decision; an "ok" given to a different question is not one.
 
 ## 6. Record
 
