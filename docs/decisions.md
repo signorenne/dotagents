@@ -143,7 +143,7 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Decided by: maintainer
 - Date: 2026-10-30
 - Rule in: home/.agents/AGENTS.md (Refute before you rely; Grounding in the current state)
-- Decision: A refuted claim, or a difference between reality and memory or a document, stops the work for a report only when it changes an approved plan, a requirement or a decision. Any other refuted assumption is corrected and recorded; any other difference is corrected and named.
+- Decision: A refuted claim, or a difference between reality and memory or a document, stops the work for a report only when it changes the plan, a requirement or a decision. Any other refuted assumption is corrected and recorded; any other difference is corrected and named.
 - Why: Grounding stopped on every difference from memory or a document, and the Refute section sent refuted claims from those sources to the same stop, so a slip in the agent's own recollection, or a stale detail no step relies on, would interrupt routine work inside an approved plan. The maintainer still hears first about every change to what was approved.
 - Rejected: Narrowing only the Refute sentence (it would contradict Grounding's stop on memory); a list of document types that stop (misses a refuted assumption of the agent's own that changes the plan); leaving both rules as they were.
 - Revisit if: a session changes course on a refuted claim the maintainer wanted to hear about first, or sessions still stop for differences that change nothing.
