@@ -162,22 +162,40 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Session restarted from compact", result.stdout)
         self.assertIn("Current branch: work", result.stdout)
 
-    def test_status_keeps_the_index_column(self):
-        # " M" (changed, not staged) must not lose its space and read as "M " (staged).
+    def committed_repo(self) -> tuple[Path, dict]:
+        # An empty global config keeps the user's git settings out of the test; status.branch
+        # is a setting some users have, and its "## branch" line is not a change.
         repo = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, repo)
+        env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull}
         git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
                "-c", "commit.gpgsign=false"]
-        subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True)
+        subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True, env=env)
+        subprocess.run([*git, "config", "status.branch", "true"], check=True, env=env)
         (repo / "tracked.txt").write_text("one\n")
-        subprocess.run([*git, "add", "tracked.txt"], check=True)
-        subprocess.run([*git, "commit", "-q", "-m", "init"], check=True)
+        subprocess.run([*git, "add", "tracked.txt"], check=True, env=env)
+        subprocess.run([*git, "commit", "-q", "-m", "init"], check=True, env=env)
+        return repo, env
+
+    def refresh(self, repo: Path, env: dict) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
+                              input=json.dumps({"cwd": str(repo), "source": "resume"}),
+                              capture_output=True, text=True, check=False, env=env)
+
+    def test_status_keeps_the_index_column(self):
+        # " M" (changed, not staged) must not lose its space and read as "M " (staged).
+        repo, env = self.committed_repo()
         (repo / "tracked.txt").write_text("two\n")
-        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
-                                input=json.dumps({"cwd": str(repo), "source": "resume"}),
-                                capture_output=True, text=True, check=False)
+        result = self.refresh(repo, env)
         self.assertEqual(result.returncode, 0)
         self.assertIn("Uncommitted changes:\n M tracked.txt\n", result.stdout)
+
+    def test_clean_tree_reports_no_changes(self):
+        repo, env = self.committed_repo()
+        result = self.refresh(repo, env)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Last commits:", result.stdout)
+        self.assertNotIn("Uncommitted changes", result.stdout)
 
     def test_slow_git_stays_within_hook_timeout(self):
         tmp = Path(tempfile.mkdtemp())
