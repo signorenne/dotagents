@@ -8,8 +8,9 @@ instructions.
 
 - You question the agent Socratically ("why?", "what are you assuming?"): it answers that question, changes nothing unless asked, and shows evidence, assumptions and what would prove it wrong.
 - The agent guides you on choices that are yours (scope, public API, architecture, rules): the decide skill establishes what is known, isolates the missing information, asks one question at a time with a recommended option and the consequence of each option, and records the decision after your explicit confirmation. Up to four independent, low-stakes questions may share one message.
+- The agent questions its own work the same way: before relying on a claim (its own, yours, a document's, a subagent's, a test's) it tries to break the ones that matter with a check that could fail; rereading is not a check. Refuted assumptions go into the progress log and the handoff, and session-close turns those a rule should have prevented into proposed changes.
 - When you ask to learn, the Learning section and the tutor skill give graded help and announce every check.
-- Not maieutic, by design: routine engineering inside an approved plan, plain questions, clear requests, and "decide" (the agent chooses with its recommendations and lists the assumptions).
+- Not maieutic toward you, by design: routine engineering inside an approved plan, plain questions, clear requests, and "decide" (the agent chooses with its recommendations and lists the assumptions).
 
 ## Daily loop in a repository
 
@@ -21,6 +22,7 @@ instructions.
 | A choice that is yours | decide |
 | Before commit or PR | review |
 | Build and tests | gates, or gates narrow <module or test filter> |
+| Writing or reviewing tests | trustworthy-tests (implement and reviewer apply it on their own) |
 | New repository or audit | project-setup |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
@@ -32,7 +34,7 @@ The subagents keep the main conversation small: scout maps code and docs read-on
 - One task per session; start a fresh session (Claude Code: /clear) between unrelated tasks.
 - After a compaction or a resume, a hook reminds the agent that its memory of the code is a summary and prints the real branch, changes and last commits.
 - Specs, progress logs and handoffs live in .private/ inside each repository (git-ignored); decisions live in the project's decision log.
-- implement keeps .private/progress/<slug> current after every step: steps with commits and checks, and every decision marked by you or by the agent. Agent decisions stay "Review: pending" until you keep or change them; implement and session-close list the pending ones.
+- implement keeps .private/progress/<slug> current after every step: steps with commits, checks and failing runs of new or changed tests, refuted assumptions, and every decision marked by you or by the agent. Agent decisions stay "Review: pending" until you keep or change them; implement and session-close list the pending ones.
 - Check where tokens go with /context and /usage in Claude Code.
 
 ## Per project
