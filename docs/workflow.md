@@ -17,6 +17,7 @@ instructions.
 |---|---|
 | Small fix | Ask directly. Hooks block gate bypasses, flag em and en dashes, format C and C++ |
 | Feature or design work | spec (raise the effort), then a fresh session, then implement on the spec file, then session-close |
+| Large or parallel work (Claude Code) | Add "use a workflow" to the request (or ultracode); /deep-research for a question about the web; ask for parallel subagents for a question across several code areas. In auto mode only the first launch asks. Save a run you want again from /workflows |
 | A choice that is yours | decide |
 | Before commit or PR | review |
 | Build and tests | gates, or gates narrow <module or test filter> |
