@@ -16,7 +16,7 @@ Following the letter of this process while skipping its spirit (a token glance a
 
 Propose no fix before finishing this phase.
 
-1. Read the actual error: full message, exception type, innermost frame, line numbers. The exact words matter: "undefined is not a function" and "cannot read property of undefined" point at different mistakes. Errors often contain the answer.
+1. Read the actual error: full message, exception type, innermost frame, line numbers. The exact words matter: "undefined is not a function" and "cannot read property of undefined" point at different mistakes. Errors often contain the answer. For a failing CI check, get the failed job's log first: with gh, save gh run view <run-id> --log-failed to a file and read the part around the first error instead of printing the whole log; without gh, ask the user to paste the failing part.
 2. State observed versus expected: what happens, where, how often, on what input, and what should happen. Sometimes the bug dissolves here: the code is right and the expectation was wrong.
 3. Check what changed. "It worked yesterday" is a gift: recent commits, a dependency bump, a config or data change, a different environment.
 4. Reproduce, or say you cannot. A reliable reproduction turns debugging from argument into experiment. Failing to reproduce is evidence too: intermittent failures point to concurrency, ordering, caching, clocks or data dependence.
