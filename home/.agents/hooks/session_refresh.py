@@ -62,7 +62,9 @@ def main() -> int:
     elif branch:
         lines.append(f"Current branch: {branch}")
         # --no-optional-locks: a status stopped by the timeout leaves no .git/index.lock.
-        status = git("--no-optional-locks", "status", "--short", cwd=cwd, deadline=deadline)
+        # --no-branch: with status.branch set, the "## branch" line is not a change.
+        status = git("--no-optional-locks", "status", "--short", "--no-branch", cwd=cwd,
+                     deadline=deadline)
         if status is None:
             lines.append("Uncommitted changes not shown: git status did not finish in time.")
         elif status:
