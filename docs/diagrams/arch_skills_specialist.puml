@@ -32,13 +32,12 @@ asbuilt --> puml
 asbuilt --> preciseui
 asbuilt --> audit
 archdoc --> spec
-archdoc -- clean
+clean -right- archdoc
 audit --> implement
 preciseui --> tests
 
 parallel -- mech
 mech --> implement
-parallel --> implement
 parallel ---> isolated
 isolated --> implement
 mech -[hidden]down- isolated
@@ -49,6 +48,7 @@ qt -- events
 events -- debug
 clean --> spec
 clean ---> implement
+tests -[hidden]down- implement
 
 legend right
   Solid arrow: hands work to
