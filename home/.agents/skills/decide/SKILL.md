@@ -16,7 +16,7 @@ State in one line: the decision, its scope, and why it is needed now. If the req
 
 ## 2. Establish, before asking anything
 
-Collect what the sources already settle: current code and docs (re-read them, do not rely on memory), the project's decision log (Accepted entries bind), and the user's earlier answers in this session. Label each item: fact (with its source), user's statement, or your inference.
+Collect what the sources already settle: current code and docs (re-read them, do not rely on memory), the project's decision log (Accepted entries bind), and the user's earlier answers in this session. Label each item: fact (with its source), user's statement, or your inference. Check each factual statement and inference the choice rests on against the sources (the user's preferences and goals are inputs, not claims to test): when a fact contradicts one, say so with the evidence in your next question instead of building on it; when one that would change the choice cannot be checked, say that it is untested.
 Never ask the user something a file, a search or a command can answer. Check it instead.
 
 ## 3. Isolate the delta
