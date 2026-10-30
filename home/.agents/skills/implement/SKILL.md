@@ -49,7 +49,7 @@ If on main or master, create a branch first: <type>/<slug>, with the type from t
 
 ## 8. Gates
 
-When all steps are in, delegate to gate-runner for the project's full pre-PR gates. Fix failures in the code, never by weakening a gate.
+When all steps are in, delegate to gate-runner for the project's full pre-PR gates. Fix failures in the code, never by weakening a gate. An INCOMPLETE gate has not passed: never report the work as done while one stands; list it with its log path among the commands still to run (Commands still needed in the handoff format).
 
 ## 9. Review
 
