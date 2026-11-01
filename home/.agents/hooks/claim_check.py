@@ -471,6 +471,9 @@ def main() -> int:
         if not (isinstance(message, str) and isinstance(path, str) and path and claims_tests_pass(message)):
             return 0
         ignored = [os.path.normpath(tempfile.gettempdir()), os.path.normpath(Path.home() / ".claude")]
+        # scratchpad_dir: one of the common input fields every hook gets, Stop included
+        # (code.claude.com/docs/en/hooks, Common input fields; Claude Code 2.1.257 or later;
+        # absent without a scratchpad). It may lie outside the temp folder this process sees.
         if isinstance(payload.get("scratchpad_dir"), str) and payload["scratchpad_dir"]:
             ignored.append(os.path.normpath(payload["scratchpad_dir"]))
         missing = verdict(tail_records(path), message, ignored)

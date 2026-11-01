@@ -2062,7 +2062,9 @@ class ClaimCheck(unittest.TestCase):
                 ("failed edit", (self.tests(), self.edit(failed=True)))):
             with self.subTest(label=label):
                 self.assert_lets_stop(self.check(self.transcript(*parts)))
-        # Task notes, temporary files and Claude Code's own files: no test reads them.
+        # Task notes, temporary files and Claude Code's own files: no test reads them. The
+        # scratchpad comes from scratchpad_dir, a common input field of every hook event,
+        # Stop included (code.claude.com/docs/en/hooks, Common input fields, 2.1.257 or later).
         notes = self.transcript(self.tests(), self.edit("/w/.private/progress/task.org"),
                                 self.edit(str(Path(tempfile.gettempdir()) / "s" / "notes.md"), tool="Write"),
                                 self.edit(str(Path.home() / ".claude/projects/p/memory/m.md"), tool="Write"),
