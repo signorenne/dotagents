@@ -465,29 +465,35 @@ class Install(unittest.TestCase):
         self.assert_hook_group(post, "after_edit.py", "codex", ["apply_patch", "Edit", "Write"], ["Bash"],
                                range(1, 601))
 
-    def assert_stop_check(self, groups: list, payload: dict):
-        """One Stop group without a matcher whose command never keeps the agent going on its
-        own failure: exit 2 from a Stop hook continues the turn, and python3 exits 2 when
-        the script is missing, so the command ends in || true."""
+    def assert_stop_check(self, groups: list, payload: dict, scripts=("progress_check.py",)):
+        """One Stop group without a matcher whose commands, one per script, never keep the
+        agent going on their own failure: exit 2 from a Stop hook continues the turn, and
+        python3 exits 2 when the script is missing, so each command ends in || true."""
         (group,) = groups
         self.assertNotIn("matcher", group)
-        (handler,) = group["hooks"]
-        self.assertEqual(handler["type"], "command")
-        self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/progress_check.py" || true')
-        self.assertLessEqual(handler["timeout"], 10)
-        self.assertNotIn("onFailure", handler)
-        installed = self.run_hook(handler["command"], payload)
-        self.assertEqual((installed.returncode, installed.stdout, installed.stderr), (0, "", ""))
-        (self.home / ".agents/hooks/progress_check.py").unlink()
-        missing = self.run_hook(handler["command"], payload)
-        self.assertEqual((missing.returncode, missing.stdout), (0, ""))
+        self.assertEqual([handler["command"] for handler in group["hooks"]],
+                         [f'python3 "$HOME/.agents/hooks/{script}" || true' for script in scripts])
+        for handler, script in zip(group["hooks"], scripts):
+            with self.subTest(script=script):
+                self.assertEqual(handler["type"], "command")
+                self.assertLessEqual(handler["timeout"], 10)
+                self.assertNotIn("onFailure", handler)
+                installed = self.run_hook(handler["command"], payload)
+                self.assertEqual((installed.returncode, installed.stdout, installed.stderr), (0, "", ""))
+                (self.home / ".agents/hooks" / script).unlink()
+                missing = self.run_hook(handler["command"], payload)
+                self.assertEqual((missing.returncode, missing.stdout), (0, ""))
 
-    def test_claude_checks_the_progress_log_before_a_stop(self):
-        # Claude Code's Stop: no matcher; input stop_hook_active, last_assistant_message.
+    def test_claude_checks_the_progress_log_and_a_test_claim_before_a_stop(self):
+        # Claude Code's Stop: no matcher; input transcript_path, stop_hook_active,
+        # last_assistant_message. The claim check reads the transcript, whose shape only
+        # Claude Code's is known; Codex calls its own format not a stable interface.
         self.install("--tools", "claude")
         hooks = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]
-        self.assert_stop_check(hooks["Stop"], {"session_id": "s", "cwd": str(self.home), "hook_event_name": "Stop",
-                                               "stop_hook_active": False, "last_assistant_message": "Done."})
+        self.assert_stop_check(hooks["Stop"], {"session_id": "s", "transcript_path": str(self.home / "t.jsonl"),
+                                               "cwd": str(self.home), "hook_event_name": "Stop",
+                                               "stop_hook_active": False, "last_assistant_message": "Tests pass."},
+                               scripts=("progress_check.py", "claim_check.py"))
 
     def test_claude_points_repeated_bash_failures_to_a_change_of_approach(self):
         # Claude Code's PostToolUseFailure: matcher on the tool name; input session_id,

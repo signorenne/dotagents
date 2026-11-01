@@ -138,6 +138,11 @@
             "type": "command",
             "command": "python3 \"$HOME/.agents/hooks/progress_check.py\" || true",
             "timeout": 10
+          },
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/hooks/claim_check.py\" || true",
+            "timeout": 10
           }
         ]
       }
