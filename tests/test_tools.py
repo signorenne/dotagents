@@ -168,6 +168,67 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             "FAIL docs/links.org:8: broken link [[*Nowhere]]: no heading 'Nowhere' in docs/links.org",
         ])
 
+    def test_validate_reports_hidden_text_in_instruction_files(self):
+        # Hermes Agent's context-file scan: a model reads characters and HTML comments that a
+        # person reviewing the file does not see. Instruction files: the global and the
+        # repository's instructions, the bridges, every text file of a skill, the subagents
+        # and the path rules. Characters: zero width (U+200B to U+200D, U+2060), bidirectional
+        # controls (U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069), U+FEFF anywhere (a
+        # byte order mark too), the soft hyphen U+00AD and the tags U+E0000 to U+E007F. HTML
+        # comments: <!-- in Markdown, outside fenced code (shown as code there).
+        def prepend(path, text):
+            target = self.repo / path
+            target.write_text(text + target.read_text(encoding="utf-8"), encoding="utf-8")
+
+        def write(path, text):
+            (self.repo / path).write_text(text, encoding="utf-8")
+
+        prepend("home/.agents/AGENTS.md", "\ufeff")
+        prepend("AGENTS.md", "<!-- x -->\n")
+        prepend("CLAUDE.md", "a\u200db\n")
+        prepend("GEMINI.md", "a\u2060b\n")
+        prepend(".github/copilot-instructions.md", "ab\u200e\u200f\n")
+        prepend("home/.agents/skills/project-setup/templates/AGENTS.md.template", "<!-- t -->\n")
+        write("home/.agents/path-rules.json", '{"rules": {"qt-quick": ["**/*.qml\u202c"]}}\n')
+        scout = self.repo / "home/.agents/agents/scout.md"
+        kept = scout.read_text(encoding="utf-8").rstrip("\n")
+        scout.write_text(kept + "\n\nhidden\u2069\n", encoding="utf-8")
+        self.add_skill("hidden-text", body="Plain line.\nA soft\u00adhyphen and <!-- note -->.\n```html\n"
+                                           "<!-- shown as code -->\n```\n")
+        write("home/.agents/skills/spec/reference.txt", "tag\U000e0041s\n"
+              "\u200c|\u202a|\u202e|\u2066|\U000e0000|\U000e007f\n"
+              "\u00a0|\u200a|\u202f|\u2065|\u206a|\U000e0080|\u2028\n")
+        write("home/.agents/skills/spec/extra.md", "<!-- a -->\n")
+        write("claude-ai/skills/tutor/notes.org", "x\u202by\n<!-- not markdown -->\n")
+        write("docs/notes.md", "not loaded as instructions: \u200b <!-- c -->\n")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        hidden = "invisible or bidirectional character"
+        comment = "HTML comment in a Markdown instruction file"
+        reported = sorted(line for line in result.stdout.splitlines() if hidden in line or comment in line)
+        self.assertEqual(reported, sorted([
+            f"FAIL home/.agents/AGENTS.md:1:1: {hidden} U+FEFF",
+            f"FAIL AGENTS.md:1:1: {comment}",
+            f"FAIL CLAUDE.md:1:2: {hidden} U+200D",
+            f"FAIL GEMINI.md:1:2: {hidden} U+2060",
+            f"FAIL .github/copilot-instructions.md:1:3: {hidden} U+200E",
+            f"FAIL .github/copilot-instructions.md:1:4: {hidden} U+200F",
+            f"FAIL home/.agents/skills/project-setup/templates/AGENTS.md.template:1:1: {comment}",
+            f"FAIL home/.agents/path-rules.json:1:34: {hidden} U+202C",
+            f"FAIL home/.agents/agents/scout.md:{kept.count(chr(10)) + 3}:7: {hidden} U+2069",
+            f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:7: {hidden} U+00AD",
+            f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:19: {comment}",
+            f"FAIL home/.agents/skills/spec/reference.txt:1:4: {hidden} U+E0041",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:1: {hidden} U+200C",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:3: {hidden} U+202A",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:5: {hidden} U+202E",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:7: {hidden} U+2066",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:9: {hidden} U+E0000",
+            f"FAIL home/.agents/skills/spec/reference.txt:2:11: {hidden} U+E007F",
+            f"FAIL home/.agents/skills/spec/extra.md:1:1: {comment}",
+            f"FAIL claude-ai/skills/tutor/notes.org:1:2: {hidden} U+202B",
+        ]))
+
     def test_validate_checks_subagent_effort_and_turn_limit(self):
         # Claude Code's effort levels are low, medium, high, xhigh and max; maxTurns is a
         # positive whole number (code.claude.com/docs/en/sub-agents).

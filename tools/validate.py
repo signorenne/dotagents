@@ -23,6 +23,14 @@ Checks:
 - no em dash or en dash in any text file git tracks or would track (every file
   outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
+- the files agents load as instructions (home/.agents/AGENTS.md, every text file of a
+  skill in either root, the subagents, the path rules, and the repository's AGENTS.md,
+  CLAUDE.md, GEMINI.md and .github/copilot-instructions.md) hold no character a reader
+  does not see but a model reads: zero width (U+200B to U+200D, U+2060), bidirectional
+  controls (U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069), U+FEFF anywhere (a
+  byte order mark too: the files are plain UTF-8), the soft hyphen U+00AD and the tags
+  U+E0000 to U+E007F; and the Markdown ones hold no HTML comment outside fenced code
+  (it hides text from a reader of the rendered file, not from the model);
 - the global instructions stay under 200 lines;
 - every Python file compiles;
 - every Org link in an Org file resolves: [[file:path]] names an existing file
@@ -65,6 +73,14 @@ ORG_HEADING = re.compile(r"^\*+[ \t]+(.*?)[ \t]*$", re.M)
 ORG_TAGS = re.compile(r"[ \t]+:([\w@#%]+:)+$")
 # Verbatim and code spans (=...=, ~...~) on one line: their text is not a link.
 ORG_VERBATIM = re.compile(r"(?<![^\s(\[{'\"-])([=~])(?=\S)[^\n]*?(?<=\S)\1(?=[\s.,:;!?)\]}'\"-]|$)", re.M)
+# Files and folders agents load as instructions, and the characters in them that a reader
+# does not see but a model reads (the context-file scan of Hermes Agent).
+INSTRUCTION_FILES = {HOME / "AGENTS.md", PATH_RULES, ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / "GEMINI.md",
+                     ROOT / ".github" / "copilot-instructions.md"}
+INSTRUCTION_FOLDERS = (HOME / "skills", ONLINE, HOME / "agents")
+HIDDEN_CHARACTER = re.compile("[\u00ad\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff\U000e0000-\U000e007f]")
+MARKDOWN_SUFFIXES = (".md", ".md.template")
+FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
 
 
 def frontmatter(path: Path) -> tuple[dict, str]:
@@ -293,6 +309,30 @@ def check_org_links(path: Path, text: str, cache: dict, errors: list) -> None:
             errors.append(f"{relative(path)}:{line}: broken link [[{target}]]: {problem}")
 
 
+def instruction_file(path: Path) -> bool:
+    return path in INSTRUCTION_FILES or any(folder in path.parents for folder in INSTRUCTION_FOLDERS)
+
+
+def check_hidden_text(rel: Path, text: str, errors: list) -> None:
+    """Report each hidden character with its line, column and code point and, in Markdown,
+    each HTML comment outside fenced code."""
+    markdown = rel.name.endswith(MARKDOWN_SUFFIXES)
+    fence = ""
+    for number, line in enumerate(text.split("\n"), start=1):
+        for match in HIDDEN_CHARACTER.finditer(line):
+            errors.append(f"{rel}:{number}:{match.start() + 1}: invisible or bidirectional character "
+                          f"U+{ord(match.group()):04X}")
+        if not markdown:
+            continue
+        marker = FENCE.match(line)
+        if marker and (not fence or (marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence)
+                                     and not line.strip().strip(fence[0]))):
+            fence = "" if fence else marker.group(1)
+        elif not fence:
+            for match in re.finditer("<!--", line):
+                errors.append(f"{rel}:{number}:{match.start() + 1}: HTML comment in a Markdown instruction file")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -314,6 +354,8 @@ def main() -> int:
         rel = path.relative_to(ROOT)
         if path.suffix == ".org":
             check_org_links(path, text, org_cache, errors)
+        if instruction_file(path):
+            check_hidden_text(rel, text, errors)
         for number, line in enumerate(text.splitlines(), start=1):
             if any(dash in line for dash in DASHES):
                 errors.append(f"{rel}:{number}: em or en dash")
