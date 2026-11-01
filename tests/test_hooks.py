@@ -1722,6 +1722,18 @@ class ClaimCheck(unittest.TestCase):
                 self.assert_blocks(self.check(transcript), self.BEFORE)
                 self.assert_lets_stop(self.check(transcript, stop_hook_active=True))  # continued once already
 
+    NONE = "no test ran after your last file edit"
+
+    def test_an_edit_with_no_test_run_at_all_blocks_once(self):
+        # The maintainer's decision of 29 October 2026: block when, after the last edit, no test run
+        # came, whether or not a run came before it.
+        for label, parts in (("edit only", (self.edit(),)),
+                             ("edit, then a quiet command", (self.edit(), self.tests(True, "git status --short", "")))):
+            with self.subTest(label=label):
+                transcript = self.transcript(*parts)
+                self.assert_blocks(self.check(transcript), self.NONE)
+                self.assert_lets_stop(self.check(transcript, stop_hook_active=True))  # continued once already
+
     def test_a_failing_run_blocks(self):
         for parts in ((self.edit(), self.tests(False)), (self.tests(False),),
                       (self.edit(), self.tests(False), self.tests(False)),
@@ -1730,6 +1742,52 @@ class ClaimCheck(unittest.TestCase):
                                                "Ran 5 tests in 0.1s\n\nFAILED (failures=1)"))):
             with self.subTest(parts=len(parts)):
                 self.assert_blocks(self.check(self.transcript(*parts)), self.FAILED)
+
+    def test_a_run_is_judged_by_its_runners_summary(self):
+        # Output lines that mention failures or errors (a test's own log, jest's
+        # console.error, Go's t.Log, pytest --lf's header) do not make a pass a failure.
+        passing = {
+            "python3 -m pytest --lf": "run-last-failure: rerun previous 2 failures\ntests/test_a.py ....\n"
+                                      "============================== 4 passed in 0.21s ===============================",
+            "python3 -m pytest -rA": "tests/test_parse.py::test_report PASSED\n----- Captured log call -----\n"
+                                     "WARNING parse: found 2 errors in input\n===== 1 passed in 0.05s =====",
+            "npx jest": "  console.error\n    Error: 3 errors while loading fixtures\n\n      at Object.<anonymous> "
+                        "(src/a.test.js:4:13)\n\nPASS src/a.test.js\nTest Suites: 1 passed, 1 total\n"
+                        "Tests:       4 passed, 4 total",
+            "go test ./...": "=== RUN   TestRetry\n    retry_test.go:12: attempt 1 failed, retrying\n"
+                             "--- PASS: TestRetry (0.00s)\nPASS\nok  \texample.com/app\t0.012s"}
+        for command, output in passing.items():
+            with self.subTest(command=command):
+                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.tests(True, command, output))))
+        # A pipe into tail hides the exit status; the summary still tells a failure.
+        failing = {
+            "python3 -m pytest | tail -2": "FAILED tests/test_a.py::test_x - assert 1 == 2\n"
+                                           "========= 1 failed, 3 passed in 0.30s =========",
+            "go test ./... | tail -3": "--- FAIL: TestX (0.00s)\nFAIL\nFAIL\texample.com/app\t0.010s",
+            "cargo test 2>&1 | tail -1": "test result: FAILED. 4 passed; 1 failed; 0 ignored; 0 measured",
+            "npx jest 2>&1 | tail -1": "Tests:       1 failed, 3 passed, 4 total"}
+        for command, output in failing.items():
+            with self.subTest(command=command):
+                self.assert_blocks(self.check(self.transcript(self.edit(), self.tests(True, command, output))),
+                                   self.FAILED)
+        # The call failed but the runner's summary says the tests passed: a later command
+        # of the chain failed, so the outcome is unknown and the stop goes through.
+        chained = self.call("Bash", {"command": "python3 -m pytest -q && git diff --exit-code"},
+                            "Exit code 1\n.....\n5 passed in 0.20s\ndiff --git a/x b/x", failed=True)
+        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), chained)))
+
+    def test_the_last_run_after_the_last_edit_decides(self):
+        # A later failing run wins over an earlier pass, and a later pass over an earlier
+        # failure; a subagent call (outcome unknown) counts only when it comes last.
+        gates = self.call("Agent", {"subagent_type": "gate-runner", "prompt": "Run the gates."}, "PASS")
+        for parts, blocks in (((self.edit(), self.tests(), self.tests(False)), True),
+                              ((self.edit(), self.tests(False), self.tests()), False),
+                              ((self.edit(), gates, self.tests(False)), True),
+                              ((self.edit(), self.tests(False), gates), False)):
+            with self.subTest(parts=[record["message"]["content"][0].get("name") for part in parts
+                                     for record in part[:1]], blocks=blocks):
+                result = self.check(self.transcript(*parts))
+                (self.assert_blocks(result, self.FAILED) if blocks else self.assert_lets_stop(result))
 
     def test_no_claim_lets_the_stop_through(self):
         # Each transcript would block a claim: only the message lets the stop through.
@@ -1766,7 +1824,7 @@ class ClaimCheck(unittest.TestCase):
             "last text before the last call": self.transcript(self.said("Running the tests."), self.tests(),
                                                               self.edit(), final=None),
             "another final message": self.transcript(self.tests(), self.edit(), final="Something else."),
-            "no test run to match": self.transcript(self.edit()),
+            "no file edit to compare with": self.transcript(self.tests(True, "git status --short", "")),
         }
         codex = self.tmp / "rollout.jsonl"
         codex.write_text("".join(json.dumps(r) + "\n" for r in (
@@ -1824,27 +1882,175 @@ class ClaimCheck(unittest.TestCase):
 
     def test_a_possible_run_after_the_last_edit_lets_the_stop_through(self):
         # Tests may run in a subagent (the gates skill's gate-runner), in the background or
-        # through a script with no known runner's name: the claim is not checked then.
+        # in a call whose result is missing: the claim is not checked then.
         for label, later in (
                 ("subagent", self.call("Agent", {"subagent_type": "gate-runner", "prompt": "Run the gates."}, "PASS")),
                 ("background", self.call("Bash", {"command": "python3 -m pytest", "run_in_background": True},
                                          "Command running in background with ID: b1")),
-                ("script", self.call("Bash", {"command": "sh tools/gates.sh"}, "GATES rc=0")),
                 ("no result", self.call("Bash", {"command": "python3 -m pytest"}, answered=False))):
             with self.subTest(label=label):
                 self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), later)))
-        # A run started in the background has no outcome yet: it is no run to match a claim to.
+        # A run started in the background before the last edit supports no claim about the edit: with
+        # nothing after the edit, the claim blocks (the maintainer's decision of 29 October 2026).
         background = self.call("Bash", {"command": "python3 -m pytest", "run_in_background": True},
                                "Command running in background with ID: b2")
-        self.assert_lets_stop(self.check(self.transcript(background, self.edit())))
+        self.assert_blocks(self.check(self.transcript(background, self.edit())), self.NONE)
+
+    def failing(self, command: str) -> list:
+        return self.call("Bash", {"command": command}, "Exit code 1\nsomething went wrong", failed=True)
+
+    def test_a_quiet_command_showing_a_runner_summary_counts_as_that_run(self):
+        # The maintainer's decision: git commit's hooks may run the tests, and any quiet
+        # command may show a runner's summary, so output with a summary (pre-commit's per-hook
+        # Passed and Failed lines too) is judged as a run with that outcome; output without
+        # one leaves the command quiet.
+        commit = {"command": "git commit -m 'feat: x'"}
+        hooks_passed = self.call("Bash", commit, "pytest" + "." * 60 + "Passed\n[feat/x 1a2b3c4] feat: x\n"
+                                 " 1 file changed, 2 insertions(+)")
+        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), hooks_passed)))
+        for label, output in (("runner summary", "pytest" + "." * 60 + "Failed\n- hook id: pytest\n- exit code: 1\n\n"
+                                                 "1 failed, 3 passed in 0.30s"),
+                              ("pre-commit line", "ruff" + "." * 62 + "Failed\n- hook id: ruff\n- exit code: 1")):
+            with self.subTest(failed=label):
+                hooks_failed = self.call("Bash", commit, output, failed=True)
+                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), hooks_failed)), self.FAILED)
+        shown = self.call("Bash", {"command": "cat test.log"}, "===== 4 passed in 0.21s =====")
+        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), shown)))
+        for label, output in (("no runner output", "[feat/x 1a2b3c4] feat: x\n 1 file changed"),
+                              ("hook skipped", "pytest" + "." * 41 + "(no files to check)Skipped\n[feat/x 1a2b3c4] x")):
+            with self.subTest(quiet=label):
+                plain = self.call("Bash", commit, output)
+                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), plain)), self.BEFORE)
+
+    def test_an_unknown_command_that_changes_files_is_an_edit_then_a_doubt(self):
+        # pre-commit run --all-files may reformat a file and then run the tests: an edit,
+        # then a run of unknown outcome. A quiet command that changes files is an edit only.
+        def changing(command, output, failed=False):
+            return self.call("Bash", {"command": command}, output, failed=failed, extra={
+                "stdout": output, "stderr": "", "interrupted": False,
+                "bashEditDiff": {"changedFiles": ["/w/src/app.py"], "files": [], "moreFiles": 0}})
+        reformat = changing("pre-commit run --all-files", "black" + "." * 63 + "Failed\n- files were modified by "
+                            "this hook\npytest" + "." * 62 + "Passed", failed=True)
+        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), reformat)))
+        copied = changing("cp /tmp/app.py src/app.py", "")
+        self.assert_blocks(self.check(self.transcript(self.tests(), copied)), self.BEFORE)
+
+    def test_powershell_is_read_like_bash_and_an_mcp_tool_may_run_tests(self):
+        # Claude Code's PowerShell tool takes its command in the same fields as Bash
+        # (code.claude.com/docs/en/tools-reference, PowerShell tool); an MCP tool's effect is
+        # unknown, so it may have run tests (the maintainer's decision); the other built-in
+        # tools (Read, Grep...) run none.
+        powershell = self.call("PowerShell", {"command": "python -m pytest"},
+                               "Exit code 1\n1 failed, 2 passed in 0.20s", failed=True)
+        self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), powershell)), self.FAILED)
+        mcp = self.call("mcp__ci__run_suite", {"suite": "unit"}, "ok")
+        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), mcp)))
+        read = self.call("Read", {"file_path": "/w/src/app.py"}, "1\tx = 1")
+        self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), read)), self.BEFORE)
+
+    def test_a_launcher_s_own_options_come_before_the_program(self):
+        # uv run's options that take a value (docs.astral.sh/uv/reference/cli, uv run) and
+        # npx's (npm exec --help) are skipped with their value; npx -c runs its text; pnpm,
+        # npm and yarn exec or dlx and bunx launch the program after them.
+        for command in ("uv run --with pytest-cov pytest", "uv --directory app run -p 3.12 --frozen pytest",
+                        "uv run -m pytest", "npx --yes jest", "npx --package=jest jest --ci", "npx -c 'jest --ci'",
+                        "pnpm exec vitest run", "npm exec -- jest", "yarn exec jest", "bunx vitest", "bun x vitest"):
+            with self.subTest(command=command):
+                self.assert_blocks(self.check(self.transcript(self.edit(), self.failing(command))), self.FAILED)
+        for command in ("uv run --with pytest-cov python gen.py", "uv sync", "npx --yes prettier --write ."):
+            with self.subTest(command=command):
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+
+    def test_a_build_tool_runs_tests_only_through_a_target_named_so(self):
+        # Option values (make -C, -f; ninja -C; mvn -pl; gradle -p, -x; just --justfile) and
+        # VAR=value words are not targets, and cmake builds only its --target or -t values.
+        # A build whose targets name no test may still run some: kind 3, the stop goes
+        # through even when it failed; a target named test, check... is a known run.
+        for command in ("ninja -C build-tests", "cmake -B build-test -S .", "make -C tests clean",
+                        "mvn -pl checkstyle compile", "gradle build -x test", "cmake --build build-test",
+                        "make -f test.mk all", "just --justfile test.just build", "make -j 4", "make CHECK=1",
+                        "ninja -t targets test"):
+            with self.subTest(kind=3, command=command):
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+        for command in ("make -C build check", "ninja -C build test", "cmake --build build --target test",
+                        "cmake --build b -t check", "cmake --build b --target all check", "mvn -pl core verify",
+                        "./gradlew -p app test", "make -j4 test", "make -j 4 check", "make test CC=clang",
+                        "rake test", "just test"):
+            with self.subTest(kind=1, command=command):
+                self.assert_blocks(self.check(self.transcript(self.edit(), self.failing(command))), self.FAILED)
+
+    def test_commands_after_the_last_edit_fall_in_three_kinds(self):
+        # The maintainer's rule: (1) a known test runner, or a script or build target named
+        # test, gate, check or verify, counts by its outcome; (2) a command that certainly
+        # runs no tests never counts; (3) anything else may have run tests: the outcome is
+        # unknown and the stop goes through. Only a known runner can block on its failure.
+        runners = ("sh tools/gates.sh", "./run_tests.sh", "python3 tools/check.py", "bash -c 'cd w && pytest -q'",
+                   "uv run pytest", "npx jest", "npm run test:unit", "make -C build check", "mvn -q verify",
+                   "cmake --build build --target test", "env CI=1 timeout 600 python3 -m pytest",
+                   "cd /w && python3 -m unittest discover -s tests 2>&1 | tail -3", "yarn vitest run")
+        for command in runners:
+            with self.subTest(kind=1, command=command):
+                self.assert_blocks(self.check(self.transcript(self.edit(), self.failing(command))), self.FAILED)
+        quiet = ("git status", "git add tests/test_a.py", "git commit -m 'fix tests'", "git -C /w diff --stat",
+                 "git diff -- tests/test_unittest.py", "git log --grep verify", "git show HEAD", "git restore src/a.py",
+                 "git stash", "cat tests/x.py | head -5", "ls tests", "tail -5 log.txt", "wc -l a.py",
+                 "grep -rn pytest docs", "rg pytest", "find tests -name '*.py'",
+                 "find . -name '*.py' -exec grep -n pytest {} +", "echo make test", "printf done", "mkdir -p out",
+                 "cp a b", "mv a b", "sed -n 1,5p a.py", "true", "cd /w && git status", "bash -c 'git status'")
+        for command in quiet:
+            with self.subTest(kind=2, command=command):
+                later = self.call("Bash", {"command": command}, "")
+                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), later)), self.BEFORE)
+        unknown = ("test -f setup.cfg", "python3 -c \"print('test')\"", "date", "sed -i s/a/b/ a.py", "npm install",
+                   "python3 gen.py", "find . -name '*.js' -exec node {} \\;", "git checkout -b x", "sed -n -i 1p a.py",
+                   "cd /w && python3 gen.py")
+        for command in unknown:
+            with self.subTest(kind=3, command=command):
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+        # Runners the hook does not know (the second review's list) pass through as kind 3.
+        for command in ("node --test", "uv run --with pytest-cov pytest", "xcodebuild test -scheme App",
+                        "php artisan test", "bin/rails test", "hatch test", "pnpm exec vitest run", "gotestsum",
+                        "yarn workspace app test"):
+            with self.subTest(review=command):
+                later = self.call("Bash", {"command": command}, "done")
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), later)))
+        # A failed known run decides unless a command of unknown kind follows it.
+        for later, blocks in ((self.call("Bash", {"command": "date"}, "Thu"), False),
+                              (self.call("Bash", {"command": "git status"}, ""), True)):
+            with self.subTest(after_the_failure=later[0]["message"]["content"][0]["input"]["command"]):
+                result = self.check(self.transcript(self.edit(), self.tests(False), later))
+                (self.assert_blocks(result, self.FAILED) if blocks else self.assert_lets_stop(result))
+
+    def test_without_the_guard_the_stop_goes_through(self):
+        # The hook reads commands with the guard's shell parser; a missing or broken copy
+        # lets every stop through, and importing it leaves no cache in the hooks folder.
+        hooks = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, hooks)
+        shutil.copy(HOOKS / "claim_check.py", hooks)
+        transcript = self.transcript(self.tests(), self.edit())
+        self.assert_blocks(self.check(transcript), self.BEFORE)  # with the guard next to it
+        alone = subprocess.run([sys.executable, str(hooks / "claim_check.py")], capture_output=True, text=True,
+                               timeout=20, check=False, input=json.dumps({
+                                   "transcript_path": transcript, "stop_hook_active": False,
+                                   "last_assistant_message": self.CLAIM}))
+        self.assert_lets_stop(alone)
+        shutil.copy(HOOKS / "guard_bash.py", hooks)
+        paired = subprocess.run([sys.executable, str(hooks / "claim_check.py")], capture_output=True, text=True,
+                                timeout=20, check=False, input=json.dumps({
+                                    "transcript_path": transcript, "stop_hook_active": False,
+                                    "last_assistant_message": self.CLAIM}))
+        self.assert_blocks(paired, self.BEFORE)
+        self.assertEqual(sorted(p.name for p in hooks.iterdir()), ["claim_check.py", "guard_bash.py"])
 
     def test_shell_edits_count_and_notes_do_not(self):
         def shell(command, changed, more=0, output=""):
             return self.call("Bash", {"command": command}, output, extra={
                 "stdout": output, "stderr": "", "interrupted": False,
                 "bashEditDiff": {"changedFiles": changed, "files": [], "moreFiles": more}})
-        for label, later in (("changed file", shell("sed -i s/a/b/ src/app.py", ["/w/src/app.py"])),
-                             ("more files", shell("python3 gen.py", [], more=3))):
+        # A quiet command that changes files is an edit (an unknown one is an edit and then a
+        # doubt: test_an_unknown_command_that_changes_files_is_an_edit_then_a_doubt).
+        for label, later in (("changed file", shell("cp /tmp/app.py src/app.py", ["/w/src/app.py"])),
+                             ("more files", shell("mv build/gen src/gen", [], more=3))):
             with self.subTest(label=label):
                 self.assert_blocks(self.check(self.transcript(self.tests(), later)), self.BEFORE)
         # A test run that changes files (snapshots) is a run; a command that changes nothing
