@@ -77,7 +77,10 @@ move a branch (=git rebase=, =git merge=, =git update-ref=, a forced
 you first. In Claude Code and Codex, when the agent ends its turn on a task
 branch whose progress log misses one of the branch's commits, the progress
 check sends it back once to record it; after a rebase the new hashes are
-enough.
+enough. In Claude Code, a final message that says the tests pass sends the
+agent back once when the session's transcript shows that no test run passed
+after its last file edit (the claim check), to run the tests or say they
+were not run.
 
 * Context hygiene
 

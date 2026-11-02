@@ -40,7 +40,7 @@ each edge carries:
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
-  (=agents/=), the six hook scripts (=hooks/=) and the path rules
+  (=agents/=), the seven hook scripts (=hooks/=) and the path rules
   (=path-rules.json=, each skill with the file globs that call for it).
 - =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
@@ -56,7 +56,8 @@ each edge carries:
   (all but the first two also as =git -C <dir> ...=), the commands that land
   a branch, and =rm -rf=; deny =git push= (also as =git -C <dir> push=) and
   reading =.env= files, =~/.ssh= and =~/.gnupg=; the synced plugin
-  =engineering@synced= turned off; the six hook entries.
+  =engineering@synced= turned off; the hook entries (seven handlers on six
+  events).
 - =install.py= turns the three sources into =~/.agents= and each tool's files.
 - =tools/build.py= writes its zips to =dist/= (git-ignored).
 - =tools/validate.py= checks the source; its docstring lists every check
@@ -427,8 +428,8 @@ Where each tool runs them:
 - Claude Code: the guard on =PreToolUse= for =Bash=, the after-edit hook on
   =PostToolUse= for =Edit= and =Write=, the compaction brief on =PreCompact=
   (manual and automatic), the session refresh on =SessionStart= after
-  =compact= or =resume=, the progress check on =Stop=, and the repeated
-  failure hook on =PostToolUseFailure= for =Bash=.
+  =compact= or =resume=, the progress check and the claim check on =Stop=,
+  and the repeated failure hook on =PostToolUseFailure= for =Bash=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
   =Write=, =SessionStart= after =compact= or =resume=, whose plain stdout
   Codex adds as developer context, and =Stop=.
@@ -440,12 +441,13 @@ Where each tool runs them:
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
   =str_replace_editor= and =apply_patch=.
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=;
-  its stop input has no =stop_hook_active=, so there the progress check
-  lets every stop through.
+  its stop input has no =stop_hook_active=, so there the progress check and
+  the claim check let every stop through.
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
 refresh and the progress check (Claude Code and Codex), the compaction
-brief and the repeated failure hook (Claude Code) get 10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
+brief, the claim check and the repeated failure hook (Claude Code) get
+10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
 never stops the work, and prints nothing but JSON on Gemini CLI's and
 Antigravity CLI's stdout. In Claude Code the guard's entry sets =onFailure=
 to =block=: a guard that cannot start, crashes or times out blocks the
@@ -506,6 +508,63 @@ Progress check (=progress_check.py=):
 4. Anything else, an error or a git slower than 8 s lets the stop through,
    and its command ends in =|| true=, since exit 2 from a Stop hook keeps the
    agent going.
+
+Claim check (=claim_check.py=, Claude Code only):
+
+1. Let the stop through unless =stop_hook_active= is =false= and
+   =last_assistant_message= says the tests pass ("tests pass" or "passed",
+   "189 tests OK", "the tests are passing", "the suite is green") in a
+   clause that holds no negation, condition or plan (not, if, unless,
+   should, will, ensure and the like).
+2. Read the last 4,000,000 bytes of =transcript_path=, a regular file opened
+   without blocking (a FIFO cannot hold the hook), and go on only when that
+   tail ends with the final message after every tool call: the file may lag
+   the conversation, and its format is not documented.
+3. List the session's events in order. An edit: an =Edit=, =Write=,
+   =MultiEdit= or =NotebookEdit= call that did not fail, or a shell call
+   whose result records changed files (=bashEditDiff=), outside the task
+   notes (a =.private= folder), the temp folder, the scratchpad
+   (=scratchpad_dir=) and =~/.claude=. A known test run, with its outcome.
+   A run of unknown outcome: a subagent (=Agent=, =Task=), an =mcp__= tool,
+   a known run in the background or without a result, a failed call whose
+   summary says the tests passed (a later command of the chain failed), and
+   a shell command of the third kind below. The other built-in tools run no
+   tests.
+4. Sort each =Bash= or =PowerShell= command (read alike) with
+   =guard_bash.py='s parser, which takes off assignments and wrappers
+   (=env=, =sudo=, =timeout=), with its rough split when the text does not
+   parse, and the text of =bash -c= followed up to 4 levels deep:
+   - a known test run: a test runner (=pytest=, =python -m unittest=,
+     =ctest=, =jest=, =go test=, =cargo test=, =npm test= and the like), a
+     script named test, gate, check or verify (=./run_tests.sh=,
+     =sh tools/gates.sh=), or a build tool with such a target (=make check=,
+     =mvn verify=, =cmake --build b --target test=), also through a launcher
+     (=uv run=, =npx=, =pnpm exec=, their own options skipped);
+   - a quiet command, which certainly runs no tests: =git status=, =add=,
+     =commit=, =diff=, =log=, =show=, =restore= or =stash= (after git's own
+     options), =cat=, =ls=, =head=, =tail=, =wc=, =grep=, =rg=, =find= whose
+     =-exec= commands are quiet, =echo=, =printf=, =mkdir=, =cp=, =mv=,
+     =sed -n= without =-i=, =true=, =cd=; it becomes a run with that outcome
+     when its output shows a runner's summary or pre-commit's
+     =hook....Passed= or =Failed= line (the maintainer's decision);
+   - anything else, unknown: a build without a test target, =python3 gen.py=,
+     a PowerShell cmdlet. An unknown command whose result records changed
+     files is an edit and then a run of unknown outcome.
+5. A run failed when a runner's summary line says so (unittest, pytest, go,
+   cargo, jest and vitest, mocha, rspec and bats, ctest, gradle, maven,
+   dotnet, phpunit, tox, make, pre-commit), or when the call failed and no
+   summary says the tests passed; a pipe into =tail= hides the exit status,
+   and other lines, such as a test's own log, are not read.
+6. When the tail holds a known run that passed or failed, answer
+   ={"decision": "block", "reason": ...}= if nothing but quiet commands
+   came after the last edit ("every test run came before your last file
+   edit") or the last event after it is a failed run ("the last test runs
+   failed"); the reason asks to run the tests and report their result, or
+   to say plainly that they were not run after the last edit, and then to
+   end the turn.
+7. Anything else, an error or a missing =guard_bash.py= lets the stop
+   through, and its command ends in =|| true=. A transcript of 20 MB is read
+   in under 3 s in the tests, within the 10 s timeout.
 
 Repeated failure (=repeated_failure.py=):
 

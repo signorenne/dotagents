@@ -39,8 +39,8 @@ depend on the model remembering it.
   model, and where set effort, maxTurns and color), the source of every other
   tool's copy.
 - /Hooks/ : =guard_bash.py=, =after_edit.py=, =session_refresh.py=,
-  =compact_brief.py=, =progress_check.py= and =repeated_failure.py= in
-  =home/.agents/hooks/=,
+  =compact_brief.py=, =progress_check.py=, =claim_check.py= and
+  =repeated_failure.py= in =home/.agents/hooks/=,
   shared by every tool; the guard and the after-edit hook learn which tool
   called them from =--tool=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
@@ -224,6 +224,7 @@ against it (events, matchers, tool names, timeouts).
 | =session_refresh.py=  | at session start after a compaction or a resume | Claude Code, Codex                     | 10 s    |
 | =compact_brief.py=    | before a compaction                             | Claude Code                            | 10 s    |
 | =progress_check.py=   | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
+| =claim_check.py=      | before the agent ends its turn                  | Claude Code                            | 10 s    |
 | =repeated_failure.py= | after a shell command fails                     | Claude Code                            | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
@@ -272,7 +273,27 @@ its turn: on a branch =<type>/<slug>= whose =.private/progress/<slug>.*=
 exists, it sends the agent back once when a commit of the branch (one no
 other local or remote-tracking branch holds) is newer than the log or not
 named in it, to record the step, its commit and its check (after a rebase,
-the new hashes). The repeated
+the new hashes). The claim check runs at the same moment, in Claude Code
+only: when the agent's final message says the tests pass ("all tests pass",
+"189 tests OK", "the suite is green", but not a hedged "should pass"), it
+reads the end of the session's transcript and sends the agent back once, to
+run the tests or say they were not run after its last edit, when a known
+test run is there and, after the last file edit, either nothing but commands
+that certainly run no tests came, or the last known run failed and no
+command of unknown kind followed it. It sorts each shell command after the
+edit, split with the guard's shell parser, into three kinds (the
+maintainer's rule): a known test run (a test runner, or a script or build
+target named test, gate, check or verify, also behind wrappers, launchers
+and =bash -c=), judged by its runner's summary lines; a quiet command
+(=git status=, =add=, =commit=, =diff=, =log=, =show=, =restore= or =stash=,
+=cat=, =ls=, =grep=, =find=, =sed -n= and the like), which counts as a run
+only when its output shows a runner's summary, as =git commit= running the
+tests in its hooks does; and anything else, which may have run tests, so its
+outcome is unknown. An unknown command that changes files counts as an edit
+and then as such a run; PowerShell commands are read like Bash ones; a
+subagent or an MCP tool counts as a run of unknown outcome too. Edits of
+task notes (=.private/=), temporary files, the scratchpad and =~/.claude= do
+not count. The repeated
 failure hook counts each failing shell command per session, by its command
 and its whole error with each word that holds a digit masked after the first
 line (timings, counts, addresses and temporary names change between runs);
@@ -298,8 +319,8 @@ The hooks share one failure model:
 - /Send the agent back at most once/ : exit 2 or a block decision from a Stop
   hook keeps the agent going, Codex documents no cap on it, and Cursor runs
   Claude Code's Stop hooks with no cap and without =stop_hook_active=. The
-  progress check blocks only when =stop_hook_active= is =false=, lets every
-  error through, and its command ends in =|| true=.
+  progress check and the claim check block only when =stop_hook_active= is
+  =false=, let every error through, and their commands end in =|| true=.
 - /Block with exit 2/ : the reason goes to stderr, which the agent sees.
   Copilot CLI shows stderr only to the user, so the guard also prints a deny
   decision with the reason on stdout, and the after-edit hook sends its report
@@ -313,9 +334,10 @@ The hooks share one failure model:
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
   (8 s for the notes listing and the git calls of the session refresh, of
-  the compaction brief and of the progress check, clang-format under 60 s);
-  the brief also stays under the 10,000 characters past which Claude Code
-  cuts it.
+  the compaction brief and of the progress check, clang-format under 60 s,
+  the last 4,000,000 bytes of the transcript for the claim check, a regular
+  file opened without blocking); the brief also stays under the 10,000
+  characters past which Claude Code cuts it.
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
   prompt never offers it. In Codex, =~/.codex/rules/dotagents.rules= forbids
@@ -444,7 +466,11 @@ sensor, the check that catches a breach. The reviewer checks every change
 against all of them (conflicts with Accepted decisions, in
 =home/.agents/agents/reviewer.md=), so the table names only the sensors
 specific to each rule: "none: the model only" means that, apart from that
-review, only the agent's own care keeps the rule.
+review, only the agent's own care keeps the rule. Two global rules that are
+not rules that bind here have sensors of their own in Claude Code: "say it
+passes only after running the check" (Reasoning and evidence) has the claim
+check, and "after two failed fixes, stop" (Agentic work) has the repeated
+failure hook's reminder.
 
 | Rule                        | Guide                                                                              | Sensor                                                                                                                                                            |
 |-----------------------------+------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------|

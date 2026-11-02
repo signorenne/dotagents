@@ -103,7 +103,11 @@ maintainer.
   the branch: when the agent ends its turn on =<type>/<slug>= while a commit
   of the branch is missing from the log or newer than its last change, it
   sends the agent back once to record the step, its commit and its check
-  (after a rebase, writing the new hashes is enough).
+  (after a rebase, writing the new hashes is enough). In Claude Code the
+  claim check also reads the final message: one that says the tests pass
+  sends the agent back once when the session's transcript shows that no
+  test run passed after the last file edit, to run the tests or say they
+  were not run.
 - /Lives in/ : the commits on a local branch. With isolation the branch lives
   in its own worktree, =../<repository>-<slug>=, created from the tip of the
   branch it will land on. The progress log is
