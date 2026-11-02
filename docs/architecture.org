@@ -62,10 +62,30 @@ each edge carries:
 - =tools/build.py= writes its zips to =dist/= (git-ignored).
 - =tools/validate.py= checks the source; its docstring lists every check
   (skill and subagent frontmatter, name and description limits, a
-  =LICENSE.txt= per skill, no inline backticks in skill prose, no em or en
-  dash in any tracked or trackable file, no unfilled template marker, the
+  =LICENSE.txt= per skill, no inline backticks in skill prose, path rules
+  that name a skill, no em or en dash in any tracked or trackable file, no
+  unfilled template marker, no hidden text in the instruction files, the
   global rules under 200 lines, every Python file compiling, every Org link
-  reaching an existing file and its =CUSTOM_ID= or heading).
+  reaching an existing file and its =CUSTOM_ID= or heading). The hidden-text
+  check reads the files agents load as instructions: =home/.agents/AGENTS.md=,
+  every text file of a skill in either root, the subagents, the path rules,
+  =claude-ai/overrides.json= and the repository's =AGENTS.md=, =CLAUDE.md=,
+  =GEMINI.md= and =.github/copilot-instructions.md=. It reports, with line,
+  column and code point, each character a reader does not see but a model
+  reads: zero width characters, bidirectional controls, =U+FEFF= (a byte
+  order mark too), the soft hyphen, the invisible operators, the Hangul
+  filler, the variation selectors and the tags. An emoji keeps its own
+  parts (a presentation selector right after a pictographic character, a
+  zero width joiner between two); a keycap and a tag sequence such as a
+  subdivision flag are reported. In the Markdown files (=.md=,
+  =.md.template=) it also reports each HTML comment outside code, which
+  hides text from a reader of the rendered file but not from the model:
+  code is a fenced block indented 0 to 3 columns from its container (the
+  margin, a blockquote, a list item), closed by its own character at least
+  as many times or by a line that leaves the container, or a code span on
+  one line not opened by an escaped backtick. A code span over several
+  lines and an indented code block are not recognised, so a =<!--= in them
+  is reported.
 - =tests/= holds four unittest suites: the hooks fed each tool's payload
   shape, the installer run against a temporary =HOME=, validate, build and
   the commit-msg hook run on a copy of the repository or on sample messages,
