@@ -223,17 +223,18 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
   the maintainer asked or a skill they ran says so.
 - /No agent pushes or publishes/ : in any tool ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). The
   guard blocks every form of =git push= and git's other ways to publish
-  (=git send-email=, =git svn dcommit= and the like), runs only the
-  read-only =gh= commands and blocks every other one, and follows the
-  command behind wrappers (=sudo=, =env=, =find -exec=, the remote command
-  of =ssh= and the like); [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]]
-  lists them. In Claude Code the settings also deny =git push=, and in Codex
-  a rules file forbids the same git commands and the =gh= commands that
-  write. The guard does not inspect a command passed as one string
-  (=bash -c=, =eval=), aliases, scripts, =gh api= or =ssh -o RemoteCommand=,
-  nor a program it does not know that runs its arguments; there the rule
-  rests on the agent. In Claude Code a guard that cannot run (it cannot
-  start, crashes or times out) blocks the command instead of letting it run.
+  (=git send-email=, =git svn dcommit= and the like), runs only the =gh=
+  commands that read or work locally and none that prints the
+  authentication token, and follows the command behind wrappers (=sudo=,
+  =env=, =find -exec=, the remote command of =ssh= and the like);
+  [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]] lists them. In Claude Code the
+  settings also deny =git push=, and in Codex a rules file forbids the same
+  git commands and the =gh= commands that are not read or local. The guard
+  does not inspect a command passed as one string (=bash -c=, =eval=),
+  aliases, scripts, =gh api= or =ssh -o RemoteCommand=, nor a program it
+  does not know that runs its arguments; there the rule rests on the agent.
+  In Claude Code a guard that cannot run (it cannot start, crashes or times
+  out) blocks the command instead of letting it run.
 - /Agents land on the maintainer's go/ : an isolated branch lands locally as
   isolated-work says, then its worktree and branch are removed
   ([[file:../DESIGN.org::#isolated-worktrees][DESIGN.org, isolated-worktrees]]).
