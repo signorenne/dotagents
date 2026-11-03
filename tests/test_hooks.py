@@ -746,6 +746,25 @@ class GuardBypassBattery(unittest.TestCase):
             with self.subTest(command=command):
                 self.assertEqual(self.exit_code(command), 0)
 
+    def test_decision_judges_a_command_without_a_payload(self):
+        # decision(text) is the guard's verdict on a command line alone, which
+        # tools/guard_replay.py calls: its reasons, or {} when the command passes.
+        for command in self.BLOCKED:
+            with self.subTest(command=command):
+                self.assertTrue(self.guard.decision(command))
+        for command in self.NEAR_MISSES:
+            with self.subTest(command=command):
+                self.assertEqual(self.guard.decision(command), {})
+        # A text the parser rejects gets the rough split, which still shows the push.
+        with self.assertRaises(self.guard.ParseError):
+            self.guard.parse_commands("git push 'origin")
+        self.assertIn(self.guard.PUSH_REASON, self.guard.decision("git push 'origin"))
+
+    def test_main_decides_through_decision(self):
+        with mock.patch.object(self.guard, "decision", return_value={}) as decision:
+            self.assertEqual(self.exit_code("git push"), 0)
+        decision.assert_called_once_with("git push")
+
 class AfterEdit(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
