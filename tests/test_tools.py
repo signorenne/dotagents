@@ -1,7 +1,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
-"""Tests for tools/validate.py and tools/build.py on a copy of the repository."""
+"""Tests for the tools in tools/ on a copy of the repository."""
 
+import ast
+import importlib.util
 import json
 import os
 import shutil
@@ -13,6 +15,15 @@ import zipfile
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+# git without the user's configuration (signing, hooks, default branch).
+GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1"}
+
+
+def load(path: Path, name: str):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class Tools(unittest.TestCase):
@@ -23,8 +34,8 @@ class Tools(unittest.TestCase):
             ".git", "dist", "__pycache__", ".private", ".claude"))
         self.addCleanup(shutil.rmtree, self.repo.parent)
 
-    def run_tool(self, name: str) -> subprocess.CompletedProcess:
-        return subprocess.run([sys.executable, "-B", str(self.repo / "tools" / name)],
+    def run_tool(self, name: str, args=()) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "-B", str(self.repo / "tools" / name), *map(str, args)],
                               capture_output=True, text=True, check=False)
 
     def test_validate_passes_on_the_repository(self):
@@ -463,6 +474,185 @@ class CommitMsg(unittest.TestCase):
                 self.assertIn(problem, result.stderr)
                 self.assertIn("type(scope): description", result.stderr)
                 self.assertIn("feat(hooks): add a stop hook", result.stderr)  # an example to follow
+
+
+class GuardReplay(unittest.TestCase):
+    """tools/guard_replay.py on synthetic Claude Code transcripts, in a copy of the
+    repository made a git repository whose main branch holds the base guard."""
+
+    setUp_copy, run_tool = Tools.setUp, Tools.run_tool
+    GUARD = Path("home/.agents/hooks/guard_bash.py")
+    MARKER = "echo replay-marker-5d1c"
+    ORG_LINES = "cat <<'X'\n#+end_example\n* not a heading\nX"
+    LONG = "echo " + "y" * 395
+    # Appended to a guard, it blocks four more commands, as a guard change would.
+    PLANT = ("\n\nPLANTED = {'git status', %r, %r, %r}\n_unplanted = decision\n\n\n"
+             "def decision(text):\n"
+             "    return {'planted block': True} if text in PLANTED else _unplanted(text)\n"
+             % (MARKER, ORG_LINES, LONG))
+
+    def setUp(self):
+        self.setUp_copy()
+        self.git("init", "-q", "-b", "main")
+        self.commit("base")
+        self.transcripts = self.repo.parent / "projects"
+        self.out = self.repo.parent / "report.org"
+        self.original = (self.repo / self.GUARD).read_text(encoding="utf-8")
+        session = [
+            self.call("toolu_1", "git status"), self.call("toolu_3", self.MARKER),
+            self.call("toolu_4", "git push origin main"), self.call("toolu_9", self.ORG_LINES),
+            self.call("toolu_10", self.LONG),
+            # A copy of a call kept by Claude Code, and another record type naming the command.
+            {"type": "api-request-blob", "sessionId": "s", "hash": "h",
+             "message": {"role": "assistant", "content": [self.block("toolu_1", "git status")]}},
+            {"type": "user", "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": "toolu_1", "content": "git status"}]}},
+            {"type": "assistant", "message": {"role": "assistant", "content": [
+                {"type": "tool_use", "id": "toolu_5", "name": "Bash", "input": {}},
+                {"type": "tool_use", "id": "toolu_6", "name": "Bash", "input": {"command": ["git", "push"]}},
+                {"type": "tool_use", "id": "toolu_7", "name": "Read", "input": {"file_path": "/x"}}]}},
+            self.call("toolu_8", "echo " + "x" * 99_996),  # 100,001 characters
+        ]
+        self.write(self.transcripts / "-w-repo" / "s1.jsonl", session, malformed="{not json")
+        self.write(self.transcripts / "-w-repo" / "s1" / "subagents" / "agent-a.jsonl",
+                   [self.call("toolu_2", "git status")])
+        # A resumed or forked session repeats earlier calls with their ids in a new file.
+        self.write(self.transcripts / "-w-repo" / "s2.jsonl", [self.call("toolu_1", "git status")])
+
+    def git(self, *args, folder=None):
+        subprocess.run(["git", "-C", str(folder or self.repo), *args], check=True, capture_output=True, env=GIT_ENV)
+
+    def commit(self, message: str, *paths):
+        self.git("add", str(self.GUARD), *paths)
+        self.git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", message)
+
+    @staticmethod
+    def block(ident: str, command: str) -> dict:
+        return {"type": "tool_use", "id": ident, "name": "Bash", "input": {"command": command}}
+
+    def call(self, ident: str, command: str) -> dict:
+        return {"type": "assistant", "message": {"role": "assistant", "content": [
+            {"type": "text", "text": "Running it."}, self.block(ident, command)]}}
+
+    @staticmethod
+    def write(path: Path, records: list, malformed: str = None):
+        path.parent.mkdir(parents=True, exist_ok=True)
+        lines = [json.dumps(record) for record in records] + ([malformed] if malformed else [])
+        path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+    def plant(self):
+        (self.repo / self.GUARD).write_text(self.original + self.PLANT, encoding="utf-8")
+
+    def replay(self, *args) -> subprocess.CompletedProcess:
+        return self.run_tool("guard_replay.py", ["--base", "main", "--transcripts", self.transcripts,
+                                                 "--out", self.out, *args])
+
+    @staticmethod
+    def section(report: str, title: str) -> str:
+        return report.split("\n* " + title, 1)[1].split("\n* ", 1)[0]
+
+    def test_an_unchanged_guard_changes_nothing(self):
+        result = self.replay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("newly blocked 0, newly allowed 0", result.stdout)
+        report = self.out.read_text(encoding="utf-8")
+        self.assertNotIn("#+begin_example", report)
+        self.assertIn("- blocked by the base guard: 1\n", report)  # git push origin main
+        self.assertIn("- blocked by the head guard: 1\n", report)
+
+    def test_a_new_block_is_listed_once_with_its_calls(self):
+        self.plant()
+        result = self.replay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("newly blocked 4, newly allowed 0", result.stdout)
+        blocked = self.section(self.out.read_text(encoding="utf-8"), "Newly blocked")
+        # Two calls (one in a subagent's transcript), repeated in a resumed session and in an
+        # api-request-blob.
+        self.assertEqual(blocked.count("#+begin_example\ngit status\n#+end_example"), 1)
+        item = blocked.split("#+begin_example\ngit status\n")[0].rstrip("\n").rsplit("\n", 1)[1]
+        self.assertIn("2 calls", item)
+        self.assertIn("planted block", item)
+
+    def test_a_removed_block_is_listed_under_newly_allowed(self):
+        self.plant()
+        self.commit("planted base")
+        (self.repo / self.GUARD).write_text(self.original, encoding="utf-8")
+        result = self.replay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("newly blocked 0, newly allowed 4", result.stdout)
+        report = self.out.read_text(encoding="utf-8")
+        self.assertEqual(self.section(report, "Newly allowed").count("#+begin_example\ngit status\n"), 1)
+        self.assertNotIn("#+begin_example", self.section(report, "Newly blocked"))
+
+    def test_commands_reach_the_report_only(self):
+        self.plant()
+        result = self.replay()
+        report = self.out.read_text(encoding="utf-8")
+        self.assertIn(self.MARKER, report)
+        for text in (self.MARKER, "git status", "git push", "yyyy"):
+            self.assertNotIn(text, result.stdout + result.stderr)
+        self.assertIn(str(self.out), result.stdout)
+
+    def test_report_blocks_stay_valid_org(self):
+        self.plant()
+        self.replay()
+        report = self.out.read_text(encoding="utf-8")
+        # Lines that Org would read as a heading or a keyword get a leading comma.
+        self.assertIn("#+begin_example\ncat <<'X'\n,#+end_example\n,* not a heading\nX\n#+end_example", report)
+        # A command is cut to 300 characters, and the cut is said.
+        self.assertIn("#+begin_example\necho " + "y" * 295 + "\n#+end_example", report)
+        self.assertIn("cut from 400 characters", report)
+
+    def test_unusable_input_is_counted_not_fatal(self):
+        result = self.replay()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        report = self.out.read_text(encoding="utf-8")
+        for line in ("- transcript files: 3", "- lines that are not JSON: 1", "- records of other types: 2",
+                     "- Bash calls: 9", "- Bash calls without a command: 2",
+                     "- commands over 100,000 characters (skipped): 1", "- distinct commands judged: 5"):
+            self.assertIn(line + "\n", report)
+
+    def test_usage_errors_exit_2_and_write_nothing(self):
+        for label, args in (("bad ref", ["--base", "no-such-ref"]),
+                            ("missing head", ["--head", self.repo / "no-guard.py"]),
+                            ("missing transcripts", ["--transcripts", self.repo / "no-folder"])):
+            with self.subTest(label=label):
+                result = self.replay(*args)
+                self.assertEqual(result.returncode, 2, result.stdout + result.stderr)
+                self.assertFalse(self.out.exists())
+
+    def test_the_default_report_goes_to_the_main_checkout(self):
+        # Run from a linked worktree, the report lands in the main checkout's .private/,
+        # since removing the worktree deletes its ignored files.
+        self.commit("tool", "tools/guard_replay.py")
+        worktree = self.repo.parent / "repo-wt"
+        self.git("worktree", "add", "-q", "-b", "wt", str(worktree))
+        result = subprocess.run([sys.executable, "-B", str(worktree / "tools/guard_replay.py"),
+                                 "--transcripts", str(self.transcripts)],
+                                capture_output=True, text=True, check=False, env=GIT_ENV)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        reports = list((self.repo / ".private" / "evidence").glob("guard-replay-*.org"))
+        self.assertEqual(len(reports), 1)
+        self.assertIn(str(reports[0]), result.stdout)
+        self.assertFalse((worktree / ".private").exists())
+
+    def test_a_guard_without_decision_gets_the_same_keys(self):
+        # A base older than decision() is judged by parse_commands, rough_commands and
+        # command_reasons, as main() did before it.
+        replay = load(self.repo / "tools" / "guard_replay.py", "guard_replay_under_test")
+        battery = load(ROOT / "tests" / "test_hooks.py", "hooks_tests_for_replay").GuardBypassBattery
+        text = (ROOT / self.GUARD).read_text(encoding="utf-8")
+        node = next(node for node in ast.parse(text).body
+                    if isinstance(node, ast.FunctionDef) and node.name == "decision")
+        lines = text.split("\n")
+        older = self.repo.parent / "guard_without_decision.py"
+        older.write_text("\n".join(lines[:node.lineno - 1] + lines[node.end_lineno:]), encoding="utf-8")
+        old_guard = replay.load_guard(older, "guard_without_decision")
+        self.assertFalse(hasattr(old_guard, "decision"))
+        old, new = replay.verdict_of(old_guard), replay.verdict_of(replay.load_guard(ROOT / self.GUARD, "head"))
+        for command in battery.BLOCKED + battery.NEAR_MISSES:
+            with self.subTest(command=command):
+                self.assertEqual(set(old(command)), set(new(command)))
 
 
 if __name__ == "__main__":
