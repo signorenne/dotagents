@@ -10,6 +10,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 import zipfile
 from pathlib import Path
@@ -714,6 +715,478 @@ class Benchmark(unittest.TestCase):
         result = self.tool("select", "--dataset", self.dataset, "--count", 9, "--seed", 1, "--out", self.folder / "t.json")
         self.assertEqual(result.returncode, 2, result.stderr)
         self.assertFalse((self.folder / "t.json").exists())
+
+
+# Fake programs for benchmark.py run: each logs its call (argv, stdin, environment facts)
+# to BENCH_FAKE_LOG and answers from the scenario in BENCH_FAKE_SCENARIO. claude answers
+# as the agent, or as the maintainer when called with --tools; a None answer prints nothing.
+FAKE_CLAUDE = r'''
+import json, os, sys
+DEFAULTS = {
+    "agent": {"type": "result", "subtype": "success", "is_error": False, "result": "I fixed the issue.",
+              "session_id": "sess-1", "num_turns": 5, "duration_ms": 1000, "total_cost_usd": 0.5,
+              "modelUsage": {"claude-opus-5-5": {}}, "permission_denials": []},
+    "maintainer": {"type": "result", "subtype": "success", "is_error": False, "result": "DONE",
+                   "total_cost_usd": 0.01},
+}
+argv, data = sys.argv[1:], sys.stdin.read()
+role = "maintainer" if "--tools" in argv else "agent"
+path = os.environ["BENCH_FAKE_SCENARIO"]
+with open(path) as handle:
+    scenario = json.load(handle)
+queue = scenario.setdefault(role, [])
+response = queue.pop(0) if queue else DEFAULTS[role]
+with open(path, "w") as handle:
+    json.dump(scenario, handle)
+secrets = [name for name, value in os.environ.items() if "REFRESH-SECRET" in value or "MCP-SECRET" in value]
+entry = {"program": "claude", "role": role, "argv": argv, "stdin": data, "cwd_files": sorted(os.listdir(".")),
+         "container": os.environ.get("BENCH_FAKE_CONTAINER"), "token": os.environ.get("CLAUDE_CODE_OAUTH_TOKEN"),
+         "secrets_in_env": secrets}
+with open(os.environ["BENCH_FAKE_LOG"], "a") as handle:
+    handle.write(json.dumps(entry) + "\n")
+expire, refresh = scenario.pop("expire_login", None), scenario.pop("refresh_login", None)
+if role == "agent" and (expire or refresh):  # the host's login expires, or is refreshed, meanwhile
+    with open(path, "w") as handle:
+        json.dump(scenario, handle)
+    with open(os.environ["BENCH_FAKE_CREDENTIALS"]) as handle:
+        login = json.load(handle)
+    if expire:
+        login["claudeAiOauth"]["expiresAt"] = 0
+    else:
+        login["claudeAiOauth"]["accessToken"] = refresh
+    with open(os.environ["BENCH_FAKE_CREDENTIALS"], "w") as handle:
+        json.dump(login, handle)
+if response is None:
+    sys.exit(1)
+print(json.dumps(response))
+'''
+FAKE_PODMAN = r'''
+import json, os, re, subprocess, sys
+argv = sys.argv[1:]
+data = sys.stdin.read() if "-i" in argv else ""
+with open(os.environ["BENCH_FAKE_SCENARIO"]) as handle:
+    scenario = json.load(handle)
+with open(os.environ["BENCH_FAKE_LOG"], "a") as handle:
+    handle.write(json.dumps({"program": "podman", "argv": argv, "stdin": data}) + "\n")
+if argv[0] == "run":
+    print("c0ffee")
+    sys.exit(0)
+if argv[0] != "exec":
+    sys.exit(0)
+index, passed = 1, {}
+while argv[index].startswith("-"):
+    if argv[index] == "-e":  # -e NAME takes the value from podman's environment, -e NAME=VALUE gives it
+        name, _, value = argv[index + 1].partition("=")
+        passed[name] = value if "=" in argv[index + 1] else os.environ.get(name, "")
+    index += 2 if argv[index] in ("-u", "-w", "-e") else 1
+container, command = argv[index], argv[index + 1:]
+if command[0] == "claude":
+    # interrupt_at: the agent call (1, 2...) at which the user presses Ctrl-C in the tool.
+    scenario["agent_calls"] = scenario.get("agent_calls", 0) + 1
+    with open(os.environ["BENCH_FAKE_SCENARIO"], "w") as handle:
+        json.dump(scenario, handle)
+    if scenario["agent_calls"] == scenario.get("interrupt_at"):
+        os.kill(os.getppid(), 2)  # SIGINT to benchmark.py
+        sys.exit(130)
+    # A container sees only the variables podman exec passes with -e.
+    env = {name: value for name, value in os.environ.items() if name == "PATH" or name.startswith("BENCH_FAKE_")}
+    env.update(passed, BENCH_FAKE_CONTAINER=container)
+    sys.exit(subprocess.run(["claude", *command[1:]], input=data, text=True, env=env).returncode)
+if "# dotagents probe" in " ".join(command):
+    print("guard=%d" % scenario.get("probe_guard", 2))
+    print("skills=%d" % scenario.get("skills", 2))
+    print("claude_md=@~/.agents/AGENTS.md")
+elif command[0] == "git":
+    # trees: each worktree's change against base_commit; branches: {ref: [time, change]}.
+    path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
+    trees = scenario.get("trees", {"/testbed": scenario.get("diff", "")})
+    branches = scenario.get("branches", {})
+    def visible(text):  # git's exclude pathspec for the notes
+        if ":(exclude).private" not in command:
+            return text
+        return "".join(section for section in re.split(r"(?m)^(?=diff --git )", text)
+                       if not section.startswith("diff --git a/.private/"))
+    refs = [word for word in command if word in branches]
+    if "rev-list" in command:
+        print(scenario.get("after_base", ""))
+    elif "worktree" in command:
+        print("\n".join("worktree " + tree for tree in trees))
+    elif "for-each-ref" in command:
+        print("\n".join("%d %s" % (when, ref) for ref, (when, _) in branches.items()))
+    elif "log" in command:
+        print(scenario.get("times", {}).get(path, 0))
+    elif "diff" in command:
+        if refs:  # base then ref; the other order is a reversed change
+            reversed_order = command[command.index(refs[0]) - 1] in ("--binary", "--quiet")
+            text = "REVERSED\n" if reversed_order else visible(branches[refs[0]][1])
+        else:
+            text = visible(trees.get(path, ""))
+        if "--quiet" in command:
+            sys.exit(1 if text else 0)
+        sys.stdout.write(text)
+'''
+
+
+class BenchmarkRun(unittest.TestCase):
+    """benchmark.py run against fake claude and podman programs (FAKE_CLAUDE, FAKE_PODMAN)."""
+
+    setUp_dataset, tool, select = Benchmark.setUp, Benchmark.tool, Benchmark.select
+    TOOL = Benchmark.TOOL
+    TOKEN = "TOKEN-SECRET-123"
+    INSTRUCTIONS = "Resolve this issue in the repository in the current folder."
+
+    def setUp(self):
+        self.setUp_dataset()
+        self.select(2, 5)
+        self.tasks = self.folder / "tasks.json"
+        self.select(1, 5, "one.json")
+        self.one = self.folder / "one.json"
+        programs = self.folder / "bin"
+        programs.mkdir()
+        for name, body in (("claude", FAKE_CLAUDE), ("podman", FAKE_PODMAN)):
+            (programs / name).write_text(f"#!{sys.executable}\n{body}", encoding="utf-8")
+            (programs / name).chmod(0o755)
+        self.scenario, self.log = self.folder / "scenario.json", self.folder / "calls.jsonl"
+        self.set_scenario({})
+        self.env = {**os.environ, "PATH": str(programs), "BENCH_FAKE_SCENARIO": str(self.scenario),
+                    "BENCH_FAKE_LOG": str(self.log), "BENCH_FAKE_CREDENTIALS": str(self.folder / "credentials.json")}
+        # An installed method: the files install.py writes, and a personal setting.
+        self.home = self.folder / "home"
+        settings = {"model": "personal", "theme": "dark", "permissions": {"deny": ["Bash(git push *)"]},
+                    "hooks": {"PreToolUse": [{"matcher": "Bash", "hooks": [{"type": "command", "command":
+                              'python3 "$HOME/.agents/hooks/guard_bash.py" --tool claude'}]}],
+                              "Stop": [{"hooks": [{"type": "command", "command":
+                                        'python3 "$HOME/.agents/hooks/claim_check.py" || true'}]}]}}
+        for name, text in ((".claude/CLAUDE.md", "@~/.agents/AGENTS.md\n"), (".claude/skills/one/SKILL.md", "one"),
+                           (".claude/skills/two/SKILL.md", "two"), (".claude/agents/scout.md", "scout"),
+                           (".claude/rules/dotagents-gates.md", "rule"), (".agents/AGENTS.md", "rules"),
+                           (".agents/hooks/guard_bash.py", "# guard"), (".claude/settings.json", json.dumps(settings))):
+            (self.home / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.home / name).write_text(text, encoding="utf-8")
+        # The login file: only the Claude access token may reach a container.
+        self.credentials = self.folder / "credentials.json"
+        self.credentials.write_text(json.dumps({
+            "claudeAiOauth": {"accessToken": self.TOKEN, "refreshToken": "REFRESH-SECRET",
+                              "expiresAt": int((time.time() + 86400) * 1000)},
+            "mcpOAuth": {"plugin:x:slack|1": {"accessToken": "MCP-SECRET"}}}), encoding="utf-8")
+        self.python = self.folder / "python"
+        (self.python / "bin").mkdir(parents=True)
+        (self.python / "bin" / "python3").write_text("", encoding="utf-8")
+        self.rundir = self.folder / "run"
+
+    def set_scenario(self, scenario: dict):
+        self.scenario.write_text(json.dumps(scenario), encoding="utf-8")
+
+    def run_bench(self, *extra, tasks=None, arms="method,plain", runs=1, cap=4, rundir=None, env=None):
+        return self.tool("run", "--tasks", tasks or self.tasks, "--runs", runs, "--arms", arms,
+                         "--model", "claude-opus-5-5", "--maintainer-model", "claude-sonnet-5-5", "--cap-usd", cap,
+                         "--out", rundir or self.rundir, "--method-home", self.home, "--credentials", self.credentials,
+                         "--hooks-python", self.python, *extra, env=env or self.env)
+
+    def calls(self, program: str, role: str = None) -> list:
+        if not self.log.exists():
+            return []
+        entries = [json.loads(line) for line in self.log.read_text(encoding="utf-8").splitlines()]
+        return [entry for entry in entries if entry["program"] == program and role in (None, entry.get("role"))]
+
+    def records(self, rundir=None) -> dict:
+        return {path.parent.name: json.loads(path.read_text(encoding="utf-8"))
+                for path in ((rundir or self.rundir) / "runs").glob("*/record.json")}
+
+    @staticmethod
+    def option(argv: list, name: str):
+        return argv[argv.index(name) + 1] if name in argv else None
+
+    def test_both_arms_get_the_same_call_except_safe_mode(self):
+        result = self.run_bench()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        agent = self.calls("claude", "agent")
+        self.assertEqual(len(agent), 4)  # 2 tasks x 2 arms x 1 run
+        for call in agent:
+            argv = call["argv"]
+            self.assertEqual(("--safe-mode" in argv), ".plain." in call["container"], call["container"])
+            self.assertEqual([self.option(argv, name) for name in ("--model", "--effort", "--permission-mode",
+                                                                   "--disallowed-tools", "--output-format")],
+                             ["claude-opus-5-5", "high", "bypassPermissions", "WebFetch,WebSearch", "json"])
+            self.assertIn(self.INSTRUCTIONS, call["stdin"])
+            self.assertNotIn("method", call["stdin"].lower())
+            self.assertEqual(call["token"], self.TOKEN)
+            self.assertEqual(call["secrets_in_env"], [])
+        prompts = {}
+        for call in agent:
+            prompts.setdefault(call["stdin"], set()).add(call["container"].split(".")[1])
+        self.assertEqual(list(prompts.values()), [{"method", "plain"}] * 2)  # one prompt per task, both arms
+        # No field only grading may use, and no secret, reaches a program's arguments or input.
+        logged = self.log.read_text(encoding="utf-8")
+        self.assertNotIn("HIDDEN", logged)
+        for secret in ("REFRESH-SECRET", "MCP-SECRET"):
+            self.assertNotIn(secret, logged)
+        self.assertNotIn(self.TOKEN, json.dumps([entry["argv"] for entry in self.calls("podman") + agent]))
+        self.assertNotIn(self.TOKEN, result.stdout + result.stderr)
+        # The simulated maintainer: on the host, no tools, its own model, an empty folder, its own login.
+        for call in self.calls("claude", "maintainer"):
+            self.assertIn("--safe-mode", call["argv"])
+            self.assertEqual(self.option(call["argv"], "--tools"), "")
+            self.assertEqual(self.option(call["argv"], "--model"), "claude-sonnet-5-5")
+            self.assertEqual((call["cwd_files"], call["token"], call["container"]), ([], None, None))
+        records = self.records()
+        self.assertEqual(len(records), 4)
+        for name, record in records.items():
+            self.assertEqual((record["stop"], record["finished"]), ("DONE", True), name)
+            self.assertEqual(record["probe"]["passed"] if record["arm"] == "method" else record["probe"],
+                             True if record["arm"] == "method" else None)
+            self.assertTrue((self.rundir / "runs" / name / "prediction.diff").exists())
+
+    def test_the_method_arm_gets_the_method_files_and_an_adapted_python(self):
+        self.run_bench(tasks=self.one, arms="method")
+        staged = self.rundir / "method"
+        settings = json.loads((staged / ".claude" / "settings.json").read_text(encoding="utf-8"))
+        self.assertNotIn("model", settings)  # the maintainer's own settings stay out
+        commands = [hook["command"] for groups in settings["hooks"].values() for group in groups
+                    for hook in group["hooks"]]
+        self.assertTrue(all(command.startswith('/opt/dotagents-python/bin/python3 "$HOME/.agents/hooks/')
+                            for command in commands), commands)
+        for name in (".claude/CLAUDE.md", ".claude/skills/two/SKILL.md", ".claude/agents/scout.md",
+                     ".claude/rules/dotagents-gates.md", ".agents/hooks/guard_bash.py"):
+            self.assertTrue((staged / name).is_file(), name)
+        run = [entry["argv"] for entry in self.calls("podman") if entry["argv"][0] == "run"][0]
+        self.assertIn(f"{self.python}:/opt/dotagents-python:ro", run)
+        self.assertEqual(run[-4:-2], ["--entrypoint", "sleep"])
+        self.assertTrue(run[-2].startswith("docker.io/swebench/"), run[-2])  # the image, fully qualified
+        record = next(iter(self.records().values()))
+        self.assertIn("python3", " ".join(record["adaptations"]))
+
+    def test_dry_run_starts_nothing(self):
+        empty = self.folder / "empty"
+        empty.mkdir()
+        result = self.run_bench("--dry-run", env={**self.env, "PATH": str(empty)})
+        self.assertEqual(result.returncode, 0, result.stderr)
+        for task in json.loads(self.tasks.read_text(encoding="utf-8"))["tasks"]:
+            for arm in ("method", "plain"):
+                self.assertIn(f"{task['agent']['instance_id']}.{arm}.1 share 1.00", result.stdout)
+        self.assertIn("podman: missing", result.stdout)
+        self.assertIn("claude: missing", result.stdout)
+        self.assertFalse(self.log.exists())
+        self.assertFalse((self.rundir / "runs").exists())
+
+    def test_the_cap_stops_runs_before_the_total_passes_it(self):
+        # A share of 1 (4 runs under 4): the first run overshoots to 3.5, its share used up
+        # before the maintainer is asked, so a second share would pass the cap.
+        self.set_scenario({"agent": [{"subtype": "success", "is_error": False, "result": "Fixed.",
+                                      "session_id": "s", "num_turns": 9, "total_cost_usd": 3.5}]})
+        result = self.run_bench()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(self.calls("claude", "agent")), 1)
+        self.assertEqual(self.calls("claude", "maintainer"), [])
+        self.assertIn("3 runs not made", result.stdout)
+        self.assertEqual(len(json.loads((self.rundir / "not-made.json").read_text(encoding="utf-8"))), 3)
+        record = next(iter(self.records().values()))
+        self.assertEqual((record["stop"], record["spend"]), ("budget", 3.5))
+
+    def test_each_call_gets_the_remaining_share(self):
+        self.set_scenario({
+            "agent": [{"subtype": "success", "is_error": False, "result": "A or B? I recommend A.",
+                       "session_id": "sess-9", "num_turns": 3, "total_cost_usd": 0.5},
+                      {"subtype": "success", "is_error": False, "result": "Done with A.",
+                       "session_id": "sess-9", "num_turns": 4, "total_cost_usd": 1.2}],
+            "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}, {"result": "DONE", "total_cost_usd": 0.1}]})
+        self.run_bench(tasks=self.one, arms="method", cap=2)  # one run, a share of 2
+        first, second = self.calls("claude", "agent")
+        self.assertAlmostEqual(float(self.option(first["argv"], "--max-budget-usd")), 2.0)
+        self.assertNotIn("--resume", first["argv"])
+        self.assertEqual(self.option(second["argv"], "--resume"), "sess-9")
+        self.assertEqual(second["stdin"], "Use A.")
+        self.assertAlmostEqual(float(self.option(second["argv"], "--max-budget-usd")), 1.4)  # 2 - 0.5 - 0.1
+        asked = [float(self.option(call["argv"], "--max-budget-usd")) for call in self.calls("claude", "maintainer")]
+        self.assertEqual([round(value, 4) for value in asked], [1.5, 0.7])
+        record = next(iter(self.records().values()))
+        # The last agent result already holds the earlier call's cost.
+        self.assertAlmostEqual(record["spend"], 1.4)
+        self.assertAlmostEqual(record["agent_cost"], 1.2)
+        self.assertAlmostEqual(record["maintainer_cost"], 0.2)
+
+    def test_the_maintainer_loop_stops(self):
+        reply = {"result": "Go ahead.", "total_cost_usd": 0.01}
+        for label, maintainer, agent_calls, stop in (
+                ("reply limit", [reply] * 10, 7, "reply limit"), ("done", [], 1, "DONE"),
+                ("no result", [None], 1, "DONE"),
+                ("budget stop", [{"subtype": "error_max_budget_usd", "is_error": True, "total_cost_usd": 0.02}], 1,
+                 "DONE")):
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario({"maintainer": maintainer})
+                rundir = self.folder / label.replace(" ", "-")
+                result = self.run_bench(tasks=self.one, arms="plain", rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(len(self.calls("claude", "agent")), agent_calls)
+                record = next(iter(self.records(rundir).values()))
+                self.assertEqual(record["stop"], stop)
+                self.assertEqual(len(record["maintainer"]), min(agent_calls, 6))
+
+    def test_a_failed_probe_is_an_error_not_a_run(self):
+        self.set_scenario({"probe_guard": 0})
+        result = self.run_bench(tasks=self.one)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        containers = [call["container"] for call in self.calls("claude", "agent")]
+        self.assertEqual([name.split(".")[1] for name in containers], ["plain"])
+        method = next(record for record in self.records().values() if record["arm"] == "method")
+        self.assertEqual((method["stop"], method["probe"]["passed"], method["calls"]), ("error", False, []))
+
+    NOTES = ("diff --git a/.private/progress/fix.org b/.private/progress/fix.org\nnew file mode 100644\n"
+             "--- /dev/null\n+++ b/.private/progress/fix.org\n@@ -0,0 +1 @@\n+notes\n")
+    FIX = "diff --git a/src/widget.py b/src/widget.py\n--- a/src/widget.py\n+++ b/src/widget.py\n@@ -1 +1 @@\n-a\n+b\n"
+    OLD = "diff --git a/src/old.py b/src/old.py\n--- a/src/old.py\n+++ b/src/old.py\n@@ -1 +1 @@\n-a\n+c\n"
+
+    def test_the_prediction_finds_the_change_outside_the_notes(self):
+        # The method's notes in /testbed/.private are not the change; the change may sit in
+        # /testbed, in another worktree, or on the newest branch that differs from base_commit.
+        for label, scenario, source, prediction in (
+                ("testbed", {"trees": {"/testbed": self.NOTES + self.FIX}}, "/testbed", self.FIX),
+                ("worktree", {"trees": {"/testbed": self.NOTES, "/home/agent/fix": self.FIX},
+                              "times": {"/home/agent/fix": 100}}, "worktree /home/agent/fix", self.FIX),
+                ("branch", {"trees": {"/testbed": self.NOTES},
+                            "branches": {"refs/heads/old": [100, self.OLD], "refs/heads/fix": [200, self.FIX]}},
+                 "branch refs/heads/fix", self.FIX),
+                ("notes only", {"trees": {"/testbed": self.NOTES}}, "none", "")):
+            with self.subTest(label=label):
+                self.set_scenario(scenario)
+                rundir = self.folder / f"prediction-{label.replace(' ', '-')}"
+                self.run_bench(tasks=self.one, arms="method", rundir=rundir)
+                [(name, record)] = self.records(rundir).items()
+                self.assertEqual(record["prediction_source"], source)
+                self.assertEqual((rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), prediction)
+
+    def test_the_prediction_leaves_out_the_hidden_test_files(self):
+        task = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]
+        test_path = task["grading"]["test_patch"].split(" b/", 1)[1].split("\n", 1)[0]
+        source = ("diff --git a/src/widget.py b/src/widget.py\n--- a/src/widget.py\n+++ b/src/widget.py\n"
+                  "@@ -1 +1 @@\n-old\n+new\n")
+        agent_test = (f"diff --git a/{test_path} b/{test_path}\nnew file mode 100644\n--- /dev/null\n"
+                      f"+++ b/{test_path}\n@@ -0,0 +1 @@\n+agent test\n")
+        self.set_scenario({"diff": source + agent_test})
+        self.run_bench(tasks=self.one, arms="plain")
+        name = next(iter(self.records()))
+        self.assertEqual((self.rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), source)
+        self.assertEqual(self.records()[name]["prediction_source"], "/testbed")
+
+    def test_task_fields_that_reach_paths_and_commands_are_checked(self):
+        task = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]
+        for field, value in (("instance_id", "../escape"), ("base_commit", "--output=/tmp/x"),
+                             ("image", "--privileged")):
+            with self.subTest(field=field):
+                bad = self.folder / f"bad-{field}.json"
+                bad.write_text(json.dumps({"tasks": [{**task, "agent": {**task["agent"], field: value}}]}),
+                               encoding="utf-8")
+                result = self.run_bench("--dry-run", tasks=bad)
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn(field, result.stderr)
+
+    def test_a_finished_run_is_not_run_again(self):
+        self.assertEqual(self.run_bench(tasks=self.one).returncode, 0)
+        self.log.unlink()
+        result = self.run_bench(tasks=self.one)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(self.calls("claude"), [])
+
+    ASKS = {"subtype": "success", "is_error": False, "result": "A or B? I recommend A.", "session_id": "s",
+            "num_turns": 3, "total_cost_usd": 3.0}
+
+    def interrupted(self) -> list:
+        path = self.rundir / "interrupted.jsonl"
+        return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
+
+    def test_a_failed_resumed_call_keeps_the_session_s_cost(self):
+        # A resumed call that fails at once may report a total of 0: the $3 already spent stays.
+        self.set_scenario({"agent": [self.ASKS, {"subtype": "success", "is_error": True, "total_cost_usd": 0,
+                                                 "result": "Claude AI usage limit reached|1786600000"}],
+                           "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}]})
+        result = self.run_bench(tasks=self.one, arms="method", cap=8)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertAlmostEqual(self.interrupted()[0]["spend"], 3.1)
+
+    def test_ctrl_c_keeps_the_attempt_and_its_spend(self):
+        self.set_scenario({"agent": [self.ASKS], "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}],
+                           "interrupt_at": 2})
+        result = self.run_bench(tasks=self.one, arms="method", cap=8)
+        self.assertNotEqual(result.returncode, 0)
+        self.assertIn("run again", result.stderr)
+        [record] = self.records().values()
+        self.assertEqual(record["finished"], False)
+        [attempt] = self.interrupted()
+        self.assertAlmostEqual(attempt["spend"], 3.1)
+        self.assertEqual(attempt["stop"], "KeyboardInterrupt")
+
+    def test_a_share_under_a_cent_is_spent(self):
+        self.set_scenario({"agent": [dict(self.ASKS, total_cost_usd=1.996)]})
+        self.run_bench(tasks=self.one, arms="method", cap=2)  # one run, a share of 2
+        self.assertEqual(self.calls("claude", "maintainer"), [])
+        self.assertEqual(next(iter(self.records().values()))["stop"], "budget")
+
+    def expire_login(self):
+        login = json.loads(self.credentials.read_text(encoding="utf-8"))
+        login["claudeAiOauth"]["expiresAt"] = int((time.time() - 60) * 1000)
+        self.credentials.write_text(json.dumps(login), encoding="utf-8")
+
+    def test_an_expired_login_is_a_missing_prerequisite(self):
+        self.expire_login()
+        dry = self.run_bench("--dry-run")
+        self.assertIn("credentials: missing", dry.stdout)
+        self.assertIn("expired", dry.stdout)
+        result = self.run_bench()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("run claude on this machine", result.stderr)
+        self.assertEqual(self.calls("claude"), [])
+
+    def test_a_login_that_expires_during_a_run_stops_it_until_refreshed(self):
+        self.set_scenario({"agent": [self.ASKS], "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}],
+                           "expire_login": True})
+        result = self.run_bench(tasks=self.one, arms="method", cap=8)
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("login", result.stdout)
+        self.assertIn("run claude on this machine", result.stdout)
+        self.assertEqual(len(self.calls("claude", "agent")), 1)  # no call made with an expired token
+        [record] = self.records().values()
+        self.assertEqual((record["stop"], record["finished"]), ("login", False))
+        self.assertAlmostEqual(self.interrupted()[0]["spend"], 3.1)
+
+    def test_a_refreshed_login_leaves_neither_token_in_the_prediction(self):
+        # Call 1 runs with the token the agent writes into a file; the host then refreshes
+        # the login, and call 2 runs with another.
+        change = f"diff --git a/.env b/.env\nnew file mode 100644\n--- /dev/null\n+++ b/.env\n@@ -0,0 +1 @@\n+{self.TOKEN}\n"
+        self.set_scenario({"agent": [self.ASKS], "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}],
+                           "refresh_login": "TOKEN-REFRESHED-456", "diff": change})
+        self.run_bench(tasks=self.one, arms="plain", cap=8)
+        self.assertEqual([call["token"] for call in self.calls("claude", "agent")], [self.TOKEN, "TOKEN-REFRESHED-456"])
+        [name] = self.records()
+        self.assertNotIn(self.TOKEN, (self.rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"))
+
+    def test_the_token_never_reaches_a_record_or_the_maintainer(self):
+        # An agent that prints its environment puts the token in its answer and in the other
+        # fields of its result; one that writes it to a file puts it in the change.
+        denial = {"tool_name": "Bash", "tool_input": {"command": f"echo {self.TOKEN}"}}
+        change = f"diff --git a/.env b/.env\nnew file mode 100644\n--- /dev/null\n+++ b/.env\n@@ -0,0 +1 @@\n+{self.TOKEN}\n"
+        self.set_scenario({"agent": [dict(self.ASKS, result=f"env: CLAUDE_CODE_OAUTH_TOKEN={self.TOKEN}",
+                                          permission_denials=[denial])], "diff": change})
+        self.run_bench(tasks=self.one, arms="plain")
+        [maintainer] = self.calls("claude", "maintainer")
+        self.assertNotIn(self.TOKEN, maintainer["stdin"])
+        self.assertIn("CLAUDE_CODE_OAUTH_TOKEN=", maintainer["stdin"])
+        [name] = self.records()
+        for kept in ("record.json", "prediction.diff"):
+            self.assertNotIn(self.TOKEN, (self.rundir / "runs" / name / kept).read_text(encoding="utf-8"), kept)
+        self.assertIn("+++ b/.env", (self.rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"))
+
+    def test_a_usage_limit_stops_the_whole_run_until_started_again(self):
+        self.set_scenario({"agent": [{"subtype": "success", "is_error": True, "total_cost_usd": 0,
+                                      "result": "Claude AI usage limit reached|1786600000"}]})
+        result = self.run_bench()
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("usage limit", result.stdout)
+        self.assertEqual(len(self.calls("claude", "agent")), 1)
+        self.assertEqual([record for record in self.records().values() if record.get("finished")], [])
+        result = self.run_bench()  # started again on the same folder, the limit gone
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len([record for record in self.records().values() if record["finished"]]), 4)
 
 
 if __name__ == "__main__":
