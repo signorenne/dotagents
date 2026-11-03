@@ -655,5 +655,66 @@ class GuardReplay(unittest.TestCase):
                 self.assertEqual(set(old(command)), set(new(command)))
 
 
+class Benchmark(unittest.TestCase):
+    """tools/benchmark.py on a synthetic dataset; its run and grade meet only fake claude,
+    podman and harness programs, never the real ones."""
+
+    TOOL = ROOT / "tools" / "benchmark.py"
+    AGENT_FIELDS = {"instance_id", "repo", "base_commit", "problem_statement", "image"}
+    LONG = {"1-4 hours", ">4 hours"}
+
+    def setUp(self):
+        self.folder = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.folder)
+        self.dataset = self.folder / "dataset.jsonl"
+        repos, buckets = ["a/one", "b/two", "c/three"], ["1-4 hours", ">4 hours", "15 min - 1 hour", "<15 min fix"]
+        # Every field only grading may use carries a HIDDEN marker, so a leak shows.
+        self.rows = [{
+            "instance_id": f"{repos[index % 3].split('/')[1]}__{index}", "repo": repos[index % 3],
+            "base_commit": f"{index:040x}", "problem_statement": f"Problem {index}: the widget breaks.",
+            "image": f"swebench/sweb.eval.x86_64.task_{index}:latest", "difficulty": buckets[index % 4],
+            "patch": f"HIDDEN-GOLD-{index}", "hints_text": f"HIDDEN-HINT-{index}",
+            "test_patch": f"diff --git a/tests/test_{index}.py b/tests/test_{index}.py\n+HIDDEN-TEST-{index}\n",
+            "eval_script": f"HIDDEN-EVAL-{index}", "log_parser": f"HIDDEN-PARSER-{index}",
+            "FAIL_TO_PASS": json.dumps([f"HIDDEN-F2P-{index}"]), "PASS_TO_PASS": json.dumps([f"HIDDEN-P2P-{index}"]),
+        } for index in range(16)]
+        self.dataset.write_text("".join(json.dumps(row) + "\n" for row in self.rows), encoding="utf-8")
+
+    def tool(self, *args, env=None) -> subprocess.CompletedProcess:
+        return subprocess.run([sys.executable, "-B", str(self.TOOL), *map(str, args)],
+                              capture_output=True, text=True, check=False, env=env)
+
+    def select(self, count: int, seed: int, name: str = "tasks.json") -> dict:
+        out = self.folder / name
+        result = self.tool("select", "--dataset", self.dataset, "--count", count, "--seed", seed, "--out", out)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return json.loads(out.read_text(encoding="utf-8"))
+
+    def test_select_is_seeded_and_keeps_the_longest_buckets(self):
+        first, again = self.select(4, 7), self.select(4, 7, "again.json")
+        ids = [task["agent"]["instance_id"] for task in first["tasks"]]
+        self.assertEqual(ids, [task["agent"]["instance_id"] for task in again["tasks"]])
+        self.assertEqual(len(set(ids)), 4)
+        rows = {row["instance_id"]: row for row in self.rows}
+        self.assertTrue(all(rows[ident]["difficulty"] in self.LONG for ident in ids), ids)
+        # One task per repository before a second from any (the long tasks span 3 repositories).
+        self.assertEqual(len({rows[ident]["repo"] for ident in ids[:3]}), 3)
+        # Another seed draws from the same 8 long tasks in another order.
+        others = {task["agent"]["instance_id"] for seed in range(1, 6) for task in self.select(4, seed, "o.json")["tasks"]}
+        self.assertTrue(others <= {row["instance_id"] for row in self.rows if row["difficulty"] in self.LONG})
+
+    def test_select_keeps_the_grading_fields_apart(self):
+        for task in self.select(8, 3)["tasks"]:
+            self.assertEqual(set(task["agent"]), self.AGENT_FIELDS)
+            self.assertNotIn("HIDDEN", json.dumps(task["agent"]))
+            for field in ("patch", "test_patch", "eval_script", "log_parser", "FAIL_TO_PASS", "PASS_TO_PASS"):
+                self.assertIn("HIDDEN", task["grading"][field])
+
+    def test_select_refuses_more_tasks_than_the_buckets_hold(self):
+        result = self.tool("select", "--dataset", self.dataset, "--count", 9, "--seed", 1, "--out", self.folder / "t.json")
+        self.assertEqual(result.returncode, 2, result.stderr)
+        self.assertFalse((self.folder / "t.json").exists())
+
+
 if __name__ == "__main__":
     unittest.main()
