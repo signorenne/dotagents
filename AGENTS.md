@@ -19,7 +19,7 @@ claude-ai/skills/             skills uploaded to claude.ai (and installed locall
 claude-ai/overrides.json      local skills also uploaded to claude.ai, with their short description
 adapters/claude/              Claude Code settings merged by the installer
 install.py                    installer: copies the source and generates each tool's files
-tools/                        validate.py and build.py
+tools/                        validate.py, build.py, guard_replay.py (a guard change against past commands) and benchmark.py (the method's A/B benchmark)
 tests/                        unittest suites for hooks, installer, tools and skill scripts
 .githooks/commit-msg          this repository's commit message check (git config core.hooksPath .githooks enables it)
 docs/                         Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide and glossary
@@ -36,6 +36,7 @@ docs/                         Org docs: docs map, architecture, pipeline, workfl
 - A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: install.py, with a test in tests/test_install.py.
 - A new check: tools/validate.py, with a test in tests/test_tools.py.
+- A change to the guard replay or the benchmark: tools/guard_replay.py or tools/benchmark.py, standard library only, with tests in tests/test_tools.py that meet only fake claude, podman and harness programs.
 - A path rule (a skill an agent should use on matching files): home/.agents/path-rules.json, checked by tools/validate.py; install.py writes Claude Code's rule files (~/.claude/rules/dotagents-<skill>.md) from it, with a test in tests/test_install.py.
 - A check on this repository's commit messages: .githooks/commit-msg, with tests in tests/test_tools.py.
 
@@ -67,3 +68,4 @@ Before each commit, run validate and the test module that covers what the commit
 - Does a changed instruction still agree with home/.agents/AGENTS.md and the rules in DESIGN.org?
 - Does a new or changed skill pass the checklist in docs/skill-authoring.org?
 - If the maintainer asked for a real agent session test of a behavior change, was it run, and do the progress log or the PR say whether it was?
+- Did a guard change run the guard replay, and did the maintainer judge each newly blocked command?

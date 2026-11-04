@@ -24,7 +24,11 @@ kind of change goes, the hard rules and the review checklist;
    =python3 install.py=. Test a behavior change in a real agent session when
    the maintainer asks for it; whether that test was done is noted in the
    task's progress log or in the pull request, never in a commit, which has
-   no body.
+   no body. A change to =home/.agents/hooks/guard_bash.py= also runs
+   =python3 tools/guard_replay.py --base main= before it lands
+   ([[file:DESIGN.org::#guard-replay][DESIGN.org#guard-replay]]): the maintainer judges each command the
+   report lists as newly blocked, and the progress log records the counts
+   and the judgement.
 5. Land the work as small commits, each one logical change that passes the
    gates on its own. Agents never push: the maintainer
    reviews the branch, gives the go to land it, and pushes
