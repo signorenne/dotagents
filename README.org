@@ -142,7 +142,8 @@ dotagents/
 |-- claude-ai/          skills uploaded to claude.ai, and overrides for local skills uploaded too
 |-- adapters/claude/    Claude Code settings: permissions, hooks, no AI attribution
 |-- install.py          cross-agent installer
-|-- tools/              validate.py (format and text rules), build.py (zips into dist/)
+|-- tools/              validate.py (format and text rules), build.py (zips into dist/),
+|                       guard_replay.py (a guard change against past commands), benchmark.py (A/B benchmark)
 |-- tests/              unittest suites for hooks, installer, tools and skill scripts
 `-- docs/               docs map, architecture, pipeline, workflow, skill authoring, glossary
 #+END_SRC
