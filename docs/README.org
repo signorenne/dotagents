@@ -27,6 +27,7 @@ open a skill's own =SKILL.md= only when the task touches it.
 | [[file:workflow.org][docs/workflow.org]]        | x          | x            |          | x          |
 | [[file:pipeline.org][docs/pipeline.org]]        | x          | x            | x        | x          |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | x          | x            | x        |            |
+| [[file:evidence.org][docs/evidence.org]]        | x          | x            | x        | x          |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | x          | x            | x        |            |
 | [[file:../claude-ai/README.md][claude-ai/README.md]]      | x          | x            |          |            |
 
@@ -63,5 +64,6 @@ adds it.
 | [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene                        |
 | [[file:pipeline.org][docs/pipeline.org]]        | From idea to merge: the stages, their artifacts, landing and pushing, failures, isolation                        |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                                         |
+| [[file:evidence.org][docs/evidence.org]]        | What the A/B benchmark measures, how it runs, its limits, and the summary of each run                            |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                                                  |
 | [[file:../claude-ai/README.md][claude-ai/README.md]]      | The claude.ai skill set: upload and update                                                                       |

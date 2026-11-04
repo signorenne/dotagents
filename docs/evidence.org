@@ -1,0 +1,76 @@
+#+TITLE: dotagents method evidence
+#+SUBTITLE: what the A/B benchmark measures, how, its limits and its results
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the method's evidence about itself: what the A/B benchmark
+measures, how it runs, what limits its numbers, and the metrics summary of
+each run. [[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]] says when it runs;
+[[file:architecture.org][docs/architecture.org]] (The evidence tools) describes =tools/benchmark.py=;
+the raw runs stay in =.private/evidence/= on the maintainer's machine.
+
+* What it measures
+
+The nexenne method (the global rules, skills, subagents, hooks and path
+rules this repository installs) against Claude Code without them, on the
+same tasks with the same main model. Per arm: how many runs resolve their
+task (the task's hidden tests pass), how many break a test that passed
+before (a regression), the cost, the turns, the time, and how often the
+agent needed the maintainer.
+
+* How it runs
+
+- Tasks: SWE-bench Verified (the =SWE-bench/SWE-bench_Verified= dataset,
+  test split, 500 tasks), only its two longest difficulty buckets, "1-4
+  hours" (42 tasks) and ">4 hours" (3), 45 tasks in 8 repositories. =select=
+  chooses them with a seed, one per repository before a second from any.
+- Arms: =method=, Claude Code with the maintainer's installed method copied
+  into the container and a probe that proves it live (its guard blocks a
+  push); =plain=, =claude --safe-mode=, which turns off CLAUDE.md, skills,
+  plugins, hooks, MCP servers and custom agents. Both run the same main
+  model (Opus 5.5) at effort high, with every permission inside the
+  container, the task's own image as the boundary, and WebFetch and
+  WebSearch off, so neither arm can look up the upstream fix.
+- Prompt: the problem statement, then "Resolve this issue in the repository
+  in the current folder. Do not push or open pull requests. When you need
+  the maintainer, ask and stop: the maintainer answers your messages." It
+  never names the method.
+- Simulated maintainer: Sonnet 5.5 on the host, with no tools, answers the
+  agent's last message when it stops: it approves a plan that fits the
+  issue, takes the option the agent recommends unless it contradicts the
+  issue, never writes code, and replies DONE when the agent reports the work
+  finished or asks nothing. At most 6 replies a run.
+- Grading: the SWE-bench harness (=swebench= 5) runs the task's hidden tests
+  on the prediction, the change against the task's =base_commit= without the
+  files the hidden test patch touches (the same in both arms).
+- Cost: the maintainer sets a cap before each run; each run gets an equal
+  share, and each call is capped at what is left of it. Costs are the
+  API-equivalent estimate Claude Code reports (=total_cost_usd=); signed in
+  with a claude.ai plan, the runs draw on the plan's usage limits instead.
+- Full run: at least 20 tasks with three runs per arm. Anything smaller is
+  labeled "pilot: not conclusive" and does not count for a version of the
+  method.
+
+* Limits
+
+- The tasks are public Python repositories whose fixes a model may have seen
+  in training; both arms share that bias.
+- The simulated maintainer is a model, not the maintainer: it answers from
+  the issue alone and leans toward the agent's recommendation.
+- The method arm runs its hooks on a standalone Python 3.12 bound into the
+  container, not on the image's own =python3=, and leaves out the
+  maintainer's personal settings (model, theme); the rest is the installed
+  method as it is.
+- WebFetch and WebSearch are off in both arms, so the method's research
+  steps cannot run.
+- =--max-budget-usd= checks a client-side estimate: a run can pass its
+  share, and the summary counts the runs that did.
+- The SWE-bench images add an empty setup commit after =base_commit=; each
+  run checks that every commit after it keeps =base_commit='s tree.
+- Runs go one at a time; a usage limit or an expired login stops the run,
+  which then resumes where it stopped.
+
+* Results
+
+None yet: the reference-patch check, the smoke run and the pilot are
+recorded here when they finish.
