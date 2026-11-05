@@ -775,7 +775,10 @@ them):
    =base_commit=, without the files the hidden tests touch) in
    =RUNDIR/runs/<run>/=; a usage limit or an expired login stops the whole
    run; the next start goes on from the stopped run, which starts again
-   from the beginning.
+   from the beginning. =--dry-run= prints the plan and the prerequisites
+   and makes the check of the commits after =base_commit= on each task's
+   image, with podman only, so a task whose runs would stop shows before any
+   spend.
 3. =grade= runs the SWE-bench harness through podman's Docker API from
    =RUNDIR/grading/=, once per arm and repeat because the harness keys
    predictions by instance id, with a =docker= program that runs podman on
