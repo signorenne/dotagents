@@ -25,9 +25,11 @@ select  reads the dataset (JSON lines exported from SWE-bench/SWE-bench_Verified
 run     runs each task R times per arm, in an interleaved order, one run at a time. A run
         starts the task's image with podman (fully qualified, SELinux labels off for the
         container), creates the user "agent" owning /testbed, gives it a git identity,
-        binds the host's claude read-only at /usr/local/bin/claude, and checks that every
-        commit after base_commit keeps base_commit's tree (SWE-bench's images add an empty
-        setup commit). The method arm also gets the installed method from --method-home
+        binds the host's claude read-only at /usr/local/bin/claude, and checks that no commit
+        after base_commit changes, against base_commit, a file the task's gold patch or hidden
+        test patch changes (SWE-bench's images add a setup commit, mostly empty, but
+        astropy__astropy-13398's pins setuptools in pyproject.toml); a commit that does makes
+        the run an error. The method arm also gets the installed method from --method-home
         (default ~): .claude/CLAUDE.md, skills, agents, rules and .agents with symlinks
         resolved, and .claude/settings.json reduced to the keys install.py writes, its hook
         commands run by the standalone Python in --hooks-python (bound read-only at
@@ -460,14 +462,25 @@ def start_container(context, name: str, image: str, arm: str) -> None:
         checked(["podman", "exec", "-u", "agent", name, "git", "config", "--global", key, value], "set git's identity")
 
 
-def commits_after_base(name: str, base: str) -> list:
+def commits_after_base(name: str, task: dict) -> list:
+    """The image's commits after base_commit. A SWE-bench setup commit may change files to
+    pin the environment; one that changes, against base_commit, a file the gold patch or the
+    hidden test patch changes may hold the fix or the tests: Failure."""
+    base = task["agent"]["base_commit"]
+    hidden = patch_paths(task["grading"].get("patch", "")) | patch_paths(task["grading"].get("test_patch", ""))
     listing = container_git(name, "rev-list", "--all", "--not", base)
     if listing.returncode:
         raise Failure(f"list the commits after base_commit: {listing.stderr.strip()[-300:]}")
     commits = listing.stdout.split()
     for commit in commits:
-        if container_git(name, "diff", "--quiet", base, commit).returncode:
-            raise Failure(f"commit {commit} after base_commit changes the tree: the image may hold the fix")
+        # --no-renames lists both sides of a rename; -z keeps unusual file names unquoted.
+        changed = container_git(name, "diff", "--name-only", "--no-renames", "-z", base, commit)
+        if changed.returncode:
+            raise Failure(f"compare commit {commit} with base_commit: {changed.stderr.strip()[-300:]}")
+        touched = sorted(set(changed.stdout.split("\0")) & hidden)
+        if touched:
+            raise Failure(f"commit {commit} after base_commit changes {', '.join(touched)}, which the task's gold "
+                          f"or hidden test patch changes: the image may hold the fix")
     return commits
 
 
@@ -628,7 +641,7 @@ def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Pat
     run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
     try:
         start_container(context, name, agent["image"], arm)
-        record["commits_after_base"] = commits_after_base(name, agent["base_commit"])
+        record["commits_after_base"] = commits_after_base(name, task)
         if arm == "method":
             record["probe"] = install_method(context, name)
             if not record["probe"]["passed"]:
