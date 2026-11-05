@@ -1051,10 +1051,11 @@ class BenchmarkRun(unittest.TestCase):
         # /testbed, in another worktree, or on the newest branch that differs from base_commit.
         for label, scenario, source, prediction in (
                 ("testbed", {"trees": {"/testbed": self.NOTES + self.FIX}}, "/testbed", self.FIX),
-                ("worktree", {"trees": {"/testbed": self.NOTES, "/home/agent/fix": self.FIX},
+                ("worktree", {"trees": {"/testbed": self.NOTES, "/home/agent/fix": self.NOTES + self.FIX},
                               "times": {"/home/agent/fix": 100}}, "worktree /home/agent/fix", self.FIX),
                 ("branch", {"trees": {"/testbed": self.NOTES},
-                            "branches": {"refs/heads/old": [100, self.OLD], "refs/heads/fix": [200, self.FIX]}},
+                            "branches": {"refs/heads/old": [100, self.OLD],
+                                         "refs/heads/fix": [200, self.NOTES + self.FIX]}},
                  "branch refs/heads/fix", self.FIX),
                 ("notes only", {"trees": {"/testbed": self.NOTES}}, "none", "")):
             with self.subTest(label=label):
@@ -1117,7 +1118,7 @@ class BenchmarkRun(unittest.TestCase):
         self.set_scenario({"agent": [self.ASKS], "maintainer": [{"result": "Use A.", "total_cost_usd": 0.1}],
                            "interrupt_at": 2})
         result = self.run_bench(tasks=self.one, arms="method", cap=8)
-        self.assertNotEqual(result.returncode, 0)
+        self.assertEqual(result.returncode, 130, result.stderr)
         self.assertIn("run again", result.stderr)
         [record] = self.records().values()
         self.assertEqual(record["finished"], False)
