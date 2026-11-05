@@ -10,7 +10,8 @@ Usage:
                                  --maintainer-model MODEL --cap-usd TOTAL --out RUNDIR
                                  [--dry-run] [--method-home DIR] [--credentials FILE]
                                  [--hooks-python DIR]
-  python3 tools/benchmark.py grade --rundir RUNDIR --swebench-python PY [--gold] [--tasks TASKS]
+  python3 tools/benchmark.py grade --rundir RUNDIR --swebench-python PY [--gold]
+                                   [--tasks TASKS]
   python3 tools/benchmark.py summary --rundir RUNDIR [--org FILE]
 
 select  reads the dataset (JSON lines exported from SWE-bench/SWE-bench_Verified, test
@@ -23,40 +24,42 @@ select  reads the dataset (JSON lines exported from SWE-bench/SWE-bench_Verified
 
 run     runs each task R times per arm, in an interleaved order, one run at a time. A run
         starts the task's image with podman (fully qualified, SELinux labels off for the
-        container), creates the user "agent" owning /testbed, gives it a git identity, binds
-        the host's claude read-only at /usr/local/bin/claude, and checks that every commit
-        after base_commit keeps base_commit's tree (SWE-bench's images add an empty setup
-        commit). The method arm also gets the installed method from --method-home (default
-        ~): .claude/CLAUDE.md, skills, agents, rules and .agents with symlinks resolved, and
-        .claude/settings.json reduced to the keys install.py writes, its hook commands run
-        by the standalone Python in --hooks-python (bound read-only at /opt/dotagents-python),
-        since the image's own python3 may be too old; a probe then proves the method is live
-        (the guard, run by the settings' own command, exits 2 on a push; the skills and the
-        global rules are in place), and a failed probe makes the run an error. The plain arm
-        runs claude --safe-mode. Every agent call is claude -p in /testbed with the same
-        model, effort high, JSON output, bypassPermissions (the container is the boundary),
-        WebFetch and WebSearch off, and --max-budget-usd set to the run's remaining share;
-        the first prompt is the problem statement and the same instructions in both arms.
-        Each call gets only the Claude access token from --credentials (default
-        ~/.claude/.credentials.json), read fresh and through the environment, never the
-        refresh token or another service's token, and the token is scrubbed from every
-        result and from the prediction before either is kept or shown to the maintainer; a token that has expired (the
-        host's claude refreshes it) stops the run as "login" before the call. When the agent stops, a simulated maintainer on the host
-        (claude -p --safe-mode, no tools, --maintainer-model, an empty folder) replies DONE
-        or answers, and an answer resumes the agent's session; at most 6 replies. The
-        prediction is the change against base_commit in /testbed (committed, staged or
-        not), else in the newest other worktree or branch the agent left it on, never
-        counting the method's notes (.private/), and without the files the task's hidden
-        test patch touches. RUNDIR/runs/<run>/ holds record.json (every
-        call's JSON result, the replies, the stop reason, the probe, the costs) and
-        prediction.diff. Cost: a run's share is the cap divided by the number of runs; a
-        run's spend is its last agent result's total_cost_usd (which holds the earlier
-        calls) plus the maintainer's calls; no run starts when the spend so far plus one
-        share would pass the cap, and the runs not made go to RUNDIR/not-made.json. A usage
-        limit or a failed login stops everything (exit 1), and so does Ctrl-C (exit 130); the
-        stopped attempt's spend still counts against the cap. Run again on the same RUNDIR to
-        go on: finished runs, errors included, are not run again (delete a run's folder to
-        run it again). --dry-run prints the plan and the prerequisites and starts nothing.
+        container), creates the user "agent" owning /testbed, gives it a git identity,
+        binds the host's claude read-only at /usr/local/bin/claude, and checks that every
+        commit after base_commit keeps base_commit's tree (SWE-bench's images add an empty
+        setup commit). The method arm also gets the installed method from --method-home
+        (default ~): .claude/CLAUDE.md, skills, agents, rules and .agents with symlinks
+        resolved, and .claude/settings.json reduced to the keys install.py writes, its hook
+        commands run by the standalone Python in --hooks-python (bound read-only at
+        /opt/dotagents-python), since the image's own python3 may be too old; a probe then
+        proves the method is live (the guard, run by the settings' own command, exits 2 on
+        a push; the skills and the global rules are in place), and a failed probe makes the
+        run an error. The plain arm runs claude --safe-mode. Every agent call is claude -p
+        in /testbed with the same model, effort high, JSON output, bypassPermissions (the
+        container is the boundary), WebFetch and WebSearch off, and --max-budget-usd set to
+        the run's remaining share; the first prompt is the problem statement and the same
+        instructions in both arms. Each call gets only the Claude access token from
+        --credentials (default ~/.claude/.credentials.json), read fresh and through the
+        environment, never the refresh token or another service's token, and the token is
+        scrubbed from every result and from the prediction before either is kept or shown
+        to the maintainer; a token that has expired (the host's claude refreshes it) stops
+        the run as "login" before the call. When the agent stops, a simulated maintainer on
+        the host (claude -p --safe-mode, no tools, --maintainer-model, an empty folder)
+        replies DONE or answers, and an answer resumes the agent's session; at most 6
+        replies. The prediction is the change against base_commit in /testbed (committed,
+        staged or not), else in the newest other worktree or branch the agent left it on,
+        never counting the method's notes (.private/), and without the files the task's
+        hidden test patch touches. RUNDIR/runs/<run>/ holds record.json (every call's JSON
+        result, the replies, the stop reason, the probe, the costs) and prediction.diff.
+        Cost: a run's share is the cap divided by the number of runs; a run's spend is its
+        last agent result's total_cost_usd (which holds the earlier calls) plus the
+        maintainer's calls; no run starts when the spend so far plus one share would pass
+        the cap, and the runs not made go to RUNDIR/not-made.json. A usage limit or a
+        failed login stops everything (exit 1), and so does Ctrl-C (exit 130); the stopped
+        attempt's spend still counts against the cap. Run again on the same RUNDIR to go
+        on: the stopped run starts again from the beginning, and finished runs, errors
+        included, are not run again (delete a run's folder to run it again). --dry-run
+        prints the plan and the prerequisites and starts nothing.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package, from
@@ -64,23 +67,23 @@ grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, s
         (default podman's socket under XDG_RUNTIME_DIR); when no docker program is on PATH,
         one that runs podman is put there, since the harness stops its containers with it.
         The harness keys predictions by instance id, so each arm and repeat is graded in a
-        call of its own; runs that never reached the agent are not graded. RUNDIR/grades.json
-        holds per run whether it is resolved and which PASS_TO_PASS tests failed
-        (regressions). The harness writes no report for an empty patch, one that does not
-        apply, or one whose tests time out: each counts as graded and unresolved. A run it failed on otherwise has no
-        grade, and grade exits 1 naming it (grade again to retry). With --gold it grades the
-        reference patches of the tasks (RUNDIR's tasks.json, or --tasks) into
-        RUNDIR/gold.json instead.
+        call of its own; runs that never reached the agent are not graded.
+        RUNDIR/grades.json holds per run whether it is resolved and which PASS_TO_PASS
+        tests failed (regressions). The harness writes no report for an empty patch, one
+        that does not apply, or one whose tests time out: each counts as graded and
+        unresolved. A run it failed on otherwise has no grade, and grade exits 1 naming it
+        (grade again to retry). With --gold it grades the reference patches of the tasks
+        (RUNDIR's tasks.json, or --tasks) into RUNDIR/gold.json instead.
 
-summary writes per arm the runs, errors, graded runs (empty or unapplied predictions
-        among them), runs without a report, the resolved rate over the graded runs, median
-        and total cost (agent and maintainer apart), median turns, minutes and replies, runs with regressions, runs
-        over their share and the stop reasons, then per task both arms side by side: an Org
-        fragment of metrics only, no transcript or command text, to --org or stdout. It is
-        labeled "pilot: not conclusive" unless both arms finished every run of a plan as
-        large as the full run of DESIGN.org's method-measured rule (20 tasks, 3 runs per
-        arm). It also gives the total spend, the interrupted attempts' share of it and the
-        runs the cap left unmade.
+summary writes per arm the runs, errors, graded runs (empty or unapplied predictions among
+        them), runs without a report, the resolved rate over the graded runs, median and
+        total cost (agent and maintainer apart), median turns, minutes and replies, runs
+        with regressions, runs over their share and the stop reasons, then per task both
+        arms side by side: an Org fragment of metrics only, no transcript or command text,
+        to --org or stdout. It is labeled "pilot: not conclusive" unless both arms finished
+        every run of a plan as large as the full run of DESIGN.org's method-measured rule
+        (20 tasks, 3 runs per arm). It also gives the total spend, the interrupted
+        attempts' share of it and the runs the cap left unmade.
 
 Standard library only. Exit: 0 done, 1 a step failed (reported), 2 usage error.
 """

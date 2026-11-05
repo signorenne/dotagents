@@ -71,8 +71,9 @@ agent needed the maintainer.
 - The SWE-bench images add an empty setup commit after =base_commit=; each
   run checks that every commit after it keeps =base_commit='s tree.
 - Runs go one at a time; a usage limit, an expired login or Ctrl-C stops
-  the run, which then resumes where it stopped, and the stopped attempt's
-  spend still counts against the cap.
+  the run; the next start goes on from the stopped run, which starts again
+  from the beginning, and the stopped attempt's spend still counts against
+  the cap.
 
 * Results
 

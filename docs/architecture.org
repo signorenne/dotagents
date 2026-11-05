@@ -771,7 +771,8 @@ them):
    cap. A run leaves =record.json= and =prediction.diff= (the change against
    =base_commit=, without the files the hidden tests touch) in
    =RUNDIR/runs/<run>/=; a usage limit or an expired login stops the whole
-   run, which resumes on the next start.
+   run; the next start goes on from the stopped run, which starts again
+   from the beginning.
 3. =grade= runs the SWE-bench harness through podman's Docker API from
    =RUNDIR/grading/=, once per arm and repeat because the harness keys
    predictions by instance id, with a =docker= program that runs podman on
