@@ -819,12 +819,16 @@ if "# dotagents probe" in " ".join(command):
     print("skills=%d" % scenario.get("skills", 2))
     print("claude_md=%s" % scenario.get("claude_md", "@~/.agents/AGENTS.md"))
 elif command[0] == "git":
-    # trees: each worktree's change against base_commit; branches: {ref: [time, change]};
-    # after_base: {commit: [the files it changes against base_commit]}, the image's own.
+    # trees: each worktree's change against head, the commit the image starts on;
+    # branches: {ref: [time, change against head]}; after_base: {commit: [the files it
+    # changes against base_commit]}, the image's own; setup_diff: head's change against
+    # base_commit, which a diff against any commit but head shows too.
     path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
     trees = scenario.get("trees", {"/testbed": scenario.get("diff", "")})
     branches = scenario.get("branches", {})
     after_base = scenario.get("after_base", {})
+    head = scenario.get("head", "HEAD-COMMIT")
+    setup = "" if head in command else scenario.get("setup_diff", "")
     def visible(text):  # git's exclude pathspec for the notes
         if ":(exclude).private" not in command:
             return text
@@ -834,11 +838,10 @@ elif command[0] == "git":
     commits = [word for word in command if word in after_base]
     if "rev-list" in command:
         print("\n".join(after_base))
-    elif "diff" in command and commits:
-        files = after_base[commits[0]]
-        if "--quiet" in command:
-            sys.exit(1 if files else 0)
-        sys.stdout.write("".join(name + ("\0" if "-z" in command else "\n") for name in files))
+    elif "--name-only" in command and commits:
+        sys.stdout.write("".join(name + ("\0" if "-z" in command else "\n") for name in after_base[commits[0]]))
+    elif "rev-parse" in command:
+        print(head)
     elif "worktree" in command:
         print("\n".join("worktree " + tree for tree in trees))
     elif "for-each-ref" in command:
@@ -848,9 +851,9 @@ elif command[0] == "git":
     elif "diff" in command:
         if refs:  # base then ref; the other order is a reversed change
             reversed_order = command[command.index(refs[0]) - 1] in ("--binary", "--quiet")
-            text = "REVERSED\n" if reversed_order else visible(branches[refs[0]][1])
+            text = "REVERSED\n" if reversed_order else visible(setup + branches[refs[0]][1])
         else:
-            text = visible(trees.get(path, ""))
+            text = visible(setup + trees.get(path, ""))
         if "--quiet" in command:
             sys.exit(1 if text else 0)
         sys.stdout.write(text)
@@ -1149,6 +1152,27 @@ class BenchmarkRun(unittest.TestCase):
                 self.run_bench(tasks=self.one, arms="method", rundir=rundir)
                 [(name, record)] = self.records(rundir).items()
                 self.assertEqual(record["prediction_source"], source)
+                self.assertEqual((rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), prediction)
+
+    PIN = ("diff --git a/pyproject.toml b/pyproject.toml\n--- a/pyproject.toml\n+++ b/pyproject.toml\n"
+           "@@ -1 +1 @@\n-setuptools\n+setuptools==68.0.0\n")
+
+    def test_the_prediction_leaves_out_the_image_s_setup_commit(self):
+        # The harness applies the prediction on the commit the image starts on, the setup
+        # commit after base_commit (astropy-13398's pins setuptools): the setup change is the
+        # image's, not the agent's, so an agent that changes nothing leaves an empty prediction.
+        for label, scenario, source, prediction in (
+                ("testbed", {"trees": {"/testbed": self.FIX}}, "/testbed", self.FIX),
+                ("branch", {"branches": {"refs/heads/fix": [200, self.FIX]}}, "branch refs/heads/fix", self.FIX),
+                ("nothing", {}, "none", "")):
+            with self.subTest(label=label):
+                self.set_scenario({**scenario, "head": "4b48727", "after_base": {"4b48727": ["pyproject.toml"]},
+                                   "setup_diff": self.PIN})
+                rundir = self.folder / f"setup-{label}"
+                self.run_bench(tasks=self.one, arms="plain", rundir=rundir)
+                [(name, record)] = self.records(rundir).items()
+                self.assertEqual((record["stop"], record.get("start_commit"), record["prediction_source"]),
+                                 ("DONE", "4b48727", source))
                 self.assertEqual((rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), prediction)
 
     def test_the_prediction_leaves_out_the_hidden_test_files(self):

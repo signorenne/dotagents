@@ -48,11 +48,14 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         the run as "login" before the call. When the agent stops, a simulated maintainer on
         the host (claude -p --safe-mode, no tools, --maintainer-model, an empty folder)
         replies DONE or answers, and an answer resumes the agent's session; at most 6
-        replies. The prediction is the change against base_commit in /testbed (committed,
-        staged or not), else in the newest other worktree or branch the agent left it on,
-        never counting the method's notes (.private/), and without the files the task's
-        hidden test patch touches. RUNDIR/runs/<run>/ holds record.json (every call's JSON
-        result, the replies, the stop reason, the probe, the costs) and prediction.diff.
+        replies. The prediction is the change against the commit the image starts on (its
+        HEAD, the setup commit, which is what the harness applies the prediction to, so a
+        setup change such as astropy's pin never counts as the agent's) in /testbed
+        (committed, staged or not), else in the newest other worktree or branch the agent
+        left it on, never counting the method's notes (.private/), and without the files
+        the task's hidden test patch touches. RUNDIR/runs/<run>/ holds record.json (every
+        call's JSON result, the replies, the stop reason, the probe, the costs, the start
+        commit) and prediction.diff.
         Cost: a run's share is the cap divided by the number of runs; a run's spend is its
         last agent result's total_cost_usd (which holds the earlier calls) plus the
         maintainer's calls; no run starts when the spend so far plus one share would pass
@@ -624,9 +627,10 @@ def without_paths(diff: str, paths: set) -> tuple:
 
 
 def predict(name: str, base: str) -> tuple:
-    """(diff against base_commit, where it came from): /testbed with every change staged,
-    else the newest other worktree or branch that differs from base_commit; the method's
-    working notes (.private/, which a task repository does not ignore) never count."""
+    """(diff against base, where it came from): /testbed with every change staged, else the
+    newest other worktree or branch that differs from base, the commit the image starts on;
+    the method's working notes (.private/, which a task repository does not ignore) never
+    count."""
     def changed(path: str) -> bool:
         container_git(name, "add", "-A", cwd=path)
         return container_git(name, "diff", "--cached", "--quiet", base, *NOT_NOTES, cwd=path).returncode == 1
@@ -657,19 +661,24 @@ def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Pat
     name = "dotagents-bench-" + re.sub(r"[^A-Za-z0-9_.-]", "-", run_id)
     record = {"run": run_id, "instance_id": agent["instance_id"], "arm": arm, "repeat": repeat, "started": now(),
               "finished": False, "stop": None, "error": None, "probe": None, "calls": [], "maintainer": [],
-              "agent_cost": 0.0, "maintainer_cost": 0.0, "spend": 0.0, "commits_after_base": [],
+              "agent_cost": 0.0, "maintainer_cost": 0.0, "spend": 0.0, "commits_after_base": [], "start_commit": None,
               "adaptations": context.method["adaptations"] if arm == "method" else [],
               "prediction_source": None, "left_out": []}
     run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
     try:
         start_container(context, name, agent["image"], arm)
         record["commits_after_base"] = commits_after_base(name, task)
+        # The harness applies the prediction on the image's HEAD, not on base_commit.
+        head = container_git(name, "rev-parse", "--verify", "HEAD^{commit}")
+        if head.returncode or not head.stdout.strip():
+            raise Failure(f"read the commit the image starts on: {head.stderr.strip()[-300:]}")
+        record["start_commit"] = head.stdout.strip()
         if arm == "method":
             record["probe"] = install_method(context, name)
             if not record["probe"]["passed"]:
                 raise Failure("the method's probe failed: the method is not live in the container")
         converse(context, name, arm, agent, record)
-        diff, record["prediction_source"] = predict(name, agent["base_commit"])
+        diff, record["prediction_source"] = predict(name, record["start_commit"])
         diff = scrubbed(diff, context.tokens)  # an agent may have written its environment into a file
         diff, record["left_out"] = without_paths(diff, patch_paths(task["grading"].get("test_patch", "")))
         (folder / "prediction.diff").write_text(diff, encoding="utf-8")
