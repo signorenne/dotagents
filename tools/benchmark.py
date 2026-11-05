@@ -65,9 +65,10 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         on: the stopped run starts again from the beginning, and finished runs, errors
         included, are not run again (delete a run's folder to run it again). --dry-run
         prints the plan and the prerequisites, then, with podman only, starts each task's
-        image (pulling it if missing, as a run would) and makes a run's check of the
-        commits after base_commit, printing per task whether a run would stop; it calls no
-        claude and writes nothing.
+        image (pulling it if missing, as a run would), makes a run's check of the commits
+        after base_commit and takes a run's prediction from the untouched image, printing
+        per task whether a run would stop, a non-empty prediction counting as a stop
+        (every run's prediction would carry it); it calls no claude and writes nothing.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package, from
@@ -496,15 +497,32 @@ def commits_after_base(name: str, task: dict, user: str = "agent") -> list:
     return commits
 
 
+def start_commit(name: str, user: str = "agent") -> str:
+    """The commit the image starts on (its HEAD): the harness applies the prediction on it,
+    not on base_commit."""
+    head = container_git(name, "rev-parse", "--verify", "HEAD^{commit}", user=user)
+    if head.returncode or not head.stdout.strip():
+        raise Failure(f"read the commit the image starts on: {head.stderr.strip()[-300:]}")
+    return head.stdout.strip()
+
+
 def check_image(task: dict) -> list:
-    """The check a run makes before its first call, on the task's image alone (no user
-    agent, nothing bound in, no claude), git running as root: the commits after
-    base_commit, or Failure where a run would stop."""
+    """The checks a run's own steps allow before its first call, on the task's image alone
+    (no user agent, nothing bound in, no claude), git running as root: the commits after
+    base_commit, then the prediction the untouched image gives, which every run's
+    prediction would carry. The commits after base_commit, or Failure where a run would
+    stop or its prediction would not be the agent's alone."""
     name = f"dotagents-bench-check-{task['agent']['instance_id']}"
     run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
     try:
         launch(name, task["agent"]["image"])
-        return commits_after_base(name, task, user="root")
+        commits = commits_after_base(name, task, user="root")
+        diff, source = predict(name, start_commit(name, user="root"), user="root")
+        if diff:
+            files = sorted(patch_paths(diff))
+            shown = ", ".join(files[:5]) + (f" and {len(files) - 5} more" if len(files) > 5 else "")
+            raise Failure(f"the untouched image gives a non-empty prediction from {source} ({shown})")
+        return commits
     finally:
         run_program(["podman", "rm", "-f", "-t", "0", name], "remove the container")
 
@@ -626,34 +644,37 @@ def without_paths(diff: str, paths: set) -> tuple:
     return "".join(kept), sorted(left_out)
 
 
-def predict(name: str, base: str) -> tuple:
+def predict(name: str, base: str, user: str = "agent") -> tuple:
     """(diff against base, where it came from): /testbed with every change staged, else the
     newest other worktree or branch that differs from base, the commit the image starts on;
     the method's working notes (.private/, which a task repository does not ignore) never
     count."""
+    def git(*args, cwd: str = TESTBED) -> subprocess.CompletedProcess:
+        return container_git(name, *args, cwd=cwd, user=user)
+
     def changed(path: str) -> bool:
-        container_git(name, "add", "-A", cwd=path)
-        return container_git(name, "diff", "--cached", "--quiet", base, *NOT_NOTES, cwd=path).returncode == 1
+        git("add", "-A", cwd=path)
+        return git("diff", "--cached", "--quiet", base, *NOT_NOTES, cwd=path).returncode == 1
 
     if changed(TESTBED):
-        return container_git(name, "diff", "--cached", "--binary", base, *NOT_NOTES).stdout, TESTBED
+        return git("diff", "--cached", "--binary", base, *NOT_NOTES).stdout, TESTBED
     candidates = []
-    for line in container_git(name, "worktree", "list", "--porcelain").stdout.splitlines():
+    for line in git("worktree", "list", "--porcelain").stdout.splitlines():
         path = line[len("worktree "):] if line.startswith("worktree ") else None
         if path and path != TESTBED and changed(path):
-            when = container_git(name, "log", "-1", "--format=%ct", cwd=path).stdout.strip()
+            when = git("log", "-1", "--format=%ct", cwd=path).stdout.strip()
             candidates.append((int(when) if when.isdigit() else 0, f"worktree {path}", path, None))
-    refs = container_git(name, "for-each-ref", "--format=%(committerdate:unix) %(refname)", "refs/heads").stdout
+    refs = git("for-each-ref", "--format=%(committerdate:unix) %(refname)", "refs/heads").stdout
     for line in refs.splitlines():
         when, _, ref = line.partition(" ")
-        if ref and container_git(name, "diff", "--quiet", base, ref, *NOT_NOTES).returncode == 1:
+        if ref and git("diff", "--quiet", base, ref, *NOT_NOTES).returncode == 1:
             candidates.append((int(when) if when.isdigit() else 0, f"branch {ref}", TESTBED, ref))
     if not candidates:
         return "", "none"
     _, source, path, ref = max(candidates)
     if ref:
-        return container_git(name, "diff", "--binary", base, ref, *NOT_NOTES).stdout, source
-    return container_git(name, "diff", "--cached", "--binary", base, *NOT_NOTES, cwd=path).stdout, source
+        return git("diff", "--binary", base, ref, *NOT_NOTES).stdout, source
+    return git("diff", "--cached", "--binary", base, *NOT_NOTES, cwd=path).stdout, source
 
 
 def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Path) -> dict:
@@ -668,11 +689,7 @@ def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Pat
     try:
         start_container(context, name, agent["image"], arm)
         record["commits_after_base"] = commits_after_base(name, task)
-        # The harness applies the prediction on the image's HEAD, not on base_commit.
-        head = container_git(name, "rev-parse", "--verify", "HEAD^{commit}")
-        if head.returncode or not head.stdout.strip():
-            raise Failure(f"read the commit the image starts on: {head.stderr.strip()[-300:]}")
-        record["start_commit"] = head.stdout.strip()
+        record["start_commit"] = start_commit(name)
         if arm == "method":
             record["probe"] = install_method(context, name)
             if not record["probe"]["passed"]:
@@ -725,7 +742,8 @@ def run(args) -> int:
         for task in tasks:
             ident = task["agent"]["instance_id"]
             try:
-                print(f"{ident} image: ok, commits after base_commit: {len(check_image(task))}", flush=True)
+                print(f"{ident} image: ok, commits after base_commit: {len(check_image(task))}, prediction: empty",
+                      flush=True)
             except Failure as error:
                 print(f"{ident} image: a run would stop: {error}", flush=True)
         return 0
