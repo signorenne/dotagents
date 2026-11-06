@@ -1574,6 +1574,22 @@ class BenchmarkResults(unittest.TestCase):
         # plain: one report, one timeout, and the run whose output only quotes a timeout.
         self.assertEqual(self.table(summary.stdout, "plain")[3:9], ["2", "0", "1", "1", "0", "0%"])
 
+    def test_a_run_that_failed_after_the_agent_counts_as_an_error_only(self):
+        # A run whose prediction step failed reached the agent, whose cost counts, but has no
+        # prediction: an error, not a run the harness failed to report on.
+        run_id = f"{self.ids[0]}.method.1"
+        path = self.rundir / "runs" / run_id / "record.json"
+        record = json.loads(path.read_text(encoding="utf-8"))
+        record.update(stop="error", error="take the prediction: git add in /testbed exited 128: fatal: lock")
+        path.write_text(json.dumps(record), encoding="utf-8")
+        (path.parent / "prediction.diff").unlink()
+        result = self.grade()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn(run_id, json.loads((self.rundir / "grades.json").read_text(encoding="utf-8")))
+        summary = self.tool("summary", "--rundir", self.rundir)
+        # runs, errors, graded, empty or not applied, tests timed out, no report, resolved, rate
+        self.assertEqual(self.table(summary.stdout, "method")[1:9], ["4", "1", "3", "0", "0", "0", "3", "100%"])
+
     def test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink(self):
         # The harness runs in RUNDIR/grading/, so a relative path must still reach the
         # Python; a venv's python is a symlink that must not be resolved, or it loses the venv.
