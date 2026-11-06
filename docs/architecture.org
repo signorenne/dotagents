@@ -780,8 +780,8 @@ them):
    from the beginning. =--dry-run= prints the plan and the prerequisites,
    makes the check of the commits after =base_commit= on each task's image
    and takes the prediction the untouched image gives, which must be empty,
-   with podman only, so a task whose runs would stop, or whose predictions
-   would carry a change that is not the agent's, shows before any spend.
+   with podman only, so a task whose runs would stop, or whose untouched
+   image already holds a change, shows before any spend.
 3. =grade= runs the SWE-bench harness through podman's Docker API from
    =RUNDIR/grading/=, once per arm and repeat because the harness keys
    predictions by instance id, with a =docker= program that runs podman on

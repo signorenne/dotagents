@@ -68,9 +68,10 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         prints the plan and the prerequisites, then, with podman only, starts each task's
         image (pulling it if missing, as a run would), makes a run's check of the commits
         after base_commit and takes a run's prediction from the untouched image, printing
-        per task whether a run would stop, a non-empty prediction or a git failure while
-        taking it counting as a stop (every run's prediction would carry it); it calls no
-        claude and writes nothing.
+        per task whether a run would stop. A git failure while taking that prediction
+        counts as a stop, and so does any change in it, checked before the hidden test
+        files are left out: a change the untouched image holds is not an agent's. It calls
+        no claude and writes no RUNDIR; an image it pulled stays in podman's store.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package (a path,
@@ -513,9 +514,10 @@ def start_commit(name: str, user: str = "agent") -> str:
 def check_image(task: dict) -> list:
     """The checks a run's own steps allow before its first call, on the task's image alone
     (no user agent, nothing bound in, no claude), git running as root: the commits after
-    base_commit, then the prediction the untouched image gives, which every run's
-    prediction would carry. The commits after base_commit, or Failure where a run would
-    stop or its prediction would not be the agent's alone."""
+    base_commit, then the prediction the untouched image gives, before the hidden test
+    files are left out, which must be empty: a change there is the image's, not an
+    agent's. The commits after base_commit, or Failure where a run would stop or the
+    untouched image holds a change."""
     name = f"dotagents-bench-check-{task['agent']['instance_id']}"
     run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
     try:
