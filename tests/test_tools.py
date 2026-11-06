@@ -832,8 +832,18 @@ elif command[0] == "git":
     # trees: each worktree's change against head, the commit the image starts on;
     # branches: {ref: [time, change against head]}; after_base: {commit: [the files it
     # changes against base_commit]}, the image's own; setup_diff: head's change against
-    # base_commit, which a diff against any commit but head shows too.
+    # base_commit, which a diff against any commit but head shows too; prunable: worktrees
+    # whose folder is gone, which git lists as prunable and cannot change into; fail:
+    # {words: message}, a git call holding every word of a key fails as git does (exit 128).
     path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
+    prunable = scenario.get("prunable", [])
+    if path in prunable:
+        print("fatal: cannot change to '%s': No such file or directory" % path, file=sys.stderr)
+        sys.exit(128)
+    for words, message in scenario.get("fail", {}).items():
+        if all(word in command for word in words.split()):
+            print(message, file=sys.stderr)
+            sys.exit(128)
     trees = scenario.get("trees", {"/testbed": scenario.get("diff", "")})
     branches = scenario.get("branches", {})
     after_base = scenario.get("after_base", {})
@@ -853,7 +863,11 @@ elif command[0] == "git":
     elif "rev-parse" in command:
         print(head)
     elif "worktree" in command:
-        print("\n".join("worktree " + tree for tree in trees))
+        for tree in list(trees) + prunable:
+            print("worktree %s\nHEAD %s" % (tree, head))
+            if tree in prunable:
+                print("prunable gitdir file points to non-existent location")
+            print()
     elif "for-each-ref" in command:
         print("\n".join("%d %s" % (when, ref) for ref, (when, _) in branches.items()))
     elif "log" in command:
@@ -1178,7 +1192,11 @@ class BenchmarkRun(unittest.TestCase):
                             "branches": {"refs/heads/old": [100, self.OLD],
                                          "refs/heads/fix": [200, self.NOTES + self.FIX]}},
                  "branch refs/heads/fix", self.FIX),
-                ("notes only", {"trees": {"/testbed": self.NOTES}}, "none", "")):
+                ("notes only", {"trees": {"/testbed": self.NOTES}}, "none", ""),
+                # A worktree whose folder the agent deleted holds no change; its commits stay on its branch.
+                ("deleted worktree", {"trees": {"/testbed": self.NOTES}, "prunable": ["/home/agent/fix"],
+                                      "branches": {"refs/heads/fix": [200, self.FIX]}}, "branch refs/heads/fix",
+                 self.FIX)):
             with self.subTest(label=label):
                 self.set_scenario(scenario)
                 rundir = self.folder / f"prediction-{label.replace(' ', '-')}"
@@ -1220,6 +1238,44 @@ class BenchmarkRun(unittest.TestCase):
         name = next(iter(self.records()))
         self.assertEqual((self.rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), source)
         self.assertEqual(self.records()[name]["prediction_source"], "/testbed")
+
+    def test_a_git_failure_in_the_prediction_is_an_error_not_an_empty_prediction(self):
+        # A git call of the prediction step that fails (a stale index.lock, a bad revision)
+        # would otherwise read as "no change", graded unresolved; a run that cannot take its
+        # prediction is an error, and the dry run shows it as a run that would stop.
+        ident = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]["agent"]["instance_id"]
+        lock = "fatal: Unable to create '/testbed/.git/index.lock': File exists."
+        bad = "fatal: bad object"
+        worktree = {"trees": {"/testbed": "", "/home/agent/fix": self.FIX}, "times": {"/home/agent/fix": 100}}
+        branch = {"branches": {"refs/heads/fix": [200, self.FIX]}}
+        for label, scenario, step, where in (
+                ("add", {"fail": {"add -A": lock}}, "add", "/testbed"),
+                ("diff --quiet", {"fail": {"diff --cached --quiet": bad}}, "diff", "/testbed"),
+                ("diff", {"trees": {"/testbed": self.FIX}, "fail": {"diff --cached --binary": bad}}, "diff",
+                 "/testbed"),
+                ("worktree list", {"fail": {"worktree list": bad}}, "worktree", "/testbed"),
+                ("worktree add", {**worktree, "fail": {"/home/agent/fix add -A": lock}}, "add", "/home/agent/fix"),
+                ("worktree log", {**worktree, "fail": {"log": bad}}, "log", "/home/agent/fix"),
+                ("for-each-ref", {"fail": {"for-each-ref": bad}}, "for-each-ref", "/testbed"),
+                ("branch diff --quiet", {**branch, "fail": {"diff --quiet refs/heads/fix": bad}}, "diff", "/testbed"),
+                ("branch diff", {**branch, "fail": {"diff --binary refs/heads/fix": bad}}, "diff", "/testbed")):
+            message = lock if lock in scenario["fail"].values() else bad
+            error = f"take the prediction: git {step} in {where} exited 128: {message}"
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario(scenario)
+                rundir = self.folder / f"predict-{label.replace(' ', '-')}"
+                result = self.run_bench(tasks=self.one, arms="plain", rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                [(name, record)] = self.records(rundir).items()
+                self.assertEqual((record["stop"], record["error"], record["prediction_source"]),
+                                 ("error", error, None))
+                self.assertEqual(len(record["calls"]), 1)  # the agent ran; its spend still counts
+                self.assertFalse((rundir / "runs" / name / "prediction.diff").exists())
+                self.set_scenario(scenario)
+                result = self.run_bench("--dry-run", tasks=self.one, rundir=self.folder / "dry")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"{ident} image: a run would stop: {error}\n", result.stdout)
 
     def test_task_fields_that_reach_paths_and_commands_are_checked(self):
         task = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]

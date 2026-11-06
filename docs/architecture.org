@@ -774,7 +774,8 @@ them):
    cap. A run leaves =record.json= and =prediction.diff= (the change against
    the commit the image starts on, its setup commit, which the harness
    patches, without the files the hidden tests touch) in
-   =RUNDIR/runs/<run>/=; a usage limit or an expired login stops the whole
+   =RUNDIR/runs/<run>/=; a git failure while taking the prediction makes
+   the run an error, not an empty prediction; a usage limit or an expired login stops the whole
    run; the next start goes on from the stopped run, which starts again
    from the beginning. =--dry-run= prints the plan and the prerequisites,
    makes the check of the commits after =base_commit= on each task's image
