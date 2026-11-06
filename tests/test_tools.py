@@ -1615,19 +1615,30 @@ class BenchmarkResults(unittest.TestCase):
 
     def test_a_run_that_failed_after_the_agent_counts_as_an_error_only(self):
         # A run whose prediction step failed reached the agent, whose cost counts, but has no
-        # prediction: an error, not a run the harness failed to report on.
+        # prediction: an error, not a run the harness failed to report on. A run whose agent
+        # call ended in an error still has its prediction, which grade grades.
         run_id = f"{self.ids[0]}.method.1"
         path = self.rundir / "runs" / run_id / "record.json"
-        record = json.loads(path.read_text(encoding="utf-8"))
-        record.update(stop="error", error="take the prediction: git add in /testbed exited 128: fatal: lock")
-        path.write_text(json.dumps(record), encoding="utf-8")
-        (path.parent / "prediction.diff").unlink()
-        result = self.grade()
-        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertNotIn(run_id, json.loads((self.rundir / "grades.json").read_text(encoding="utf-8")))
-        summary = self.tool("summary", "--rundir", self.rundir)
+        prediction = path.parent / "prediction.diff"
+        fix = prediction.read_text(encoding="utf-8")
         # runs, errors, graded, empty or not applied, tests timed out, no report, resolved, rate
-        self.assertEqual(self.table(summary.stdout, "method")[1:9], ["4", "1", "3", "0", "0", "0", "3", "100%"])
+        for label, error, source, row in (
+                ("prediction failed", "take the prediction: git add in /testbed exited 128: fatal: lock", None,
+                 ["4", "1", "3", "0", "0", "0", "3", "100%"]),
+                ("agent error", None, "/testbed", ["4", "1", "4", "0", "0", "0", "4", "100%"])):
+            with self.subTest(label=label):
+                record = json.loads(path.read_text(encoding="utf-8"))
+                record.update(stop="error", error=error, prediction_source=source)
+                path.write_text(json.dumps(record), encoding="utf-8")
+                prediction.unlink(missing_ok=True)
+                if source:
+                    prediction.write_text(fix, encoding="utf-8")
+                result = self.grade()
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
+                self.assertEqual(run_id in grades, bool(source))
+                summary = self.tool("summary", "--rundir", self.rundir)
+                self.assertEqual(self.table(summary.stdout, "method")[1:9], row)
 
     def test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink(self):
         # The harness runs in RUNDIR/grading/, so a relative path must still reach the
