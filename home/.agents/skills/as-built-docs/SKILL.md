@@ -1,6 +1,6 @@
 ---
 name: as-built-docs
-description: "Writes as-built documentation of an existing repository or app from its code: a knowledge base for non-developers, a manual test guide, a developer guide and diagrams, every statement traced to code or a spec and independently fact-checked. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding or architecture docs, DeepWiki-style docs), or to update such docs after the code changed."
+description: "Writes as-built documentation of an existing repository or app from its code: a knowledge base for non-developers, a manual test guide, a developer guide and diagrams, every statement traced to code or a spec and independently fact-checked. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding docs or architecture docs of existing code, DeepWiki-style docs), or to update such docs after the code changed."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
