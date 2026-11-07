@@ -11,7 +11,8 @@ Goal: three documents that a person reads easily and can trust. They say how the
 ## Working rules
 
 - Keep facts in a notes file (.private/as-built/notes.md when .private/ is git-ignored, otherwise a scratch folder), one line each: id, area tag, statement, file:line. Write from the notes: they survive compaction and spare rereading the code.
-- Delegate code reading, one area per subagent that runs on the session's model, told to stay read-only and to return facts in that line format: in Claude Code the general-purpose subagent, elsewhere the tool's default general agent. Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
+- Delegate code reading to at most about four subagents, one per code area split by folders so each file is read once, told to write nothing but their own facts file, one fact per line in that format, and to return a short summary: in Claude Code the general-purpose subagent with model sonnet, elsewhere the tool's default general agent. Each reads with search and line ranges, never a whole file over about 300 lines or an old document in full, and stops at about 80 tool calls with what it has. Writers and fact-checkers run on the session's model. Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
+- Verify each fact twice and no more: where it is mapped, with its file:line, and in the independent fact-check. Writers and fixers re-read a source only for a fact that is ambiguous or contradicted, or that a worked example or expected test value depends on. Keep the main session lean: long outputs go to files you search, and you look at a picture through a small copy in a scratch folder (for example magick IN.png -resize 480x OUT.png).
 - External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition. External names are the names of external values and of the calls and events the platform vendor documents as the device's or host's interface, not the classes, signals or functions of a framework the code uses.
 - Describe the software as built, without judging it: no bugs, suspicions, unused code or contract anomalies in the docs. Note each one in the notes file under "for the audit", with file:line, and hand the list over at the end.
 - Write one document and one section at a time.
@@ -80,6 +81,7 @@ Pictures of the UI come from the real app, never from a drawing of how it might 
 - Make each picture repeatable, as section 1 of the precise-ui-changes skill says (fixed data and clock, settled animations, device pixels), and save its recipe in the notes (how to start the app, the input sequence, the grab command, the crop and markers), so an update renders it again.
 - When the user provides the pictures (section 1), or the recipe does not run or drive the app here, list the screens and states you need and ask the user for those pictures; write those sections once they arrive.
 - Pictures are PNG files in the docs' images folder with the kb_, tg_ or dev_ prefix, cropped to what the section explains.
+- Drive the app from a script, not by hand in the main session: one render script per repository in the notes folder starts the app, sets each state through the project's own input tools, grabs the window or framebuffer as the first point says and runs annotate.py, so an update renders every picture again with one command.
 - Mark each element the text explains with the bundled script: in Claude Code python3 ${CLAUDE_SKILL_DIR}/scripts/annotate.py, elsewhere python3 ~/.agents/skills/as-built-docs/scripts/annotate.py (it needs Pillow: ask before installing it). Place each marker at the edge of its element, not over text the reader needs; the legend under the picture uses the same numbers.
 
 ## 7. Verify
@@ -94,7 +96,7 @@ Run each check as a one-off command saved in the notes (the update runs them aga
 6. every diagram renders (exit code 0 and nothing on stderr) and has a title, and every class in a class diagram shows members;
 7. every picture exists, has its recipe in the notes or is marked as provided by the user, and has a legend with as many entries as it has markers.
 
-Then the fact-check: one subagent per document that did not write it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the document, not the branch diff), given the document, the code and the specs but not your notes. It returns wrong or unsupported claims with file:line, and the passages where a reader without your notes gets lost. Re-check each finding at the source before fixing it, then run checks 1 to 7 again.
+Then the fact-check: one subagent per document that did not write it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the document, not the branch diff), given the document, the code and the specs but not your notes. It returns wrong or unsupported claims with file:line, and the passages where a reader without your notes gets lost. Fixes go to one fresh agent per document (in Claude Code the general-purpose subagent with model sonnet), given the report, the facts and the writing rules, not the writer's transcript: it re-checks each finding at the source before fixing it and lists the findings it rejects with their evidence. Then run checks 1 to 7 again.
 
 ## 8. Report
 
@@ -102,11 +104,11 @@ Files changed, decisions taken, what was verified and what was not, the pictures
 
 ## 9. Update
 
-Sync the docs to the code; never write them again from scratch.
+Sync the docs to the code; never write them again from scratch. Docs that record a commit are a verified fact source for every file unchanged since that commit: reuse their statements instead of mapping those files again.
 
 1. Read the recorded commit from the headers and run git diff --stat <recorded commit>..HEAD.
 2. Find the affected sections through the appendix's file index. Map only the changed areas again, run the appendix's extraction commands from the notes again, and render again the pictures of the screens that changed.
 3. Rewrite only the affected sections, vocabulary entries, diagrams, pictures and appendix rows, and update the commit in the headers.
 4. Run checks 1 to 7 on all the docs, and the fact-check on the changed sections.
 
-Docs in an earlier layout of this skill are migrated once to this structure, keeping what is still true: show the new outline first (section 3), and move behaviors to confirm, unused code and anomalies to the list for the audit. For docs without a recorded commit, ask whether to migrate them or to keep their structure.
+Docs in an earlier layout of this skill are migrated once to this structure, keeping what is still true: map only what the new layout needs and the old docs lack (class members, the UI component map, picture states), take the rest from the old docs where the code they record has not changed, show the new outline first (section 3), and move behaviors to confirm, unused code and anomalies to the list for the audit. For docs without a recorded commit, ask whether to migrate them or to keep their structure.
