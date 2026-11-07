@@ -42,7 +42,7 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 
 ## D-0004: Skills keep their full guidance
 
-- Status: Accepted
+- Status: Superseded by D-0013
 - Proposed by: maintainer
 - Decided by: maintainer
 - Date: 2026-10-07
@@ -147,3 +147,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: Grounding stopped on every difference from memory or a document, and the Refute section sent refuted claims from those sources to the same stop, so a slip in the agent's own recollection, or a stale detail no step relies on, would interrupt routine work inside an approved plan. The maintainer still hears first about every change to what was approved.
 - Rejected: Narrowing only the Refute sentence (it would contradict Grounding's stop on memory); a list of document types that stop (misses a refuted assumption of the agent's own that changes the plan); leaving both rules as they were.
 - Revisit if: a session changes course on a refuted claim the maintainer wanted to hear about first, or sessions still stop for differences that change nothing.
+
+## D-0013: Skills are concise and complete
+
+- Status: Accepted
+- Proposed by: maintainer (skills go straight to the point), agent (wording, guide, sources)
+- Decided by: maintainer
+- Date: 2026-11-07
+- Rule in: docs/skill-authoring.md, AGENTS.md (this repository)
+- Decision: A skill holds every step and rule a model would otherwise get wrong, each stated once; it does not explain what a capable model already knows, gives a reason only where a rule is not obvious, and keeps rare or bulky detail in a file read only when needed. Adapting a third-party skill still changes only what conflicts with the maintainer's rules. Replaces D-0004.
+- Why: Anthropic's skill authoring guide: once a skill loads, every token competes with the conversation, so add only context the model lacks; its context engineering article: aim for the smallest set of high-signal tokens, which is not the same as short. Instruction adherence falls as the number of instructions grows (IFScale benchmark, 2025). D-0004's premise held only until the skill loads.
+- Rejected: Keeping D-0004 (full guidance whatever the length); shortening by dropping rules (vague guidance is its own failure mode).
+- Revisit if: a real session shows a trimmed skill missing a rule it needed (restore that rule), or a skill's guidance no longer fits in SKILL.md under 500 lines.

@@ -20,7 +20,7 @@ adapters/claude/           Claude Code settings merged by the installer
 install.py                 installer: copies the source and generates each tool's files
 tools/                     validate.py and build.py
 tests/                     unittest suites for hooks, installer and tools
-docs/                      workflow guide and decision log
+docs/                      workflow guide, skill authoring guide and decision log
 ```
 
 ## Where changes go
@@ -36,8 +36,8 @@ docs/                      workflow guide and decision log
 - Skills use only the Agent Skills fields name, description and license; the name equals the folder name; descriptions are third person, say what and when, at most 1024 characters (200 for claude.ai).
 - Every skill folder has a LICENSE.txt. New work is MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). Adapted third-party work keeps its license and records the changes (see claude-ai/skills/tutor/NOTICE.txt).
 - No em dash or en dash characters anywhere, and no inline backticks in skill prose.
-- Instructions are written for models: explain the reason behind a rule, give a positive instruction, no capitalized emphasis, examples kept.
-- Change a skill's behavior only on purpose; keep each skill's full guidance (length costs nothing until the skill loads).
+- Instructions are written for models: a positive instruction, a reason only where the rule is not obvious, an example where it shows the expected output, no capitalized emphasis.
+- Change a skill's behavior only on purpose. Skills are concise and complete (every step and rule a model would otherwise get wrong, stated once) and follow docs/skill-authoring.md.
 - Hooks never block on unreadable input and never print anything but JSON on Gemini CLI's stdout.
 - Commit subjects: type(scope): description, lower case, imperative, one line, no body, no AI attribution trailers.
 
@@ -56,4 +56,5 @@ Run all three before every commit. CI runs the same commands.
 - Does the change sit in its owning place (table above), without a second copy?
 - Do validate, tests and build pass?
 - Does a changed instruction still agree with home/.agents/AGENTS.md and the decision log (docs/decisions.md)?
+- Does a new or changed skill pass the checklist in docs/skill-authoring.md?
 - Was a behavior change tested with a real agent session, and is that noted in the commit or PR?
