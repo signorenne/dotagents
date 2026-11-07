@@ -834,16 +834,18 @@ elif command[0] == "git":
     # changes against base_commit]}, the image's own; setup_diff: head's change against
     # base_commit, which a diff against any commit but head shows too; prunable: worktrees
     # whose folder is gone, which git lists as prunable and cannot change into; fail:
-    # {words: message}, a git call holding every word of a key fails as git does (exit 128).
+    # {words: message or [exit, message]}, a git call holding every word of a key fails with
+    # that message and exit (128, git's fatal exit, unless given).
     path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
     prunable = scenario.get("prunable", [])
     if path in prunable:
         print("fatal: cannot change to '%s': No such file or directory" % path, file=sys.stderr)
         sys.exit(128)
-    for words, message in scenario.get("fail", {}).items():
+    for words, failure in scenario.get("fail", {}).items():
         if all(word in command for word in words.split()):
+            code, message = failure if isinstance(failure, list) else (128, failure)
             print(message, file=sys.stderr)
-            sys.exit(128)
+            sys.exit(code)
     # unborn: worktrees on a branch with no commits yet (git checkout --orphan), where
     # rev-parse -q --verify HEAD exits 1 with no output and log exits 128.
     if path in scenario.get("unborn", []) and "rev-parse" in command:
@@ -1299,6 +1301,11 @@ class BenchmarkRun(unittest.TestCase):
         branch = {"branches": {"refs/heads/fix": [200, self.FIX]}}
         for label, scenario, step, where in (
                 ("add", {"fail": {"add -A": lock}}, "add", "/testbed"),
+                # Not every failure is git's fatal 128: a plain error exits 1, a usage error 129.
+                ("add exit 1", {"fail": {"add -A": [1, "error: unable to index file 'src/widget.py'"]}}, "add",
+                 "/testbed"),
+                ("diff --quiet exit 129", {"fail": {"diff --cached --quiet": [129, "usage: git diff [<options>]"]}},
+                 "diff", "/testbed"),
                 ("diff --quiet", {"fail": {"diff --cached --quiet": bad}}, "diff", "/testbed"),
                 ("diff", {"trees": {"/testbed": self.FIX}, "fail": {"diff --cached --binary": bad}}, "diff",
                  "/testbed"),
@@ -1316,8 +1323,9 @@ class BenchmarkRun(unittest.TestCase):
                 ("for-each-ref", {"fail": {"for-each-ref": bad}}, "for-each-ref", "/testbed"),
                 ("branch diff --quiet", {**branch, "fail": {"diff --quiet refs/heads/fix": bad}}, "diff", "/testbed"),
                 ("branch diff", {**branch, "fail": {"diff --binary refs/heads/fix": bad}}, "diff", "/testbed")):
-            message = lock if lock in scenario["fail"].values() else bad
-            error = f"take the prediction: git {step} in {where} exited 128: {message}"
+            [failure] = scenario["fail"].values()
+            code, message = failure if isinstance(failure, list) else (128, failure)
+            error = f"take the prediction: git {step} in {where} exited {code}: {message}"
             with self.subTest(label=label):
                 self.log.unlink(missing_ok=True)
                 self.set_scenario(scenario)
