@@ -10,6 +10,8 @@ A prompt is a specification, and the failure mode is not length but ambiguity. M
 
 This applies to anything that is itself an instruction for an AI model: prompts, system prompts, custom instructions, agent or subagent instructions, skills, templates, and "why does it keep doing Y instead of Z", even when the user only pastes text and says "make this better".
 
+When the user asks for one specific change to an existing prompt, make only that change (minimal-editing); the full rewrite is for requests to improve or debug the prompt as a whole.
+
 Optimize the total tokens and turns needed to reach a good result, not the length of the first message. A prompt fifty words longer that avoids two rounds of correction is the shorter prompt.
 
 ## Preserve
@@ -82,12 +84,12 @@ When the user says "it keeps doing X", find the instruction that permits X, not 
 | "Emphasis makes it comply" | Emphasis competes with emphasis. Specificity works; volume does not. |
 | "More instructions, more control" | More instructions, more conflicts the model resolves for you. |
 | "Shorter is always better" | Shorter and vaguer costs more in correction turns. |
-| "The role-play framing sets the tone" | The task sets the tone. The persona is usually inert. |
+| "The role-play framing sets the tone" | The task sets the tone. A role helps only when it adds domain context the task lacks; a generic "world-class expert" adds nothing. |
 | "Better safe than sorry on edge cases" | Unreachable branches dilute the reachable ones. |
 
 ## Output
 
-Return the optimized prompt as a single copy-pasteable block with nothing to strip out. If the changes are not obvious, add two or three lines on what you cut and why, not a full diff.
+In chat, return the optimized prompt as a single copy-pasteable block with nothing to strip out. When the prompt lives in a file you can edit, edit the file and report what changed and where (path:line). If the changes are not obvious, add two or three lines on what you cut and why, not a full diff.
 
 If the original is ambiguous in a way you cannot resolve, do not guess silently: write it on your best reading, then flag the assumption in one line.
 

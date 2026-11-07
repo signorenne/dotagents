@@ -52,7 +52,7 @@ Compression reduces volume, not precision: drop a paragraph of narrative rather 
 
 ## Output
 
-Deliver a single copy-pasteable block the user can drop into a new conversation as the first message, with nothing before or after it to strip.
+Deliver a single copy-pasteable block the user can drop into a new conversation as the first message, with nothing before or after it to strip. If the brief contains code blocks, fence the whole brief with four backticks so the inner fences survive.
 
 ```
 # Continuing: <short project name>
@@ -73,3 +73,7 @@ Deliver a single copy-pasteable block the user can drop into a new conversation 
 Drop empty sections instead of writing "N/A". Aim for under 500 words; go longer only for precision (a config block, a schema, a set of exact identifiers). Length spent on facts is fine; length spent on narrative is not.
 
 The test before returning it: hand only this text to someone competent who never saw the conversation. Could they take the next action correctly without guessing? Whatever they would have to guess belongs in the brief.
+
+## Related
+
+In a repository with the session-close skill, closing or handing off a session goes to session-close, which writes the project's handoff file from git and the commands actually run; this brief is for chat and for work outside a repository.
