@@ -482,7 +482,6 @@ failure hook's reminder.
 | =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); the progress check in Claude Code and Codex (a branch commit missing from its log)     |
 | =tests-attacked=            | implement (section 7), trustworthy-tests                                           | the reviewer's attack on each new or changed test                                                                                                                 |
 | =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                              |
-| =method-measured=           | this rule, =docs/evidence.org=                                                     | none: the maintainer checks the date of =docs/evidence.org= against the version                                                                                   |
 | =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
 | =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
 | =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                      | the reviewer's checklist question; the replay report in the progress log                                                                                          |
@@ -582,20 +581,6 @@ tokens per session, so no context lacks it; the tutor skill adds depth on
 top.
 
 In: =home/.agents/AGENTS.md= (Learning), =claude-ai/skills/tutor/=.
-
-*** Each version of the method is measured
-:PROPERTIES:
-:CUSTOM_ID: method-measured
-:END:
-Before a version of the nexenne method is published, =tools/benchmark.py=
-runs the full benchmark, at least 20 SWE-bench Verified tasks with three
-runs per arm, with and without the method on the same main model, and its
-metrics summary is committed in =docs/evidence.org=; raw runs stay in
-=.private/evidence/=. A pilot does not count. It also runs on the
-maintainer's request after a change to a workflow skill or a subagent, and
-never without the maintainer's go and a cap on its cost.
-
-In: =tools/benchmark.py=, =docs/evidence.org=.
 
 ** Source and install
 

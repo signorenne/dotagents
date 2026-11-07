@@ -3,11 +3,12 @@
 #+OPTIONS: toc:2 num:nil ^:nil
 #+STARTUP: showall
 
-This file owns the method's evidence about itself: what the A/B benchmark
-measures, how it runs, what limits its numbers, and the metrics summary of
-each run. [[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]] says when it runs;
-[[file:architecture.org][docs/architecture.org]] (The evidence tools) describes =tools/benchmark.py=;
-the raw runs stay in =.private/evidence/= on the maintainer's machine.
+This file is the record of the method's A/B benchmark: what it measured,
+how it ran, what limits its numbers, and its runs. The maintainer dropped
+the benchmark on 7 November 2026: the method is judged by its results in
+real work, and no further runs are planned; =tools/benchmark.py= stays,
+unused. [[file:architecture.org][docs/architecture.org]] (The evidence tools) describes it; the
+raw runs stay in =.private/evidence/= on the maintainer's machine.
 
 * What it measures
 
