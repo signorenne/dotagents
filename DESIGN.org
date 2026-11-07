@@ -101,19 +101,20 @@ to =session-close= inside a git repository.
   the code with =scout= before planning. =as-built-docs= reads the code with
   read-only subagents on the session's model instead (in Claude Code the
   general-purpose subagent, elsewhere the tool's default general agent).
-- =gates=, =implement=, =project-setup=, =isolated-work= and =as-built-docs=
-  run long commands through =gate-runner=, which reports the commit it tested,
-  so only verdicts and first errors reach the conversation; =implement= and
-  =isolated-work= also give it the folder and the commit to test, and
-  =parallel-agents= gates each branch through =isolated-work=.
-- =branch-review=, =implement= and =mechanical-changes= hand the finished change to
-  =reviewer=, which reports the HEAD it reviewed; =implement= also gives it the
-  folder and the commit it expects there, and =parallel-agents= runs
-  implement's review on the merged result.
+- =gates=, =implement=, =project-setup=, =isolated-work=, =as-built-docs= and
+  =notes-from-work= run long commands through =gate-runner=, which reports the
+  commit it tested, so only verdicts and first errors reach the conversation;
+  =implement= and =isolated-work= also give it the folder and the commit to
+  test, and =parallel-agents= gates each branch through =isolated-work=.
+- =branch-review=, =implement=, =mechanical-changes= and =notes-from-work=
+  hand the finished change to =reviewer=, which reports the HEAD it reviewed;
+  =implement= also gives it the folder and the commit it expects there, and
+  =parallel-agents= runs implement's review on the merged result.
 - =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
-  subagent that did not write them, and =code-audit= has each finding attacked
-  by one briefed only on the claim and the code: in Claude Code the
-  general-purpose subagent told not to edit, elsewhere =reviewer=.
+  subagent that did not write them, =code-audit= has each finding attacked by
+  one briefed only on the claim and the code, and =notes-from-work= has each
+  finding attacked by one given the claims and their sources: in Claude Code
+  the general-purpose subagent told not to edit, elsewhere =reviewer=.
 - Where a tool has no subagents, the skill follows
   =~/.agents/agents/<name>.md= itself.
 

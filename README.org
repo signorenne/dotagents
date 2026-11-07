@@ -188,6 +188,9 @@ when asked in words.
   bundled day and night palette, checked by rendering.
 - [[file:home/.agents/skills/clean-architecture/SKILL.md][clean-architecture]] : keeps an application in clean architecture with
   MVVM, with dependencies that point inward and are checked by the build.
+- [[file:home/.agents/skills/notes-from-work/SKILL.md][notes-from-work]] : turns what a session found (a bug's cause and fix, a
+  workaround, a technique) into checked notes in the user's knowledge vault,
+  landed after the user approves them.
 
 ** Code quality
 
