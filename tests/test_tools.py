@@ -824,7 +824,19 @@ if command[0] == "claude":
     env = {name: value for name, value in os.environ.items() if name == "PATH" or name.startswith("BENCH_FAKE_")}
     env.update(passed, BENCH_FAKE_CONTAINER=container)
     sys.exit(subprocess.run(["claude", *command[1:]], input=data, text=True, env=env).returncode)
-if "# dotagents probe" in " ".join(command):
+if command[0] in ("find", "cat"):
+    # transcripts: {path: text}, the session files Claude Code wrote in the container; without
+    # the key, its projects folder does not exist, as when no session was saved.
+    files = scenario.get("transcripts")
+    target = command[1]
+    if files is None or (command[0] == "cat" and target not in files):
+        print("%s: '%s': No such file or directory" % (command[0], target), file=sys.stderr)
+        sys.exit(1)
+    if command[0] == "cat":
+        sys.stdout.write(files[target])
+    else:
+        print("\n".join(path for path in files if path.startswith(target + "/")))
+elif "# dotagents probe" in " ".join(command):
     print("guard=%d" % scenario.get("probe_guard", 2))
     print("skills=%d" % scenario.get("skills", 2))
     print("claude_md=%s" % scenario.get("claude_md", "@~/.agents/AGENTS.md"))
@@ -1289,6 +1301,38 @@ class BenchmarkRun(unittest.TestCase):
         name = next(iter(self.records()))
         self.assertEqual((self.rundir / "runs" / name / "prediction.diff").read_text(encoding="utf-8"), source)
         self.assertEqual(self.records()[name]["prediction_source"], "/testbed")
+
+    def test_a_run_keeps_the_agent_s_whole_change_and_its_transcripts(self):
+        # Kept to judge the quality of the work, never graded: the change with the tests the
+        # prediction leaves out, and Claude Code's session files (the main session and each
+        # subagent), the token scrubbed as from a prediction. Without session files the run
+        # still counts, and the record says what is missing.
+        task = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]
+        test_path = task["grading"]["test_patch"].split(" b/", 1)[1].split("\n", 1)[0]
+        agent_test = (f"diff --git a/{test_path} b/{test_path}\nnew file mode 100644\n--- /dev/null\n"
+                      f"+++ b/{test_path}\n@@ -0,0 +1 @@\n+agent test\n")
+        home = "/home/agent/.claude/projects"
+        sessions = {f"{home}/-testbed/sess-1.jsonl": f'{{"tool": "Bash", "output": "TOKEN={self.TOKEN}"}}\n',
+                    f"{home}/-testbed/sess-1/subagents/agent-a.jsonl": '{"role": "reviewer"}\n'}
+        for label, scenario, saved, kept in (
+                ("sessions", {"transcripts": sessions}, {"saved": 2, "errors": []},
+                 {"-testbed/sess-1.jsonl": '{"tool": "Bash", "output": "TOKEN=[access token]"}\n',
+                  "-testbed/sess-1/subagents/agent-a.jsonl": '{"role": "reviewer"}\n'}),
+                ("no session folder", {}, {"saved": 0, "errors": [
+                    f"list the transcripts: find: '{home}': No such file or directory"]}, {})):
+            with self.subTest(label=label):
+                self.set_scenario({"diff": self.FIX + agent_test, **scenario})
+                rundir = self.folder / f"keep-{label.replace(' ', '-')}"
+                result = self.run_bench(tasks=self.one, arms="plain", rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                [(name, record)] = self.records(rundir).items()
+                folder = rundir / "runs" / name
+                self.assertEqual((record["stop"], record["transcripts"]), ("DONE", saved))
+                self.assertEqual((folder / "prediction.diff").read_text(encoding="utf-8"), self.FIX)
+                self.assertEqual((folder / "agent.diff").read_text(encoding="utf-8"), self.FIX + agent_test)
+                found = {str(path.relative_to(folder / "transcripts")): path.read_text(encoding="utf-8")
+                         for path in (folder / "transcripts").rglob("*.jsonl")}
+                self.assertEqual(found, kept)
 
     def test_a_git_failure_in_the_prediction_is_an_error_not_an_empty_prediction(self):
         # A git call of the prediction step that fails (a stale index.lock, a bad revision)
