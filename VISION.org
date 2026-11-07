@@ -90,7 +90,7 @@ once before it reaches any tool.
   or settings entry dropped from the repository stays installed, and =--audit=
   lists the leftovers for the maintainer ([[file:DESIGN.org::*Install model][DESIGN.org, Install model]]).
 - Holding a project's own rules. Each repository keeps its own =AGENTS.md=,
-  decision log and agent workflows, created by =project-setup=; the global
+  project docs and decision log, created by =project-setup=; the global
   layer tells agents how to work, not what a project decided.
 - A rule set per tool. No rule is written for one tool unless that tool lacks
   what the rule needs.

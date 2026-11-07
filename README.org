@@ -91,7 +91,8 @@ Then:
    Instructions for Claude, and upload the skill set as described in
    [[file:claude-ai/README.md][claude-ai/README.md]].
 2. In any repository, run =project-setup= once to give it its =AGENTS.md=,
-   decision log and agent workflows.
+   the bridges and the project docs (vision, design, contributing, a docs
+   map, a decision log and agent workflows).
 
 The full guide, including the daily loop and the maieutic method, is
 [[file:docs/workflow.org][docs/workflow.org]].
@@ -172,8 +173,8 @@ when asked in words.
   reports only verdicts and the first errors.
 - [[file:home/.agents/skills/session-close/SKILL.md][session-close]] : records the real state of the work in a handoff the next
   fresh session resumes from.
-- [[file:home/.agents/skills/project-setup/SKILL.md][project-setup]] : sets up or audits a repository's =AGENTS.md=, decision
-  log and agent workflows.
+- [[file:home/.agents/skills/project-setup/SKILL.md][project-setup]] : sets up or audits a repository's =AGENTS.md=, bridges
+  and project docs, from vision to agent workflows.
 
 ** Documentation and design
 

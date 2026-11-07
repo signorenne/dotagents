@@ -151,10 +151,13 @@ Source: Anthropic, [[https://code.claude.com/docs/en/costs][Manage costs effecti
 
 Everything global works in every repository. Each repository needs its own
 layer once: an =AGENTS.md= with the project's facts (commands, rules, where
-files go), a decision log, an agent workflows doc, and =.private/= in
-=.gitignore=. Run project-setup in the repository root to create or audit it.
-Add a project skill only for a recipe you repeat that =AGENTS.md= does not
-already describe.
+files go), the =CLAUDE.md=, =GEMINI.md= and =.github/copilot-instructions.md=
+bridges, the project docs (vision, design, a style guide when there is code,
+contributing, and in the docs folder a docs map, a writing guide, a decision
+log and an agent workflows doc), and =.private/= in =.gitignore=. Run
+project-setup in the repository root to create or audit it. Add a project
+skill only for a recipe you repeat that =AGENTS.md= does not already
+describe; project-setup creates one only when you ask.
 
 * Setup
 
