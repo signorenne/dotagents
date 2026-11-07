@@ -68,11 +68,11 @@ approval.
 GitHub Actions ([[file:.github/workflows/ci.yml][.github/workflows/ci.yml]]) runs the =check= job on every
 push and pull request, in three configurations:
 
-| Runner          | Python | Notes                                            |
-|-----------------+--------+--------------------------------------------------|
-| =ubuntu-latest= |    3.9 | the oldest Python the installer supports         |
-| =ubuntu-latest= |   3.12 | with Pillow, which the skills' image scripts use |
-| =macos-latest=  |   3.12 | the other platform the installer supports        |
+| Runner          | Python | Notes                                                                                 |
+|-----------------+--------+---------------------------------------------------------------------------------------|
+| =ubuntu-24.04=  |    3.9 | the oldest Python the installer supports; setup-python builds none for Ubuntu 26.04   |
+| =ubuntu-latest= |   3.12 | with Pillow, which the skills' image scripts use                                      |
+| =macos-latest=  |   3.12 | the other platform the installer supports                                             |
 
 Each runs the three local gates in order (validate, test with =-v=, build).
 Pillow is installed in one job only, so the other two prove the tests run
