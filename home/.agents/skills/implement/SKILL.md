@@ -12,7 +12,7 @@ If given a spec path, read the whole spec; it is the source of requirements, and
 
 ## 2. Workflow
 
-Pick the matching workflow from the project's docs (its AGENTS.md recipes and agent workflows doc: component change, bug fix, new module, docs). Its steps and exit criteria are binding.
+Pick the matching workflow from the project's docs (its AGENTS.md recipes and agent workflows doc). Its steps and exit criteria are binding; when none matches, follow this skill's steps.
 
 ## 3. Ground in the current code
 
@@ -24,7 +24,7 @@ List the steps. Each step is one logical change that becomes one commit, with it
 
 ## 5. Progress log
 
-Once the plan is approved (or needs no approval), create the task's progress log in the project's working-notes location: .private/progress/<slug>.<ext> when .private/ is git-ignored, otherwise ask once where it goes. Use the project's progress template when it has one, in the project's prose format; the slug is the spec's slug, or the branch slug without a spec. The log is how the user reviews the work and how a later session resumes it, so keep it current as you go, not at the end:
+Once the plan is approved (or needs no approval), create the task's progress log in the project's working-notes location: .private/progress/<slug>.<ext> when .private/ is git-ignored, otherwise ask once where it goes. Use the project's progress template when it has one, in the project's prose format; the slug is the spec's slug, or without a spec the slug of the branch that section 6 creates. The log is how the user reviews the work and how a later session resumes it, so keep it current as you go, not at the end:
 
 - Before editing for a step: set its status to in progress with the files it will change. A later session that finds a step in progress with no matching commit shows the diff of those files and asks the user whether to finish or discard it; it discards nothing without that answer. When the user said not to commit, a finished step is done with "not committed" in place of the hash.
 - After each step: its status, commit hash and subject, the check run with its result, and for each behavior a new or changed test pins, the run that showed its test failing first (none for a test only moved or renamed).
@@ -58,6 +58,6 @@ Delegate to reviewer with the intent of the change and the progress log path. Fi
 
 ## 10. Report
 
-Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions), plus the commit list and the path of the progress log. List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place. Never push.
+Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions, Verify before use), plus the commit list and the path of the progress log. List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place. Never push.
 
 After two failed attempts at the same problem, stop, restate assumptions and evidence, and propose a different approach before trying again. Use the systematic-debugging skill if it is available.

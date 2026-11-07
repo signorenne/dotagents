@@ -9,7 +9,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 Scope from the user's words: "full" (default) means the project's pre-PR gates; "narrow <module or test filter>" means one module's tests or one test case.
 
 1. Find the commands in the project's docs: the Validation commands section of AGENTS.md, the contributing guide, or a CI-mirroring script those docs name. Never invent a command or a flag.
-2. List the touched files (git diff --name-only against the merge base with main, plus uncommitted changes) so docs or per-module targets can be chosen.
+2. List the touched files (git diff --name-only against the merge base with main, or master when there is no main, plus uncommitted changes) so docs or per-module targets can be chosen.
 3. Delegate to gate-runner with: the exact commands, the scope, and the touched files.
 4. Relay its table (gate, command, PASS, FAIL, INCOMPLETE or SKIP with reason) and, for each failure, the first errors with path:line and the log path. INCOMPLETE rows come with their log path like failures, and with gate-runner's note on the unknown result, the log and the time limit. Add nothing else.
 

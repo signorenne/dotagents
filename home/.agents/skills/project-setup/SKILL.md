@@ -1,12 +1,12 @@
 ---
 name: project-setup
-description: "Sets up or audits a repository for work with coding agents: drafts or checks AGENTS.md from what the repository actually does (with every validation command run once), adds a decision log and agent workflows in the repository's doc format, git-ignores local specs and handoffs, and proposes project skills. Use when the user asks to set up, bootstrap, onboard or audit agent instructions for a project."
+description: "Sets up or audits a repository for work with coding agents: drafts or checks AGENTS.md from what the repository actually does (with every validation command run once), adds a decision log and agent workflows in the repository's doc format, git-ignores local specs and handoffs, and proposes project skills. Use when the user asks to set up, bootstrap or audit agent instructions (AGENTS.md) for a project."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
 # Project setup
 
-Templates live in the templates/ folder next to this file (in Claude Code: ${CLAUDE_SKILL_DIR}/templates). Every <FILL: ...> marker must be replaced with verified facts or the line removed; none may remain in the result.
+Templates live in the templates/ folder next to this file (in Claude Code: ${CLAUDE_SKILL_DIR}/templates; elsewhere ~/.agents/skills/project-setup/templates). Every <FILL: ...> marker must be replaced with verified facts or the line removed; none may remain in the result.
 
 ## 1. Survey (delegate to scout)
 
@@ -14,7 +14,7 @@ Collect, citing files: languages, build system and its exact commands, test runn
 
 ## 2. Decide the open points with the user
 
-Use the decide skill only for what the repository does not answer, typically: where docs go and in which format when it is mixed, whether to add the GEMINI.md bridge (needed when contributors use Gemini CLI without context.fileName including AGENTS.md), and whether project skills are wanted now.
+Use the decide skill only for what the repository does not answer, typically: where docs go and in which format when it is mixed, whether to add the GEMINI.md bridge (needed when contributors use Gemini CLI without context.fileName including AGENTS.md), and whether project skills are wanted now. Then list the files you will create or change, each with its source template, and wait for the user's go.
 
 ## 3. AGENTS.md
 
@@ -22,6 +22,7 @@ Use the decide skill only for what the repository does not answer, typically: wh
 - If it does not exist: draft it from the template, filling each section from the survey. Keep it under about 200 lines; a line belongs there only if removing it would cause an agent to make a mistake.
 - Validation commands: run each command once (delegate to gate-runner when output is long). Keep only commands that worked; mark any you could not run as "not verified" and tell the user.
 - If CLAUDE.md, GEMINI.md or copilot instructions duplicate rules, propose turning them into pointers to AGENTS.md.
+- If step 2 chose the GEMINI.md bridge, create GEMINI.md from templates/bridges/GEMINI.md.template. Create CLAUDE.md from templates/bridges/CLAUDE.md.template only for notes that apply to Claude Code alone (Claude Code reads AGENTS.md by itself when there is no CLAUDE.md).
 
 ## 4. Decision log and workflows
 
@@ -37,4 +38,4 @@ For a recipe the user repeats in this repository, create .agents/skills/<name>/S
 
 ## 7. Report
 
-List files created or changed, commands verified and their results, commands not verified, and decisions recorded. Commit only if the user asks, in the project's convention, one logical change per commit.
+First run grep -rn "<FILL" on the files you created and fix every match. Then list files created or changed, commands verified and their results, commands not verified, and decisions recorded. Commit only if the user asks, in the project's convention, one logical change per commit.

@@ -1,6 +1,6 @@
 ---
 name: session-close
-description: "Closes a working session in a repository: records the real state of the work in the project's handoff format from git and the commands actually run, settles pending decisions with the user, and leaves a handoff the next fresh session can resume from. Use when the user says the session is over, asks to close, wrap up or hand off work in a repository, or before clearing the context."
+description: "Closes a working session in a repository: records the real state of the work in the project's handoff format from git and the commands actually run, settles pending decisions with the user, and leaves a handoff the next fresh session can resume from. Use when the user says the session is over, asks to close, wrap up or hand off work in a repository, or before clearing the context. Inside a git repository, prefer it over context-handoff."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -12,6 +12,6 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 3. Name the code-level facts the next session will depend on (files, symbols, signatures) and mark them "verify before use": they may change before the next session reads the handoff.
 4. Lessons: for each refuted assumption that a rule, a skill or a subagent instruction should have prevented, draft the smallest change to the owning text that would have prevented it, with the refuted assumption as its reason. A draft for a rule of this project joins the decisions of step 5 as a Proposed entry. A draft for the global instructions, a global skill or a global subagent (installed under ~/.agents from their own source repository) goes into the reply; never edit the installed copy. Change no rule without the user's approval of the exact text.
 5. Decisions: list each decision made in this session that the decision log does not hold yet and that meets its recording bar. Ask the user to accept, reject or leave each as Proposed, then write them accordingly (Accepted only when the user confirmed, decided by the user). Then list the progress log's decisions by agent still marked Review: pending, and record kept or changed for each one the user reviews.
-6. Write the handoff to the project's working-notes location (for example .private/handoff/<YYYY-MM-DD>-<slug>.<ext> when .private/ is git-ignored; otherwise ask once), in the project's prose format.
+6. Update the handoff's Decisions from step 5, then write the handoff to the project's working-notes location (for example .private/handoff/<YYYY-MM-DD>-<slug>.<ext> when .private/ is git-ignored; otherwise ask once), in the project's prose format.
 7. Uncommitted work: list it and ask whether to commit it as the next logical step, leave it, or stash it. Never push.
 8. Reply with the handoff path, the progress log path when there is one, and the single next action, phrased for a fresh session (for example: start a fresh session, then run the implement skill on .private/specs/<slug> from step N).
