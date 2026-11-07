@@ -82,19 +82,21 @@ grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, s
         The harness keys predictions by instance id, so each arm and repeat is graded in a
         call of its own; runs that never reached the agent, or whose prediction failed, are
         not graded.
-        RUNDIR/grades.json holds per run whether it is resolved and which PASS_TO_PASS
-        tests failed (regressions). The harness writes no report for an empty patch, one
-        that does not apply, or one whose tests time out: each counts as graded and
-        unresolved. A run it failed on otherwise has no grade, and grade exits 1 naming it
+        RUNDIR/grades.json holds per run whether it is resolved, which PASS_TO_PASS tests
+        failed (regressions) and a hash of the prediction it graded. The harness writes no
+        report for an empty patch, one that does not apply, or one whose tests time out:
+        each counts as graded and unresolved. A run it failed on otherwise has no grade, and grade exits 1 naming it
         (grade again to retry). With --gold it grades the reference patches of the tasks
         (RUNDIR's tasks.json, or --tasks) into RUNDIR/gold.json instead.
 
 summary writes per arm the runs, errors, graded runs (empty or unapplied predictions and
-        timed-out tests among them, each counted), runs without a report, the resolved rate
-        over the graded runs, median and total cost (agent and maintainer apart), median
-        turns, minutes and replies, runs with regressions, runs over their share and the
-        stop reasons, then per task both arms side by side: an Org fragment of metrics
-        only, no transcript or command text, to --org or stdout. It is labeled "pilot: not
+        timed-out tests among them, each counted), runs without a report (the harness failed
+        on them, grades.json does not hold them yet, or their prediction changed since it
+        was graded: grade again), the resolved rate over the graded runs, median and total
+        cost (agent and maintainer apart), median turns, minutes and replies, runs with
+        regressions, runs over their share and the stop reasons, then per task both arms
+        side by side: an Org fragment of metrics only, no transcript or command text, to
+        --org or stdout. It is labeled "pilot: not
         conclusive" unless both arms finished every run of a plan as large as the full run
         of DESIGN.org's method-measured rule (20 tasks, 3 runs per arm). It also gives the
         total spend, the interrupted attempts' share of it and the runs the cap left
@@ -927,7 +929,8 @@ def grade(args) -> int:
         submitted = {ident: run for ident, run in runs.items() if run[1].strip()}
         for run_id, patch in runs.values():
             if not patch.strip():
-                grades[run_id] = {"graded": True, "resolved": False, "outcome": "empty prediction", "regressions": []}
+                grades[run_id] = {"graded": True, "resolved": False, "outcome": "empty prediction", "regressions": [],
+                                  "prediction_sha256": text_digest(patch)}
         if not submitted:
             continue
         predictions = grading / f"predictions-{model}.jsonl"
@@ -935,14 +938,32 @@ def grade(args) -> int:
                                                    "model_patch": patch}) + "\n"
                                        for ident, (_, patch) in sorted(submitted.items())), encoding="utf-8")
         reports = harness(python, grading, env, f"{rundir.name}-{model}", predictions.name, model, sorted(submitted))
-        for ident, (run_id, _) in submitted.items():
-            grades[run_id] = reports[ident]
+        for ident, (run_id, patch) in submitted.items():
+            grades[run_id] = {**reports[ident], "prediction_sha256": text_digest(patch)}
     write_json(rundir / "grades.json", grades)
     for arm in sorted({run_id.split(".")[-2] for run_id in grades}):
         mine = [value for run_id, value in grades.items() if run_id.split(".")[-2] == arm]
         print(f"{arm}: {sum(value['resolved'] for value in mine)} of {len(mine)} resolved")
     print(f"grades: {rundir / 'grades.json'}")
     return unreported(grades, grading)
+
+
+def text_digest(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def current_grades(rundir: Path, grades: dict) -> dict:
+    """The grades whose run still has the prediction they graded. A run made again after
+    grade has another prediction, or none, under the same id, so its old grade no longer
+    counts until grade runs again; a grade without a hash, from a grades.json written
+    before grade recorded one, is kept."""
+    kept = {}
+    for run_id, value in grades.items():
+        path = rundir / "runs" / run_id / "prediction.diff"
+        recorded = value.get("prediction_sha256")
+        if path.exists() and (recorded is None or recorded == text_digest(path.read_text(encoding="utf-8"))):
+            kept[run_id] = value
+    return kept
 
 
 def unreported(grades: dict, grading: Path) -> int:
@@ -1025,6 +1046,8 @@ def summary(args) -> int:
                                      for path in sorted((rundir / "runs").glob("*/record.json")))
                if record.get("finished")]
     grades = read_json(rundir / "grades.json", "the grades") if (rundir / "grades.json").exists() else None
+    if grades is not None:
+        grades = current_grades(rundir, grades)
     tasks, runs, arms = plan["tasks"], plan["runs"], plan["arms"]
     # Full only when both arms finished every planned run of a plan as large as the rule's.
     reached = {record["run"] for record in records if record.get("calls")}
