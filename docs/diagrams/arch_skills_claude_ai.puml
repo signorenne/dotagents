@@ -14,8 +14,13 @@ package "claude.ai set" {
   component "verifying-before-claiming-done" as verify
   component "context-handoff" as handoff
   component "tutor" as tutor
+  component "atomic-notes" as notes
 }
 
+notes --> research
+notes --> editing
+notes --> tutor
+notes --> verify
 
 scoping --> decide
 decide -- analysis

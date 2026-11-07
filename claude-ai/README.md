@@ -20,6 +20,7 @@ repository is the source: edit skills here, never on claude.ai.
 | decision-analysis | Compare options and commit to a recommendation |
 | context-handoff | Self-contained brief to continue elsewhere |
 | prompt-optimizer | Specific, checkable prompts and agent instructions |
+| atomic-notes | Notes and explanations, one idea per note linked under a hub (Zettelkasten) |
 
 ## Upload
 
