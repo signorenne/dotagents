@@ -45,8 +45,9 @@ maintainer.
   runs each validation command once.
 - /Produces/ : =AGENTS.md= with the commands that worked, a decision log and an
   agent workflows doc in the repository's docs folder and prose format, the
-  =.private/= lines in =.gitignore=, and, where needed, the bridges =GEMINI.md=
-  and =CLAUDE.md= and project skills under =.agents/skills/=.
+  =.private/= lines in =.gitignore=, the bridges =CLAUDE.md=, =GEMINI.md= and
+  =.github/copilot-instructions.md=, and, where needed, project skills under
+  =.agents/skills/=.
 - /Lives in/ : the repository, committed when the maintainer asks.
 
 ** 2. Decide
