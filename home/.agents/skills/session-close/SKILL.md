@@ -1,7 +1,7 @@
 ---
 name: session-close
 description: "Closes a working session in a repository: records the real state of the work in the project's handoff format from git and the commands actually run, settles pending decisions with the user, and leaves a handoff the next fresh session can resume from. Use when the user says the session is over, asks to close, wrap up or hand off work in a repository, or before clearing the context. Inside a git repository, prefer it over context-handoff."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Session close

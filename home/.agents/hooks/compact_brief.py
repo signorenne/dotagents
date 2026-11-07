@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """PreCompact hook (Claude Code): tell the compaction summary what resuming the work
 needs. When a PreCompact hook exits 0, Claude Code uses its stdout as instructions for
 the summary, cut at 10,000 characters. The brief asks the summary to keep the task and

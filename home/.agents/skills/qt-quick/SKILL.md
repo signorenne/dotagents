@@ -1,7 +1,7 @@
 ---
 name: qt-quick
 description: "Qt 6 Quick and QML facts that coding agents get wrong, and the Qt way to apply clean MVVM: view models exposed without context properties, bindable properties, threads and qmllint; which SVG features Qt draws by version; crisp images (sourceSize, pixel ratio, mipmap, whole pixels); asynchronous loading that really is asynchronous; values inherited down the item tree. Use when writing, reviewing or debugging Qt Quick or QML code, the C++ view models behind QML views, or SVG and image assets for a Qt app."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Qt Quick

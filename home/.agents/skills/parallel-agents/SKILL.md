@@ -1,7 +1,7 @@
 ---
 name: parallel-agents
 description: "Coordinates several coding agents writing at once in one git repository: decides whether the work splits, gives each agent its own worktree, build folder, scratch folder and files, writes the briefs, watches progress, and lands each branch on a commit that passed the gates. Use when the user asks to run agents, subagents or sessions in parallel on a repository, to split a feature or refactor across agents, or to merge the branches they produced."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Parallel agents

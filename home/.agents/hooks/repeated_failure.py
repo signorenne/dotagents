@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """PostToolUseFailure hook (Claude Code, matcher Bash): notice when the same shell
 command fails the same way again and again in one session, and remind the agent of the
 rule for it: after two failed fixes, stop, restate the assumptions and the evidence,

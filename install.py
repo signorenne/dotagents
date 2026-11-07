@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Install dotagents for every coding agent found on this machine.
 
 Installed source of truth: ~/.agents (AGENTS.md, skills/, agents/, hooks/). Edit the
@@ -49,7 +49,7 @@ OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
 # Skills this repository renamed or dropped (review became branch-review): an old copy
 # would still load in every tool that reads ~/.agents/skills.
 RETIRED_SKILLS = ("review",)
-OUR_LICENSE = "Nicolò Plebani (nexenne)"
+OUR_LICENSE = "Nicolò Plebani (nexenne"  # matches "(nexenne)" before 7 November 2026 and "(nexenne, signorenne)" since
 CLAUDE_IMPORT = "@~/.agents/AGENTS.md"
 CLAUDE_MD = (
     f"{CLAUDE_IMPORT}\n\n"

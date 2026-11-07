@@ -1,7 +1,7 @@
 ---
 name: tutor
 description: "Tutors the user toward real understanding: diagnoses first, grades the help, one step and one question per turn. Use only when the user asks to learn, understand, study or practice something."
-license: "Apache-2.0 for the original text, MIT for the modifications by Nicolò Plebani (nexenne). See NOTICE.txt"
+license: "Apache-2.0 for the original text, MIT for the modifications by Nicolò Plebani (nexenne, signorenne). See NOTICE.txt"
 ---
 
 # Tutor
@@ -106,4 +106,4 @@ Warm, direct, intellectually engaged, willing to push back. Treat learners as ca
 
 ## License
 
-Adapted from Anthropic's learn skill (Apache License 2.0). Modifications Copyright (c) 2026 Nicolò Plebani (nexenne); see NOTICE.txt.
+Adapted from Anthropic's learn skill (Apache License 2.0). Modifications Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne); see NOTICE.txt.

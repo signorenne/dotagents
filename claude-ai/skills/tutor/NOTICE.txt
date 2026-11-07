@@ -3,7 +3,7 @@ tutor skill
 Original work: the learn skill by Anthropic, licensed under the Apache License,
 Version 2.0 (LICENSE.txt).
 
-Modifications Copyright (c) 2026 Nicolò Plebani (nexenne) <https://github.com/signorenne>.
+Modifications Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne) <https://github.com/signorenne>.
 As allowed by section 4 of the Apache License, the modifications are also
 available under the MIT License (LICENSE-MIT.txt). The work as a whole remains
 subject to the Apache License, Version 2.0.

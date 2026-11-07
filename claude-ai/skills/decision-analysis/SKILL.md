@@ -1,7 +1,7 @@
 ---
 name: decision-analysis
 description: "Compares options on the user's criteria and commits to a recommendation and what would flip it. Use when choosing products, tools, libraries or vendors; a project's own choice goes to decide."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Decision analysis

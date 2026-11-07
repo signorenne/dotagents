@@ -243,7 +243,7 @@ the set through [[file:claude-ai/overrides.json][claude-ai/overrides.json]], wit
 
 * License
 
-MIT, Copyright (c) 2026 Nicolò Plebani (nexenne), see [[file:LICENSE][LICENSE]]. Every
+MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne), see [[file:LICENSE][LICENSE]]. Every
 skill folder carries its own =LICENSE.txt=. The tutor skill is adapted from
 Anthropic's learn skill and keeps its Apache License 2.0; see
 [[file:claude-ai/skills/tutor/NOTICE.txt][claude-ai/skills/tutor/NOTICE.txt]].

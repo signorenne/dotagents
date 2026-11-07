@@ -1,7 +1,7 @@
 ---
 name: decide
 description: "Guides the user to a project decision step by step with maieutic (Socratic) questions instead of deciding for them: establishes what is known, isolates the missing information that would change the choice, asks one question at a time with a recommended option and its consequences, then confirms and records the decision. Use when the user asks for help to decide, choose or settle a design, scope, API, architecture, workflow or adoption question in a project (including which library, tool or service it adopts), when a plan or spec reaches a choice that belongs to the user, or when the user invokes decide."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Decide (maieutic method)

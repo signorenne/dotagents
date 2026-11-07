@@ -1,7 +1,7 @@
 ---
 name: systematic-debugging
 description: "Diagnoses failures from evidence before any fix: reproduces, compares with a working case, tests one hypothesis. Use for bugs, errors, failing tests or CI, crashes, hangs, slowness or wrong output."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Systematic debugging

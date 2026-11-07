@@ -1,7 +1,7 @@
 ---
 name: architecture-doc
 description: "Builds a requirements document and an architecture document with the user for a new system or major component, following established practice: EARS requirements checked against ISO/IEC/IEEE 29148, quality scenarios covering ISO/IEC 25010, an arc42 architecture with C4 diagrams, ADRs, traceability, an ATAM-style evaluation and an independent review. Use when the user plans a new system, product or major component, or asks for its requirements (functional or non-functional), an SRS, an architecture document, arc42 or C4 diagrams, or an evaluation of a planned architecture. Not for a single decision (decide), one increment of an existing repository (spec), laying out an application's code in layers (clean-architecture) or documenting existing code (as-built-docs)."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Architecture doc

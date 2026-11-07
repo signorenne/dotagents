@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Stop hook (Claude Code): when the agent's final message says the tests pass, check in
 the session's transcript that a test run passed after the last file edit.
 

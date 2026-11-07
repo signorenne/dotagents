@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Stop hook (Claude Code and Codex): before the agent ends its turn on a task branch,
 check that the task's progress log records the branch's commits.
 

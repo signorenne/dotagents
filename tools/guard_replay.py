@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Replay the shell commands of past Claude Code sessions through two versions of the
 guard's decision, without running any of them, and report what a guard change newly
 blocks and newly allows, so the maintainer can judge each new block before it lands.
