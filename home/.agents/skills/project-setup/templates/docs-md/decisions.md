@@ -10,7 +10,8 @@ question.
 - The maintainer decides. An entry becomes Accepted only through the maintainer's
   explicit acceptance, and Decided by then records it.
 - Agents add entries as Proposed. An agent writes Accepted only to record a
-  decision the maintainer explicitly accepted in the same session.
+  decision the maintainer explicitly accepted, or delegated by saying "decide",
+  in the same session.
 - A Proposed entry binds nobody and changes no owning doc. Changing a rule in an
   owning doc needs the maintainer's explicit approval of that change.
 - An Accepted entry binds later work. A task that conflicts with one stops and
