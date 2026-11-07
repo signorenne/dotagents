@@ -178,8 +178,10 @@ when asked in words.
 
 ** Documentation and design
 
-- [[file:home/.agents/skills/as-built-docs/SKILL.md][as-built-docs]] : writes a knowledge base, a manual test guide and a
-  developer guide from the code, fact-checked and synced when the code changes.
+- [[file:home/.agents/skills/as-built-docs/SKILL.md][as-built-docs]] : asks which documents to write, where to save them, how
+  to run the app for its screenshots and the scope, then writes a knowledge base, a manual test
+  guide and a developer guide from the code, fact-checked and synced when the
+  code changes.
 - [[file:home/.agents/skills/architecture-doc/SKILL.md][architecture-doc]] : builds the requirements and the architecture of a new
   system or major component (EARS, arc42, C4, ADRs, an ATAM-style evaluation).
 - [[file:home/.agents/skills/plantuml-diagrams/SKILL.md][plantuml-diagrams]] : draws PlantUML diagrams that read at a glance, in the

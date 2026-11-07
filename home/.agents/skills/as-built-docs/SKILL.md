@@ -1,6 +1,6 @@
 ---
 name: as-built-docs
-description: "Writes as-built documentation of an existing repository or app from its code, as files in the repository, for people to read: a knowledge base of how it works for technical non-developers, a manual test guide and a developer guide, each opening with its own vocabulary and the big picture, with UML diagrams (class diagrams with their key members), annotated pictures of the screens and a reference appendix for agents, every statement traced to code and fact-checked, and synced instead of rewritten when the code changes. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding or architecture docs of existing code), or to update such docs after the code changed. Not for finding bugs or code smells (code-audit), planning a new system (architecture-doc), or a repository's vision, design, contributing docs and docs map (project-setup)."
+description: "Writes as-built documentation of an existing repository or app from its code, as files in the repository, for people to read: a knowledge base of how it works for technical non-developers, a manual test guide and a developer guide, each opening with its own vocabulary and the big picture, with UML diagrams (class diagrams with their key members), annotated pictures of the screens and a reference appendix for agents, every statement traced to code and fact-checked, and synced instead of rewritten when the code changes. It first asks which documents to write, where to save them, how to run the app for its screenshots, and the scope. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding or architecture docs of existing code), or to update such docs after the code changed. Not for finding bugs or code smells (code-audit), planning a new system (architecture-doc), or a repository's vision, design, contributing docs and docs map (project-setup)."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -16,15 +16,16 @@ Goal: three documents that a person reads easily and can trust. They say how the
 - Describe the software as built, without judging it: no bugs, suspicions, unused code or contract anomalies in the docs. Note each one in the notes file under "for the audit", with file:line, and hand the list over at the end.
 - Write one document and one section at a time.
 
-## 1. Inputs
+## 1. Ask first
 
-Take them from the request, the repository and its existing docs; ask only what none of them settles.
+Before mapping the code, ask the user in one round, each question with what you found in the repository and a recommended answer (grouped as the decide skill groups questions). A point the request already settles is stated, not asked; on an update (section 9), ask only what the notes do not hold.
 
-- Code path, docs folder, file names, language, markup and conventions (match the existing docs).
-- Documents: knowledge base, test guide, developer guide. Drop one that has no reader (a library has no manual test guide).
-- Where the external contracts are defined (API specs, schemas, protocol databases): the names in the code are only half of each contract.
-- The commit and versions described, each with its source.
-- Existing docs that record a commit: go to section 9 and sync them; never write them again from scratch.
+- Which documents: the knowledge base, the test guide, the developer guide, or a subset; recommend from what the repository is (a library has no manual test guide). Each document's audience and register are fixed by section 5.
+- Where to save them: the repository's docs folder, committed with the code, or under .private/ (git-ignored, for docs the repository should not carry), or another folder the user names. Their diagrams and images folders go next to them.
+- How to run the app for the pictures: the build and launch commands, how to reach each screen and state (its simulator, test harness or input script), the display or device to grab from, and whether you may run it here; otherwise the user provides the pictures (section 6).
+- Scope and contracts: the whole app or named modules or features; where the external contracts are defined (API specs, schemas, protocol databases), since the names in the code are only half of each contract; the commit and versions to describe, each with its source.
+
+Take from the repository and its existing docs, without asking: the code path, file names, language, markup and conventions (match the existing docs). Existing docs that record a commit: go to section 9 and sync them; never write them again from scratch.
 
 ## 2. Map the code
 
@@ -75,9 +76,9 @@ PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and 
 
 Pictures of the UI come from the real app, never from a drawing of how it might look:
 
-- Run the app and drive it to each screen and state with the input it really gets: clicks, touches and keys, and the signals or messages it receives (through the project's simulator or test harness). Then grab the window or the framebuffer: through the project's screenshot or scenario tests when it has them, otherwise with the platform's tools (for example grim on Wayland, import from ImageMagick on X11, a framebuffer dump on a device).
+- Run the app with the recipe from section 1 and drive it to each screen and state with the input it really gets: clicks, touches and keys, and the signals or messages it receives (through the project's simulator or test harness). Then grab the window or the framebuffer: through the project's screenshot or scenario tests when it has them, otherwise with the platform's tools (for example grim on Wayland, import from ImageMagick on X11, a framebuffer dump on a device).
 - Make each picture repeatable, as section 1 of the precise-ui-changes skill says (fixed data and clock, settled animations, device pixels), and save its recipe in the notes (how to start the app, the input sequence, the grab command, the crop and markers), so an update renders it again.
-- When the app cannot run or be driven here, list the screens and states you need and ask the user for the pictures; write those sections once they arrive.
+- When the user provides the pictures (section 1), or the recipe does not run or drive the app here, list the screens and states you need and ask the user for those pictures; write those sections once they arrive.
 - Pictures are PNG files in the docs' images folder with the kb_, tg_ or dev_ prefix, cropped to what the section explains.
 - Mark each element the text explains with the bundled script: in Claude Code python3 ${CLAUDE_SKILL_DIR}/scripts/annotate.py, elsewhere python3 ~/.agents/skills/as-built-docs/scripts/annotate.py (it needs Pillow: ask before installing it). Place each marker at the edge of its element, not over text the reader needs; the legend under the picture uses the same numbers.
 
