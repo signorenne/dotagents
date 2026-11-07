@@ -11,7 +11,7 @@ Goal: docs that describe the software as built at one commit, where every statem
 ## Working rules
 
 - Keep facts in a notes file (.private/as-built/notes.md when .private/ is git-ignored, otherwise a scratch folder), one line each: id, area tag, statement, file:line. Write chapters from the notes: they survive compaction and spare rereading the code.
-- Delegate code reading to scout, one per area, returning facts in that line format. Send long command output to gate-runner.
+- Delegate code reading, one area per read-only subagent, returning facts in that line format (in Claude Code the general-purpose subagent told not to edit; elsewhere scout, told to return facts in that format instead of its brief). Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
 - External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition.
 - Write one document and one chapter at a time.
 - Describe as built: never fix the code in the text. Suspicious behavior goes in "behaviors to confirm"; the owner decides what is a bug.
@@ -43,7 +43,7 @@ Outline of each document, diagram list, candidate behaviors to confirm, premises
 
 ## 4. Documents
 
-Every document: numbered sections (stable links, findable by number); a header with commit, versions and links to the sibling docs; sections readable on their own; each fact in one document only, the others link to it.
+Every document: numbered sections (stable links, findable by number); a header with commit, versions and links to the sibling docs; sections readable on their own; each fact in one document only, the others link to it (except external values: the knowledge base explains them for users, the developer guide maps them to code).
 
 - Knowledge base, with no code identifiers except external names and log messages: overview and context diagram; glossary; states and saved values; where the app appears and how it starts; what the user sees; one section per function (when usable, what happens, what is visible after, which external values change); automatic behaviors; external values (how to find each in the contract files, one worked example per mechanism); troubleshooting; behaviors to confirm (B1..Bn, each with the test that shows it).
 - Test guide: setup (equipment, default state, inputs to send, how to reach each starting state); test index with the knowledge base sections and B items each test covers (at least one test per function, automatic behavior and observable B item); test cases as tables of step, action, expected screen or output, expected external value.
@@ -55,7 +55,7 @@ Every document: numbered sections (stable links, findable by number); a header w
 - Trace each expected test value through the code in step order, including the state earlier steps leave.
 - Compute worked examples with a command; choose inputs away from rounding edges.
 - Write "(library)" or "not verified" where a claim rests on something you did not read.
-- Diagrams: PlantUML in the docs' diagrams folder, kb_ or dev_ prefix, no style file, theme or colors, because PlantUML's defaults stay readable in light and dark viewers; render to SVG, look at each render, split any too wide to read.
+- Diagrams: PlantUML in the docs' diagrams folder, kb_ or dev_ prefix, no style file, theme or colors, because PlantUML's defaults stay readable in light and dark viewers; render to SVG for the docs and to PNG in a scratch folder, look at each PNG, split any diagram too wide to read. Without plantuml, say so and mark the diagrams not rendered.
 
 ## 6. Verify
 
@@ -63,11 +63,11 @@ Run each check as a one-off command, after seeing it catch an error planted in a
 
 1. every external value in the code appears in the knowledge base and the developer guide, with one contract entry per direction that exists in the spec;
 2. every relative link, image and anchor resolves, and a link text with a section number points to that section;
-3. no placeholders, TODOs or forbidden characters;
-4. no code identifiers in the knowledge base or test guide;
+3. no placeholders, TODOs or characters the project forbids;
+4. no code identifiers in the knowledge base or test guide, except external names and log messages;
 5. every diagram renders: exit code 0 and nothing on stderr.
 
-Then the fact-check: one reviewer subagent per document, given the document, the code and the specs but not your notes, returning wrong or unsupported claims with file:line. Re-check each finding at the source before fixing it, then re-run checks 1 to 5.
+Then the fact-check: one subagent per document that did not write it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the document, not the branch diff), given the document, the code and the specs but not your notes, returning wrong or unsupported claims with file:line. Re-check each finding at the source before fixing it, then re-run checks 1 to 5.
 
 ## 7. Update
 

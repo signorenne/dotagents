@@ -1,6 +1,6 @@
 ---
 name: architecture-doc
-description: "Builds a requirements document and an architecture document with the user for a new system or major component, following established practice: EARS requirements checked against ISO/IEC/IEEE 29148, quality scenarios covering ISO/IEC 25010, an arc42 architecture with C4 diagrams, ADRs, traceability, an ATAM-style evaluation and an independent review. Use when the user plans a new system, product or major component, or asks for requirements (functional or non-functional), an SRS, an architecture or design document, arc42, C4 diagrams, ADRs, or an evaluation of a planned architecture."
+description: "Builds a requirements document and an architecture document with the user for a new system or major component, following established practice: EARS requirements checked against ISO/IEC/IEEE 29148, quality scenarios covering ISO/IEC 25010, an arc42 architecture with C4 diagrams, ADRs, traceability, an ATAM-style evaluation and an independent review. Use when the user plans a new system, product or major component, or asks for its requirements (functional or non-functional), an SRS, an architecture document, arc42 or C4 diagrams, or an evaluation of a planned architecture. Not for a single decision (decide), one increment of an existing repository (spec) or documenting existing code (as-built-docs)."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -8,7 +8,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 Goal: two clear documents a team can build from: REQUIREMENTS.md (what the system must do, and how well) and ARCHITECTURE.md (how, and why).
 
-Sources, cited in the documents where used: ISO/IEC/IEEE 29148 (requirements); EARS (Mavin et al., 2009); ISO/IEC 25010:2023 (quality model); Bass, Clements, Kazman, Software Architecture in Practice (quality scenarios, tactics, ATAM); ISO/IEC/IEEE 42010 (stakeholders, concerns, views); arc42; the C4 model; Nygard's ADRs. For depth: Fairbanks, Just Enough Software Architecture; Richards and Ford, Fundamentals of Software Architecture; Ford, Parsons, Kua, Building Evolutionary Architectures; Evans, Domain-Driven Design.
+Sources, cited in the documents where used: ISO/IEC/IEEE 29148 (requirements); EARS (Mavin et al., 2009); ISO/IEC 25010:2023 (quality model); Bass, Clements, Kazman, Software Architecture in Practice (quality scenarios, tactics, ATAM); ISO/IEC/IEEE 42010 (stakeholders, concerns, views); arc42; the C4 model; Nygard's ADRs (with the rejected options that later templates such as MADR add); Fairbanks, Just Enough Software Architecture (design depth by risk); Ford, Parsons, Kua, Building Evolutionary Architectures (fitness functions).
 
 ## Working rules
 
@@ -63,6 +63,7 @@ One EARS sentence each:
 - Go through the nine ISO/IEC 25010:2023 characteristics: functional suitability, performance efficiency, compatibility, interaction capability, reliability, security, maintainability, flexibility, safety. Write requirements for those that matter; say in one line why the others do not.
 - Write each as a quality scenario (QS-01): source, stimulus, artifact, environment, response, response measure (a number with a unit). Example: a user submits a search to the search service at a peak of 200 requests per second; results return within 300 ms at the 95th percentile.
 - Rate each scenario high, medium or low for business importance and for technical risk (utility tree). High on both means architecturally significant: these drive the design and the evaluation.
+- Then show the user the requirements summary and the open questions, and wait for the go before designing: a design built on unconfirmed requirements gets rebuilt.
 
 ## 6. Architecture (arc42)
 
@@ -74,7 +75,7 @@ One EARS sentence each:
 6. Runtime: the key flows as sequence diagrams, including at least one failure flow.
 7. Deployment: nodes, environments, scaling, failover.
 8. Crosscutting concepts that apply: domain model, persistence, error handling, security, observability, configuration.
-9. Decisions: one ADR each (title, status, context, decision, consequences, rejected options), numbered and never deleted; a superseded ADR links to its replacement. Also record them in the project's decision log when it has one.
+9. Decisions: when the project has a decision log, record each decision there and list them here by id, one line each; otherwise one ADR each here (title, status, context, decision, consequences, rejected options), numbered and never deleted, a superseded ADR linking to its replacement.
 10. Quality: for each scenario, the decisions that address it, and a fitness function (an automated check that fails when the design drifts) where possible.
 11. Risks and technical debt, by priority, with mitigation.
 12. Glossary.
@@ -85,11 +86,11 @@ A matrix of requirement, building blocks, decisions and verification. Flag a req
 
 ## 8. Evaluate (ATAM style)
 
-Walk each significant scenario through the design and record sensitivity points, tradeoff points, risks and non-risks. Then attack it: each dependency slow, down or returning garbage; each data store at ten times the volume; each interface with a malicious caller. A risk goes to section 11 or changes the design; changing a decision the user accepted goes back to the user.
+Walk each significant scenario through the design and record sensitivity points, tradeoff points, risks and non-risks. Then attack it: each dependency slow, down or returning garbage; each data store at ten times the volume; each interface with a malicious caller. A risk goes to arc42 section 11 or changes the design; changing a decision the user accepted goes back to the user.
 
 ## 9. Independent review
 
-Give both documents, without your reasoning, to a subagent that did not write them (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer). It reports by id: requirements that fail a 29148 characteristic, conflicts, concerns not covered, missing or vague measures, traceability gaps, wrong facts about a technology, contradictions between the documents, and passages hard to understand. Re-check each finding before fixing it; show the user any change to a confirmed requirement or an accepted decision.
+Give both documents, without your reasoning, to a subagent that did not write them (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the documents, not the branch diff; it has no web access, so check the facts about technologies against their documentation yourself). It reports by id: requirements that fail a 29148 characteristic, conflicts, concerns not covered, missing or vague measures, traceability gaps, wrong facts about a technology, contradictions between the documents, and passages hard to understand. Re-check each finding before fixing it; show the user any change to a confirmed requirement or an accepted decision.
 
 ## 10. Report
 
