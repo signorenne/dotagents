@@ -655,8 +655,9 @@ def predict(name: str, base: str, user: str = "agent") -> tuple:
     newest other worktree or branch that differs from base, the commit the image starts on;
     the method's working notes (.private/, which a task repository does not ignore) never
     count. A worktree whose folder is gone (git lists it as prunable) holds no change; its
-    commits stay on its branch. A git call that fails (any exit but 0, and for a diff
-    --quiet but 0 or 1) is a Failure: a prediction it would leave empty is not the agent's."""
+    commits stay on its branch, if it had one. A git call that fails (any exit but 0, and
+    for a diff --quiet but 0 or 1) is a Failure: a prediction it would leave empty is not
+    the agent's."""
     def git(*args, cwd: str = TESTBED, ok: tuple = (0,)) -> subprocess.CompletedProcess:
         result = container_git(name, *args, cwd=cwd, user=user)
         if result.returncode not in ok:
@@ -675,7 +676,7 @@ def predict(name: str, base: str, user: str = "agent") -> tuple:
         if line.startswith("worktree "):
             trees.append([line[len("worktree "):], False])
         elif line.startswith("prunable") and trees:
-            trees[-1][1] = True  # its folder is gone: no change to take, its commits stay on its branch
+            trees[-1][1] = True  # its folder is gone: no change to take; its commits stay on its branch, if it had one
     for path, gone in trees:
         if path != TESTBED and not gone and changed(path):
             # A branch with no commits yet (checkout --orphan) has no commit time: git log
