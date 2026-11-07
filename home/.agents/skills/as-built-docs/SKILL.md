@@ -46,11 +46,11 @@ The outline of each document with the purpose of each section, the vocabulary te
 
 - Header: one line with the commit, the versions and links to the sibling documents.
 - Section 1, Vocabulary: the 10 to 15 terms this document's reader needs first, one sentence each, in the order they first appear. A term shared with a sibling document is worded the same in both. Define any other term where it first appears.
-- Section 2, The big picture: what the software is for, then how it works in 3 to 6 numbered steps and one diagram, all within the first 300 words.
-- Every other section opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
+- Section 2, The big picture: what the software is for, then how it works in 3 to 6 numbered steps and one diagram, all within 300 words of its heading (the vocabulary before it does not count).
+- Every section after the big picture opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
 - One idea per sentence, split above about 25 words; one topic per paragraph, at most 5 sentences; active voice; one term per concept.
 - Numbers only where they explain something or the reader types or reads them. Tables only for lookups (items with several attributes, if-then rules), each introduced by a sentence.
-- Each fact has one home, and a sibling document links to it rather than repeating it, at most one cross-reference per paragraph. The vocabulary and the external values are the exceptions: the knowledge base explains external values, the developer guide's appendix maps them to code.
+- Each fact has one home, and a sibling document links to it rather than repeating it, at most one cross-reference per paragraph (the header line excepted). The vocabulary and the external values are the exceptions: the knowledge base explains external values, the developer guide's appendix maps them to code.
 - Numbered, descriptive headings, so links stay stable.
 
 Accuracy:
@@ -62,13 +62,15 @@ Accuracy:
 
 ## 5. The documents
 
+Each word budget counts prose outside the vocabulary, tables, code blocks and image lines: the vocabulary's terms are as long as their shared wording needs. "About" allows 10 percent either way.
+
 - Knowledge base, for technical non-developers, with no code identifiers except external names and log messages, about 2,500 to 3,500 words: vocabulary; the big picture with a context diagram; the core model (the mechanism the rest depends on) with its diagram; where the app appears; the screens, one picture each with numbered markers and a legend (element, what it shows, what you can do with it); one section per function (what it does, when it is available, what you see, which external values change, one example, and before and after pictures when it changes the screen); automatic behaviors (what is saved and restored, safety rules, language and units); reference lookups (external values with one computed contract example per mechanism, values per state); troubleshooting (symptom, cause, action).
 - Test guide, for testers, about 400 to 600 words before the test cases: vocabulary; how testing works (a bench diagram and the few rules every test relies on); setup (equipment, named starting states with a picture of each, and how to reach each); an index of tests by function; test cases in knowledge base order, each with one sentence of purpose, its starting state and a table of step, action, expected screen, expected external value, with a cropped picture of the expected screen where its look is what the step tests; what to record when a step fails. Every function and automatic behavior has a test, and tests check the current behavior.
 - Developer guide, for developers, about 3,000 to 4,000 words before the appendix: vocabulary of code concepts; architecture at a glance (the data flow in numbered steps, a component diagram by layer, the few design decisions with their reasons); code structure (a layer or package diagram and a short folder table); UI structure (a component diagram of screens, views and components with the view model or class behind each, and the annotated picture of each screen naming the component behind each element); one class diagram per layer or area, each with a paragraph on its responsibilities; behavior (the core state diagram and one sequence per main flow, each with the rules it keeps); persistence; recipes for common changes and the design constraints behind them; build, run and release. Appendix A, Reference, tables only, for maintainers and agents: external values to code (code constant, external name, contract id, direction), persistence keys, identifiers, configuration keys, and the file index (file, sections that describe it). The identifiers the prose leaves out live here.
 
 ## 6. Diagrams and pictures
 
-PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and opens the section it explains. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
+PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and comes at the start of the section it explains, right after the section's opening sentence. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
 
 Pictures of the UI come from the real app, never from a drawing of how it might look:
 
@@ -85,8 +87,8 @@ Run each check as a one-off command saved in the notes (the update runs them aga
 1. every external value in the code appears in the knowledge base and in the appendix, with one contract entry per direction that exists in the spec;
 2. the appendix matches the code both ways: every entry exists at the described commit, and every key, identifier and mapping the extraction commands find is listed;
 3. every relative link, image and anchor resolves, and a link text with a section number points to that section;
-4. no placeholders, TODOs or characters the project forbids, and no code identifiers in the knowledge base or test guide except external names and log messages;
-5. readability: the big picture within the first 300 words of each document; at most about 5 code identifiers per 100 words of prose outside the appendix; at most one cross-reference per paragraph; no sentence over 35 words; every section opens with prose; each document within its word budget;
+4. no placeholders, TODOs or characters the project forbids, and no code identifiers in the knowledge base or test guide except external names (the contract's names, configuration and data file keys, and the platform API's call and event names) and log messages;
+5. readability: the big picture within 300 words of its heading; at most about 5 code identifiers per 100 words of prose outside the appendix; at most one cross-reference per paragraph, the header line excepted; no sentence over 35 words; every section after the vocabulary opens with prose; each document within its word budget, 10 percent either way, counted without the vocabulary, tables, code blocks and image lines;
 6. every diagram renders (exit code 0 and nothing on stderr) and has a title, and every class in a class diagram shows members;
 7. every picture exists, has its recipe in the notes or is marked as provided by the user, and has a legend with as many entries as it has markers.
 
