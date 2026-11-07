@@ -35,7 +35,7 @@ Test it before fixing (a log line, a breakpoint, a one-off script, a narrowed te
 
 ## Phase 4: fix and verify
 
-Make the minimum change that addresses the root cause. Verify the original failure is gone by the same means that showed it, then check the obvious neighbors: other call sites, the same pattern elsewhere.
+In a project with tests, first write a test that reproduces the failure and see it fail for the right reason (trustworthy-tests). Then make the minimum change that addresses the root cause. Verify the original failure is gone by the same means that showed it, then check the obvious neighbors: other call sites, the same pattern elsewhere.
 
 Count your attempts. If a fix does not work, return to Phase 1 with the new information instead of stacking another fix. After two failed fixes, stop fixing: restate your assumptions and the evidence, and change approach. When each fix reveals a new problem somewhere else, that is the signature of a wrong design, not a wrong line: say so and discuss the structure.
 

@@ -8,9 +8,11 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 Two failure modes cost real money: answering a changeable question from memory, and burning ten searches on something one good source settles. This skill is the narrow band between them.
 
-Before any search ask: would being wrong here matter, and could the truth have changed since I last saw it? If both are yes, search. If either is no, answer directly.
+Before any search ask: would being wrong here matter, and could my answer be wrong (the fact may have changed, or I may misremember it)? If both are yes, search. If either is no, answer directly.
 
 Confidence about a changeable fact is not evidence. The more familiar the domain, the more certain the stale answer feels.
+
+Without a search or fetch tool, answer from knowledge, mark each changeable or load-bearing claim as unverified with the date your knowledge is from, and name the source the user should check.
 
 ## Sort the claims first
 
@@ -78,15 +80,15 @@ When credible sources disagree, do not average them or silently pick one. Say wh
 
 ## Output
 
-Lead with the answer. Then only what earns its place: evidence that carries weight, uncertainty that could change the conclusion, and the implication for the user's decision. Cite what a skeptic would click. When it changes how much to trust a key claim, name the evidence type (meta-analysis, randomized trial, observational study, preprint, benchmark, vendor documentation).
+Lead with the answer. Then only what earns its place: evidence that carries weight, uncertainty that could change the conclusion, and the implication for the user's decision. Cite what a skeptic would click.
 
-No search diary: "I searched for X, then Y" is process, not information, unless the user asked how you found it. Never present a source as read if you saw only a snippet.
+No search diary: "I searched for X, then Y" is process, not information, unless the user asked how you found it.
 
 Label the status of each part: what a source says, what you infer, what is unknown. That labeling is the most useful thing in a research answer and the first to get lost.
 
-Example. "Is the Pro plan still $20/month and does it include the API?"
+Example. "Is Acme's Pro plan still $20/month and does it include the API?"
 Weak: three searches, a hedged paragraph, a summary of the pricing page.
-Strong: one fetch of the official pricing page, then "Yes, $20/month as of the pricing page today. API access isn't included; it is billed separately per token." Two facts, one primary source, done.
+Strong: one fetch of the official pricing page, then "Yes, $20/month as of Acme's pricing page today. API access isn't included; it is billed separately per token." Two facts, one primary source, done.
 
 ## Related
 

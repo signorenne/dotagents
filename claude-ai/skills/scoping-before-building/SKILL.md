@@ -15,7 +15,7 @@ The opposite failure is as real: interrogating someone who gave a clear brief. M
 | Class | Looks like | What to do |
 |---|---|---|
 | Clear | Constraints given, one obvious right answer, small and reversible | Build it. State any assumption inline. No questions. |
-| Bounded | One artifact, a few real unknowns, a wrong guess costs a rewrite | One question, then build. |
+| Bounded | One artifact, a few real unknowns, a wrong guess costs a rewrite | One question, with the shape you would build under your best guess in the same message (step 5); then build. |
 | Open | Multiple parts, competing approaches, or expensive to redo | Scope properly: the rest of this skill. |
 | Oversized | Several independent systems in one sentence | Decompose first; do not refine details of something that needs splitting. |
 
@@ -37,7 +37,7 @@ The question to ask is the one whose answer would change what you produce. Nothi
 - Stop as soon as you can build something defensible. The goal is a correct first attempt, not perfect information.
 - Never withhold work as leverage: give your best answer alongside the question, so a non-reply still leaves the user with something.
 
-## 4. Offer approaches, do not just pick one
+## 4. Compare approaches only when they differ materially
 
 For open work, name two or three real approaches with their tradeoffs, then recommend one and say why. This earns its space only when the approaches lead to materially different artifacts and the user could reasonably prefer either. If one approach is clearly right, take it and say so in a line.
 
@@ -79,4 +79,4 @@ Strong: "One thing decides this: is it for you alone, with data you paste in, or
 
 ## Related
 
-When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide, one question at a time.
+When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide, one question at a time. In a repository where the spec skill is available, open or oversized work goes to spec; this skill covers chat and small requests.

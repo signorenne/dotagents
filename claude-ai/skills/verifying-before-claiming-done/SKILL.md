@@ -12,7 +12,7 @@ Claims of completion are claims about evidence. Say what you observed, not what 
 
 ## Before saying done, answer these
 
-1. What did I actually observe? Ran it and saw output, versus reasoned that it should work. These differ and must be reported differently.
+1. What did I actually observe? Ran it and saw output, versus reasoned that it should work. These differ and must be reported differently. A check counts only if it could have failed: a test never seen failing, or output you did not read, is not an observation.
 2. Did I check the thing the user asked for, or an adjacent thing that was easier to check?
 3. Did every part get done? Multi-part requests lose parts. Re-read the original request, not your summary of it, and tick off each piece.
 4. What did I not verify? There is always something. Name it.

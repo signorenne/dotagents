@@ -54,7 +54,7 @@ Each means: make the requested change only, and mention the rest in one line.
 
 ## Output
 
-Show what changed, not what did not:
+Show what changed, not what did not. When you edited a file directly, report what changed and where (path:line) and reprint it only if asked; in chat:
 
 - Localized code change: a diff or the changed function, with enough context to place it.
 - Prose edit: the revised paragraph or section.
