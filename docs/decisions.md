@@ -159,3 +159,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: Anthropic's skill authoring guide: once a skill loads, every token competes with the conversation, so add only context the model lacks; its context engineering article: aim for the smallest set of high-signal tokens, which is not the same as short. Instruction adherence falls as the number of instructions grows (IFScale benchmark, 2025). D-0004's premise held only until the skill loads.
 - Rejected: Keeping D-0004 (full guidance whatever the length); shortening by dropping rules (vague guidance is its own failure mode).
 - Revisit if: a real session shows a trimmed skill missing a rule it needed (restore that rule), or a skill's guidance no longer fits in SKILL.md under 500 lines.
+
+## D-0014: as-built-docs reads code on the session's model
+
+- Status: Accepted
+- Proposed by: agent
+- Decided by: maintainer
+- Date: 2026-11-08
+- Rule in: home/.agents/skills/as-built-docs/SKILL.md (Working rules)
+- Decision: The subagents that map code for as-built-docs run on the session's model (in Claude Code the general-purpose subagent), not on a smaller one.
+- Why: The independent fact-check catches wrong facts but not missing ones, so a weaker reader's omissions would reach the documents unnoticed; correctness comes first and documentation runs are rare. A test run on this repository cost 6.56 USD on Opus 5.5.
+- Rejected: Sonnet for the mapping subagents (cheaper, but no later step catches what it misses).
+- Revisit if: a side-by-side run on the same repository shows a smaller model finds the same facts and behaviors to confirm.
