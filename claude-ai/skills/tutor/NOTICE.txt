@@ -15,5 +15,6 @@ ladder, concrete example before the rule, misconception, fading and retention
 rules; removed em dashes and inline emphasis.
 
 Modifications made on 2026-11-08: diagnosis before teaching is always done, also
-for fluent or worked requests; heading renamed to Tutor; tool-neutral wording for
+for fluent, worked or direct-explanation requests (an explicit request for the
+answer still skips it); heading renamed to Tutor; tool-neutral wording for
 the model's own verdict; removed a repeated rule on explicit answer requests.
