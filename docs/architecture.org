@@ -39,7 +39,7 @@ each edge carries:
 | CI (=ci.yml=)                          | =tools/build.py=                   | run on every push and pull request                                                                                                |
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
-  18 local skills (=skills/=), the three subagents in Claude Code format
+  19 local skills (=skills/=), the three subagents in Claude Code format
   (=agents/=), the seven hook scripts (=hooks/=) and the path rules
   (=path-rules.json=, each skill with the file globs that call for it).
 - =claude-ai/= holds the claude.ai set (=skills/=, eleven skills), the overrides
@@ -393,9 +393,10 @@ The subagents these skills use:
   Code, elsewhere reviewer told that its target is the claim, not the branch
   diff).
 - notes-from-work has each finding attacked by a subagent given the claims
-  and their sources, not the author's probes (the general-purpose subagent in
-  Claude Code, reviewer elsewhere), and runs the vault's gates through
-  gate-runner and its review through reviewer.
+  and their sources, not the author's probes, which runs probes of its own
+  (the general-purpose subagent in Claude Code, the tool's default general
+  agent elsewhere), and runs the vault's gates through gate-runner and its
+  review through reviewer.
 - mechanical-changes sends its review to reviewer. parallel-agents gates each
   branch through isolated-work, which runs gate-runner on the rebased commit
   (unless the rebase left it unchanged and its pass is logged), and reviews

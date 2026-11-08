@@ -111,10 +111,13 @@ to =session-close= inside a git repository.
   =implement= also gives it the folder and the commit it expects there, and
   =parallel-agents= runs implement's review on the merged result.
 - =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
-  subagent that did not write them, =code-audit= has each finding attacked by
-  one briefed only on the claim and the code, and =notes-from-work= has each
-  finding attacked by one given the claims and their sources: in Claude Code
-  the general-purpose subagent told not to edit, elsewhere =reviewer=.
+  subagent that did not write them, and =code-audit= has each finding attacked
+  by one briefed only on the claim and the code: in Claude Code the
+  general-purpose subagent told not to edit, elsewhere =reviewer=.
+  =notes-from-work= has its claims attacked by one given the claims and their
+  sources, which runs its own probes: the general-purpose subagent in Claude
+  Code, the tool's default general agent elsewhere, told to write only in its
+  own scratch folder.
 - Where a tool has no subagents, the skill follows
   =~/.agents/agents/<name>.md= itself.
 
