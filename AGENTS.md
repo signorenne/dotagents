@@ -11,7 +11,7 @@ the repository itself.
 
 ```text
 home/.agents/AGENTS.md     global instructions, installed as ~/.agents/AGENTS.md
-home/.agents/skills/       local skills (decide, spec, implement, review, gates, session-close, project-setup, as-built-docs, architecture-doc)
+home/.agents/skills/       local skills (decide, spec, implement, review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams)
 home/.agents/agents/       subagents in Claude Code format, the source for every tool's copy
 home/.agents/hooks/        hook scripts shared by every agent
 claude-ai/skills/          skills uploaded to claude.ai (and installed locally for every agent)

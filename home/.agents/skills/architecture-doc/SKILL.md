@@ -24,7 +24,7 @@ Sources, cited in the documents where used: ISO/IEC/IEEE 29148 (requirements); E
 
 - Plain words, short sentences, one idea per sentence. Every term in the glossary, used with one meaning.
 - Each document opens with a short summary: the problem, the main decisions, the top risks.
-- Use a table or a diagram when the content has structure. Each diagram answers one question, has a title and a legend, and shows only what that question needs; use the tool's default look, with no style file, theme or colors, so it stays readable in light and dark viewers.
+- Use a table or a diagram when the content has structure. Each diagram answers one question, has a title and a legend, and shows only what that question needs; with PlantUML, draw and check it with the plantuml-diagrams skill (its palette reads in light and dark themes); with another tool, keep its default look.
 - No padding: drop a section that adds nothing, with a one-line reason.
 
 ## 1. Frame

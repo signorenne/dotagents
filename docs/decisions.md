@@ -171,3 +171,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The independent fact-check catches wrong facts but not missing ones, so a weaker reader's omissions would reach the documents unnoticed; correctness comes first and documentation runs are rare. A test run on this repository cost 6.56 USD on Opus 5.5.
 - Rejected: Sonnet for the mapping subagents (cheaper, but no later step catches what it misses).
 - Revisit if: a side-by-side run on the same repository shows a smaller model finds the same facts and behaviors to confirm.
+
+## D-0015: Diagrams use the nexenne palette in day and night
+
+- Status: Accepted
+- Proposed by: maintainer (nexenne colours, no broken dark previews), agent (one file with a dark block, packages instead of stereotypes)
+- Decided by: maintainer
+- Date: 2026-11-08
+- Rule in: home/.agents/skills/plantuml-diagrams/ (SKILL.md, palette.iuml)
+- Decision: Every PlantUML diagram includes the skill's palette.iuml and no other styling: the nexenne-day colours, and the nexenne-night colours when it is drawn in dark mode. The skill names neither the palette's origin nor any project. Groups are shown with packages, not stereotypes.
+- Why: A light fill set without its text colour made diagrams unreadable in the dark Emacs preview. PlantUML applies a style's dark block on -darkmode renders (tested through the picoweb server the preview uses), so one file serves both themes; styles do not reach stereotype labels, which stay small and grey.
+- Rejected: No colours at all (readable but plain); fixed light colours (unreadable in dark previews); separate day and night files (the diagram would have to switch includes).
+- Revisit if: the nexenne palette changes (copy its new values), or PlantUML starts writing the dark block into SVG output.
