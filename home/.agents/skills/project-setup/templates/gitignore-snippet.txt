@@ -1,4 +1,4 @@
-# Local agent working notes (specs, handoffs): never versioned.
+# Local agent working notes (specs, progress logs, handoffs): never versioned.
 .private/
 
 # Personal per-project agent settings.
