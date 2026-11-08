@@ -1,0 +1,306 @@
+#+TITLE: The dotagents method
+#+SUBTITLE: how an agent and its maintainer take a change from request to landing
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the method: its principles, the roles, the lanes, the plan
+file and its states, when the agent stops, review and triage, the checks,
+resume, delegation, the register and how the method is measured. The global
+rules ([[file:home/.agents/AGENTS.md][home/.agents/AGENTS.md]]) state the method's core in its vocabulary;
+the skills apply it and never restate it; [[file:DESIGN.org][DESIGN.org]] holds the rules that
+bind this repository; [[file:docs/glossary.org][docs/glossary.org]] defines the terms.
+
+Version 1, 8 November 2026, written with the rework branch and binding once
+the maintainer accepts it. Sources: [[file:docs/evidence.org][docs/evidence.org]] and the
+"What comes from where" table at the end.
+
+* Principles
+
+1. Size the process to the consequence of a mistake, never to habit. Small
+   work takes the short lane; risk forces the long one; a lane can be
+   raised mid-work and never lowered.
+2. One file per change carries its whole state: intent, plan, log, review,
+   next step. Any session resumes from it.
+3. Judgment stays on the strongest model and with the maintainer; mechanics
+   move to scripts and hooks that cost no model turn.
+4. Look before asking, ask once and in one batch, and stop only for a closed
+   list of reasons. Every other choice is taken, recorded with what it costs
+   if wrong, and shown at the end.
+5. Short contexts: clearing the session between steps is cheap because the
+   file holds the state, and subagents return short reports in a fixed form.
+6. Refute before you rely: each claim the work depends on is a hypothesis to
+   break with the cheapest check that could fail, applied where it pays: the
+   plan's assumptions, each test, each review finding.
+7. Each rule has one owner and, when one command can detect a breach, a
+   check rather than more text.
+8. Skills name actions, never a tool's own tool names; what differs per tool
+   lives in one description of that tool (the installer's).
+9. The method is judged on real sessions, with numbers anyone can recompute.
+
+Speed and usage are goals wherever they cost no quality.
+
+* Roles
+
+| Role        | Who                               | Owns                                                                                             |
+|-------------+-----------------------------------+--------------------------------------------------------------------------------------------------|
+| maintainer  | the person                        | the intent, the decisions, the decision log, approval, landing, pushing                          |
+| main agent  | the session's model               | investigation, the plan, the code, triage of findings, rulings                                   |
+| scout       | subagent, read-only               | a cited map of an unknown or wide area                                                           |
+| reviewer    | subagent, fresh context, strongest model | findings on a finished change, in two modes                                               |
+| gate-runner | subagent, smallest model          | running the documented gates and returning verdicts and first errors                            |
+| worker      | general subagent                  | one bounded job of a fan-out skill (reading, extracting, drafting, fact-checking)               |
+
+A worker never starts reviewers of its own; review is the caller's step.
+
+* Lanes
+
+The build skill investigates first, then says which lane it takes, so the
+maintainer can override it in one word.
+
+| Lane   | When                                                                                         | Plan                                       | Approval                             | Review                                   |
+|--------+----------------------------------------------------------------------------------------------+--------------------------------------------+--------------------------------------+------------------------------------------|
+| direct | one sentence, one or two known files                                                         | none                                       | none                                 | the agent re-reads its diff; the narrow check |
+| quick  | about 100 changed lines or fewer, no risk surface, no choice that is the maintainer's         | a short plan file                           | announced, not awaited               | one quick reviewer pass                  |
+| full   | anything larger, or any risk surface                                                         | the plan file (about 900 to 1,600 tokens)  | one approval, holding every question | the full reviewer pass                   |
+
+Risk surfaces force the full lane: a public API, a data migration, security
+(outside input, authentication, secrets), a new dependency, threading, the
+build, an irreversible step. Work that needs several plans gets a design
+first (the design skill): objective, non-goals, decisions, acceptance and the
+ordered list of plans; each plan is then one run of build, in its own
+session.
+
+The risk grade of a plan (low, medium, high) sets the review depth: high
+risk gets a second reviewer pass on the fixes and is proposed for an
+isolated worktree.
+
+* The plan file
+
+=.private/plans/<slug>.<ext>= in the project's working-notes folder, in its
+prose format (=org= or =md=); in a linked worktree, in the main checkout's
+=.private=. It replaces the spec of a single change, the progress log and the
+handoff. A second file beside it, =<slug>.log=, is written only by scripts and
+hooks.
+
+** State header
+
+The lines before the first section, one =- Key: value= list item each, read
+by the scripts and the session hook:
+
+#+begin_example
+- Status: in progress
+- Lane: full
+- Risk: medium
+- Base: 201ced0
+- Branch: feat/plan-scripts
+- Review: full
+- Next: S3 check_step records the failing-first run
+#+end_example
+
+Status is one of draft, approved, in progress, in review, built, landed,
+blocked, dropped. Lane is direct, quick or full; Risk low, medium or high;
+Review quick or full (full with a second pass when the risk is high).
+
+** Sections
+
+| Section       | Holds                                                                                                                                    | Written      |
+|---------------+------------------------------------------------------------------------------------------------------------------------------------------+--------------|
+| Intent        | the problem, the approach, what must always hold, what is out of scope, the acceptance criteria as observable behaviors, the unchanged behavior with the tests that pin it, who approved and when | frozen at approval; the maintainer's |
+| Code map      | the files, symbols and lines the work needs, what to reuse, what not to touch; a map to check against the code                          | before approval |
+| Assumptions   | table: assumption, the check that could refute it, its result                                                                           | before approval, results as they come |
+| Steps         | table: number, step, files, check, status (pending, in progress, done, dropped), commit; then constraints for every step and the interfaces between dependent steps | before approval, status as it goes |
+| Verification  | the narrow check per step, the full gates once on the last commit                                                                       | before approval |
+| Rulings       | table: number, ruling, why, alternative, cost if wrong, review (pending, kept, changed)                                                 | as they are taken |
+| Dead ends     | one line per approach that failed: what, the result, why dropped                                                                        | as they happen |
+| Review        | table: number, source (reviewer, maintainer), severity, location, finding, verdict, evidence                                            | at review |
+
+** The log file
+
+One tab-separated line per event, appended by check_step and the step-log
+hook, never by the agent: time, step, kind (baseline, check, fail-first,
+gate, commit), commit (or "uncommitted" with the dirty files counted), result
+(pass, fail), test count or "-", command or commit subject.
+
+** States
+
+draft (investigating, plan being written) to approved (the maintainer's
+word; the quick lane skips it) to in progress (steps) to in review (gates
+passed, reviewer running) to built (findings triaged, gates green on the last
+commit) to landed (on the target branch). blocked names its stop in Next;
+dropped is the maintainer's. A session that finds a step in progress with no
+commit shows the diff of its files and asks whether to finish or discard it;
+nothing is discarded without that answer.
+
+Old specs, progress logs and handoffs are accepted as the starting intent of
+a new plan; they are not converted.
+
+* Questions and stops
+
+- While investigating the agent asks nothing: what the code, the docs or
+  the decision log can settle, it reads.
+- Before approval it shows, in one message, its assumptions as a table
+  (evidence, what breaks if wrong, how sure) and the open questions that are
+  the maintainer's, each with options, consequences and its recommendation.
+  One answer approves the plan.
+- During the work it stops only for:
+  1. a change to the frozen intent (something the maintainer would notice in
+     the result);
+  2. a public API, architecture, dependency or data migration the plan does
+     not hold;
+  3. an irreversible, destructive or security-sensitive action;
+  4. a test or gate that could pass only by being deleted or loosened;
+  5. a conflict with an accepted decision;
+  6. two changed approaches that both failed;
+  7. a plan so broken that every path is a guess.
+- Everything else is a ruling: decided, recorded in the plan with its reason,
+  the alternative and what it costs if wrong, and listed at the end for
+  review in one place.
+
+* Review and triage
+
+- The reviewer is a fresh context on the strongest model, in one of two
+  modes. Quick: the diff, the plan's acceptance, the project's hard rules,
+  the tests' ability to fail; bounded. Full: the whole checklist, the attack
+  on each test and on the change's central claims.
+- A finding states its practical consequence; a change with nothing wrong
+  gets no findings.
+- The main agent checks each finding at its location and gives one verdict:
+  real (high, medium, low), false with a disproof the reviewer could read,
+  or undecided with what would settle it. It never lowers a reviewer's
+  severity.
+- It fixes in one pass what this change caused when the fix is simple; each
+  fix that changes behavior is proven by a test seen failing first; then the
+  plan's verification runs again. A fix that involves the maintainer's
+  choice stops the work; any other fix that is not simple is made and
+  recorded as a ruling. Minor findings are listed, not fixed.
+- A second reviewer pass, limited to the fixes, happens only when the risk is
+  high or a fix added a public surface.
+- What is not this change's problem goes to =.private/deferred.<ext>=, one
+  line each, only when the base commit has it too.
+- A finding that shows the plan was wrong sends the work back to the plan,
+  at most three times; one that shows the intent was wrong stops the work.
+
+* Checks
+
+Three standard-library scripts in the build skill, each one call:
+
+- plan_state: the branch, base, HEAD, dirty files, the plan's header, the
+  step in progress, the open rulings and the last log lines. The session
+  hook prints the same excerpt.
+- check_step: runs a step's check, keeps the full output in a file, prints
+  the tail, and appends the log line. Told that a failure is expected, it
+  records the failing-first run, and a pass then fails the call. A run on a
+  dirty tree is logged as uncommitted.
+- floor_check: compares the diff with the base and reports removed tests,
+  added skips and added suppressions, the size of the diff and the risk
+  surfaces it touches; a quick-lane change that outgrew its lane is raised
+  before review. Exit 2 means it could not run and never reads as clean.
+
+The full lane runs the baseline (the narrow check and the tests that pin the
+unchanged behavior) on the base commit before the first step; the quick
+lane does not. The narrow check runs per step, the full gates once on the
+last commit, through gate-runner.
+
+* Resume and short contexts
+
+- On a new session, a clear, a resume or a compaction, the session hook
+  prints, on a task branch with a plan file, the plan's header, the step in
+  progress and the open rulings, marked as a map to check against git.
+- After a step's commit with a large context, a hook tells the maintainer in
+  one line that this is a good point to clear the session (Claude Code;
+  elsewhere the build skill says it).
+- Implementation runs in the main conversation. Handing a whole plan to one
+  builder subagent is an experiment, adopted only if the numbers show
+  shorter sessions at equal quality.
+
+* Delegation
+
+- Every delegation names its return form and a size limit, the model and the
+  effort.
+- scout is called only when the area is unknown or wide; the quick lane reads
+  its few files itself. gate-runner runs on the smallest model at low effort.
+  The reviewer and every agent that judges (fact-checks, verdicts) run on the
+  strongest model.
+- Fan-out skills (as-built-docs, code-audit, notes-from-work,
+  parallel-agents) size the number of workers and what each reads before
+  launching, and give each job a tier: reading and extraction at a lower
+  effort, verdicts and fact-checks on the strongest model. A lower tier is
+  kept only where both the fact-check error rate and a coverage measure (a
+  sample of source items looked for in the output) hold, because a
+  fact-check cannot see what is missing.
+
+* Register
+
+Chat replies and status lines use a terse register: the answer first, no
+ceremony, short words, every fact kept, at most one short line between tool
+calls. Briefs to subagents, their reports and the agent's own notes use short
+fixed forms. Full sentences stay for questions to the maintainer, warnings,
+irreversible steps, step orders a fragment could scramble, and every text
+someone acts on later: the intent and acceptance criteria, rules, skill
+text, docs for people, commits. On request the register goes terser still
+(telegraphic), never at the cost of a fact.
+
+* Decisions
+
+- Rulings: routine choices the agent takes during a change, in the plan,
+  with what each costs if wrong; the maintainer keeps or overturns them at
+  the end. They end with the plan.
+- Intent: the maintainer's choices for one change, in the plan's frozen
+  block.
+- The decision log: tracked in git (in this repository, DESIGN.org "Rules
+  that bind"; elsewhere the project's own log), for choices that outlive a
+  change. Only the maintainer accepts an entry; a conflict with an accepted
+  entry stops the work.
+
+* Working notes
+
+| Folder                        | Holds                                                                  |
+|-------------------------------+------------------------------------------------------------------------|
+| .private/plans/               | <slug>.<ext> and <slug>.log, one pair per change                       |
+| .private/designs/             | designs of work that needs several plans                               |
+| .private/deferred.<ext>       | one line per issue that is not the current change's problem           |
+| .private/handoff/             | only for a session with no plan file                                   |
+| .private/research/, others    | unchanged                                                              |
+
+=.private= is git-ignored; when it is not, the agent asks once where notes go.
+
+* Measuring
+
+- Time and usage: =python3 tools/session_stats.py --since <date>= over the
+  Claude Code transcripts (wall-time split, question rounds, bookkeeping
+  calls, context per request, weighted usage by subagent kind and by skill),
+  run before and after a change to the method.
+- Quality: per landed change, whether a fix caused by it reached main within
+  14 days (judged from the diff by an agent that did not build it), and the
+  plan's review findings by severity and source.
+- Fail rules, written before the switch: rule Q sends the quick lane back to
+  one approval and a full review when 5 of its first 10 landed changes
+  escape (baseline 26%), or at once on an escaped blocker-class defect;
+  rule R brings back the second review pass when 3 of the first 10 full-lane
+  changes without one have an escape or a maintainer-found major in code a
+  review fix wrote; rule F reports a rise above 0.5 first-pass blockers or 4
+  majors per full-lane change.
+- Targets, against the same tool's baseline of 25 September to 8 November 2026
+  (bookkeeping 2.7% of tool calls, 375 question rounds for 477 prompts): half
+  the bookkeeping calls, at most one question round for a quick-lane change,
+  half the command approvals.
+
+* What comes from where
+
+| Source                  | Taken                                                                                                                                                         |
+|-------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| BMAD-METHOD             | one plan file whose status drives resume; frozen intent; the lane chosen after investigating; questions in one batch; verdicts for findings; the deferred list |
+| superpowers             | rulings with their cost; one fix pass proven by failing tests; bookkeeping inside the call that does the work; constraints and interfaces in plans; workers never start reviews; model and effort in every delegation; tool-neutral skills |
+| compound-engineering    | the risk-surface floor under the lanes; findings state their consequence; who owns the fix; the test for keeping a lesson; the repository as a plugin         |
+| GSD                     | the assumptions table; the closed stop list; a size baseline per file; the context warning                                                                   |
+| spec-kit                | tools described as data with one test suite; the generic target; the hash manifest; one script that prints the state                                          |
+| planning-with-files     | the plan shown at session start; the next-step line                                                                                                           |
+| ECC                     | hooks that record facts without a model turn; the hint to clear a large context                                                                              |
+| caveman                 | the terse register for chat and status lines; fixed short forms between agents                                                                               |
+| addyosmani/agent-skills | the diff floor check; git bisect in debugging; plugin manifests                                                                                              |
+| anthropics/skills       | how to write trigger cases; the marketplace file                                                                                                              |
+| dotagents before        | refute first; tests seen failing and attacked; the guard and its replay; gate-runner; one source installed into every tool; no agent pushes                    |
+
+This method's own steps: the risk grade sets the review depth; the check
+that a finished diff still fits its lane; the coverage measure for worker
+output.
