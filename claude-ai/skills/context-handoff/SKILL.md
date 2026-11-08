@@ -1,6 +1,6 @@
 ---
 name: context-handoff
-description: "Writes a self-contained brief so work can continue in a new chat, session or model. Use for handoffs, catch-up notes, status recaps, a prompt to continue, or before running out of context."
+description: "Writes a self-contained brief so work can continue in a new chat, session or model. Use for handoffs, a prompt to continue elsewhere, catch-up notes for someone else, or before running out of context."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 

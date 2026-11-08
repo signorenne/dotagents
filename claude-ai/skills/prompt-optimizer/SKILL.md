@@ -10,7 +10,7 @@ A prompt is a specification, and the failure mode is not length but ambiguity. M
 
 This applies to anything that is itself an instruction for an AI model: prompts, system prompts, custom instructions, agent or subagent instructions, skills, templates, and "why does it keep doing Y instead of Z", even when the user only pastes text and says "make this better".
 
-When the user asks for one specific change to an existing prompt, make only that change (minimal-editing); the full rewrite is for requests to improve or debug the prompt as a whole.
+When the user asks for one specific change to an existing prompt, make only that change (minimal-editing); the full rewrite is for requests to improve or debug the prompt as a whole. A repository's AGENTS.md checked against what the repository actually does goes to project-setup where available.
 
 Optimize the total tokens and turns needed to reach a good result, not the length of the first message. A prompt fifty words longer that avoids two rounds of correction is the shorter prompt.
 
@@ -67,7 +67,7 @@ A system prompt holds standing rules that apply to every request, with no task i
 
 ## Debugging a prompt that misbehaves
 
-When the user says "it keeps doing X", find the instruction that permits X, not a new instruction forbidding it. Prompts fail more often from a vague clause the model resolved badly than from a missing rule; adding "DO NOT do X" on top of the clause that invited X gives a longer prompt with the same behavior.
+When the user says "it keeps doing X", find the instruction that permits X, not a new instruction forbidding it. Prompts fail more often from a vague clause the model resolved badly than from a missing rule; adding "DO NOT do X" on top of the clause that invited X gives a longer prompt with the same behavior. When you can run the prompt, run the old and new versions on the input that showed X and compare; otherwise say the fix is untested and give that input.
 
 ## Red flags
 
