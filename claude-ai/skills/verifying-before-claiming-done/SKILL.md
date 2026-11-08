@@ -34,7 +34,6 @@ Never let "should work" and "works" collapse into the same sentence. If you did 
 - "That should do it", with nothing executed.
 - Summarizing what you wrote as if it were what you achieved.
 - Reporting the parts that went well and quietly dropping the part that did not.
-- "The tests should pass now."
 - Claiming completion for a multi-step request when you completed the first step well.
 - Declaring done because the session has run long.
 

@@ -1,6 +1,6 @@
 ---
 name: scoping-before-building
-description: "Sizes up a request to make something (app, feature, script, doc, process) and asks only the question that changes the result before building. Use when a request is looser than what it asks for."
+description: "Sizes up a request to make something and asks only the question that changes the result before building. Use when asked to build, make or write something whose purpose, audience or format is unclear."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -10,12 +10,12 @@ The expensive failure is not building it wrong. It is building the wrong thing w
 
 The opposite failure is as real: interrogating someone who gave a clear brief. Most requests need no scoping at all. Match the process to the gap between what was asked for and what has to be decided.
 
-## 1. Classify, before anything else
+## 1. Classify, once you have read what is in front of you (step 2)
 
 | Class | Looks like | What to do |
 |---|---|---|
 | Clear | Constraints given, one obvious right answer, small and reversible | Build it. State any assumption inline. No questions. |
-| Bounded | One artifact, a few real unknowns, a wrong guess costs a rewrite | One question, with the shape you would build under your best guess in the same message (step 5); then build. |
+| Bounded | One artifact, a few real unknowns, a wrong guess costs a rewrite | If a reasonable default exists, build under it and state it in one line; otherwise one question, with the shape you would build under your best guess in the same message (step 5). |
 | Open | Multiple parts, competing approaches, or expensive to redo | Scope properly: the rest of this skill. |
 | Oversized | Several independent systems in one sentence | Decompose first; do not refine details of something that needs splitting. |
 
@@ -79,4 +79,4 @@ Strong: "One thing decides this: is it for you alone, with data you paste in, or
 
 ## Related
 
-When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide, one question at a time. In a repository where the spec skill is available, open or oversized work goes to spec; this skill covers chat and small requests.
+When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide where available, one question at a time. In a repository where the spec skill is available, open or oversized work goes to spec; requirements and an architecture for a new system or product go to architecture-doc where available; this skill covers chat and small requests.

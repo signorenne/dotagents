@@ -1,6 +1,6 @@
 ---
 name: decision-analysis
-description: "Compares options on the criteria that matter to this user and commits to a recommendation, its tradeoff and what would flip it. Use when choosing products, tools, libraries, vendors or strategies."
+description: "Compares options on the user's criteria and commits to a recommendation, its tradeoff and what would flip it. Use when choosing products, tools, libraries, vendors or strategies, not project design."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -78,4 +78,4 @@ Strong: "Postgres, if you already run it: SELECT ... FOR UPDATE SKIP LOCKED hand
 
 ## Related
 
-Verify prices, limits and versions first with efficient-research, then decide here: research gathers, this commits. When the choice belongs to the user inside their own project (scope, architecture, public API, rules), this analysis feeds the decide skill, which settles it with them one question at a time.
+Verify prices, limits and versions first with efficient-research, then decide here: research gathers, this commits. When the choice belongs to the user inside their own project (scope, architecture, public API, rules), this analysis feeds the decide skill where available, which settles it with them one question at a time.
