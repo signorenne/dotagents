@@ -3,7 +3,10 @@
 """Tests for the tools in tools/ on a copy of the repository."""
 
 import ast
+import contextlib
+import datetime
 import importlib.util
+import io
 import json
 import os
 import shutil
@@ -1863,6 +1866,138 @@ class BenchmarkResults(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("not graded", result.stdout)
         self.assertEqual(self.table(result.stdout, "method")[3:9], ["-"] * 6)
+
+
+class SessionStats(unittest.TestCase):
+    """tools/session_stats.py on a fake Claude Code project folder. Every expected value
+    is worked out by hand from the definitions in the script's docstring."""
+
+    SECRET = "SECRET-TRANSCRIPT-TEXT"
+
+    def setUp(self):
+        self.stats = load(ROOT / "tools" / "session_stats.py", "session_stats")
+        self.folder = Path(tempfile.mkdtemp()) / "-home-me-project"
+        self.folder.mkdir()
+        self.addCleanup(shutil.rmtree, self.folder.parent)
+        self.day = datetime.datetime(2026, 11, 10, 10, 0, tzinfo=datetime.timezone.utc)
+
+    def at(self, seconds: int) -> str:
+        return (self.day + datetime.timedelta(seconds=seconds)).strftime("%Y-%m-%dT%H:%M:%SZ")
+
+    def assistant(self, seconds, message_id, tokens, *content, stop="tool_use"):
+        return {"type": "assistant", "timestamp": self.at(seconds),
+                "message": {"id": message_id, "content": list(content), "stop_reason": stop,
+                            "usage": dict(zip(("input_tokens", "cache_creation_input_tokens",
+                                               "cache_read_input_tokens", "output_tokens"), tokens))}}
+
+    def user(self, seconds, content):
+        return {"type": "user", "timestamp": self.at(seconds), "message": {"content": content}}
+
+    @staticmethod
+    def call(name, call_id, **arguments):
+        return {"type": "tool_use", "id": call_id, "name": name, "input": arguments}
+
+    @staticmethod
+    def result(call_id):
+        return {"type": "tool_result", "tool_use_id": call_id, "content": "ok"}
+
+    @staticmethod
+    def write(path: Path, rows) -> None:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("".join(json.dumps(row) + "\n" for row in rows) + "not json\n")
+
+    def session(self, name="s1", day=(2026, 11, 10)):
+        self.day = datetime.datetime(*day, 10, 0, tzinfo=datetime.timezone.utc)
+        def text(words):
+            return {"type": "text", "text": words}
+        rows = [
+            self.user(0, f"Please {self.SECRET}"),                                      # prompt 1, turn opens
+            self.assistant(10, "m1", (100, 0, 1000, 50), self.call("Bash", "b1", command="git status")),
+            self.user(20, [self.result("b1")]),                                          # tools 10
+            self.assistant(30, "m2", (10, 200, 2000, 20),
+                           self.call("Agent", "a1", subagent_type="reviewer", prompt="x")),
+            self.user(930, [self.result("a1")]),                                         # reviewer 900
+            self.assistant(940, "m3", (5, 0, 3000, 10), text("Shall I proceed?"), stop="end_turn"),
+            self.assistant(941, "m3", (5, 0, 3000, 10), text("Shall I proceed?"), stop="end_turn"),  # human 1
+            self.user(1000, "yes"),                                                      # human 59, question 1
+            self.assistant(1010, "m4", (1, 0, 4000, 5),
+                           self.call("Write", "w1", file_path="/w/.private/plans/a.org", content="x"),
+                           self.call("AskUserQuestion", "q1", questions=[])),            # question 2
+            self.user(1020, [self.result("w1")]),                                        # tools 10
+            self.user(1080, [self.result("q1")]),                                        # human 60 (dialog)
+            self.assistant(1090, "m5", (0, 0, 5000, 1), self.call(
+                "Agent", "g1", subagent_type="general-purpose", prompt="x")),
+            {**self.user(1091, [self.result("g1")]),                                     # general-purpose 1
+             "toolUseResult": {"isAsync": True, "status": "async_launched", "agentId": "ag1"}},
+            self.assistant(1100, "m6", (0, 0, 6000, 1), text("Started."), stop="end_turn"),
+            {"type": "queue-operation", "operation": "enqueue", "timestamp": self.at(1400),
+             "content": "<task-notification><task-id>ag1</task-id></task-notification>"},
+            # general-purpose 300 while the turn is closed, ended by the queue record naming ag1
+            {"type": "api-request", "timestamp": self.at(1401)},                        # human 1, turn opens
+            self.assistant(1410, "m7", (0, 0, 7000, 1), text(f"Done, {self.SECRET}"), stop="end_turn"),
+            self.user(2110, "later"),                                                    # 700 s away
+            self.assistant(2120, "m8", (0, 0, 8000, 1), text("ok"), stop="end_turn"),
+        ]
+        self.write(self.folder / f"{name}.jsonl", rows)
+        agent = self.folder / name / "subagents" / "agent-x1.jsonl"
+        self.write(agent, [self.assistant(40, "r1", (1000, 0, 0, 100))])
+        agent.with_suffix(".meta.json").write_text(json.dumps(
+            {"agentType": "reviewer", "model": "opus", "effort": "high"}))
+
+    def test_one_session_is_measured_by_the_documented_rules(self):
+        self.session()
+        measured = self.stats.session(self.folder / "s1.jsonl")
+        # model: gaps of 10, 10, 10, 1 (ends at an assistant message), 10, 10, 9, 9, 10.
+        self.assertEqual(measured["split"], {"model": 79, "tools": 20, "agent:reviewer": 900,
+                                             "agent:general-purpose": 301, "human": 120})
+        self.assertEqual(measured["active_seconds"], 1420)
+        self.assertEqual((measured["prompts"], measured["questions"], measured["bookkeeping_calls"]), (3, 2, 2))
+        self.assertEqual(measured["tokens"]["requests"], 8)
+        self.assertEqual(sorted(measured["contexts"]), [1100, 2210, 3005, 4001, 5000, 6000, 7000, 8000])
+        # 116 input + 200 * 1.25 + 36000 * 0.1 + 89 * 5
+        self.assertAlmostEqual(measured["weighted"], 4411)
+        self.assertEqual(measured["subagents"][0]["kind"], "reviewer")
+        self.assertAlmostEqual(measured["subagents"][0]["weighted"], 1500)
+
+    def test_bookkeeping_is_note_writing_and_read_only_git(self):
+        notes = [("Bash", "cd /r && git status --short && git log --oneline -5"),
+                 ("Bash", "git -C /r diff --stat HEAD | tail -3"),
+                 ("Bash", "git branch"), ("Edit", "/r/.private/progress/x.org")]
+        work = [("Bash", "git commit -m x && git log -1"), ("Bash", "git status; rm -f x"),
+                ("Bash", "git branch -D topic"), ("Bash", "grep -r x ."), ("Edit", "/r/src/x.py")]
+        for name, value in notes + work:
+            argument = {"command": value} if name == "Bash" else {"file_path": value}
+            self.assertEqual(self.stats.bookkeeping(name, argument), (name, value) in notes, value)
+
+    def test_the_summary_splits_usage_and_counts_method_agents(self):
+        self.session()
+        data = self.stats.summary([self.stats.session(self.folder / "s1.jsonl")])
+        self.assertEqual((data["context_median"], data["context_p90"]), (4500, 8000))
+        self.assertEqual(data["method_agent_hours"], 0.25)
+        self.assertEqual(data["bookkeeping_share"], 0.4)
+        self.assertEqual(data["subagent_share"], round(1500 / 5911, 3))
+        self.assertEqual(data["subagents_by_kind"], {"reviewer (opus, high)":
+                                                     {"agents": 1, "requests": 1, "weighted": 1500}})
+        self.assertEqual(data["per_skill"], {})
+
+    def test_the_report_keeps_the_date_window_and_never_prints_transcript_text(self):
+        self.session("s1")
+        self.session("s2", day=(2026, 10, 1))
+        self.session("s3", day=(2026, 11, 25))
+        printed = captured(self.stats.main, ["--since", "2026-11-01", "--until", "2026-11-20", str(self.folder)])
+        self.assertIn("sessions 1, active 0.39 h, prompts 3, question rounds 2", printed)
+        self.assertNotIn(self.SECRET, printed)
+        self.assertNotIn("Shall I proceed", printed)
+        data = json.loads(captured(self.stats.main, ["--since", "2026-11-01", "--until", "2026-11-25",
+                                                     "--json", str(self.folder)]))
+        self.assertEqual(data["sessions"], 2)  # s1 and s3: the last day counts whole
+
+
+def captured(function, argv) -> str:
+    buffer = io.StringIO()
+    with contextlib.redirect_stdout(buffer):
+        function(argv)
+    return buffer.getvalue()
 
 
 if __name__ == "__main__":
