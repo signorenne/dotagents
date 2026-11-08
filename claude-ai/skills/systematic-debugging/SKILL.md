@@ -6,80 +6,54 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 # Systematic debugging
 
-Guessing at fixes is seductive because sometimes it works. When it does not, it leaves the code worse: changes that were not needed, the original bug still live, and a muddier picture of what is wrong. The cost is asymmetric, so diagnose first.
+Diagnose before you change anything. A change made without knowing the cause either misses it or hides it, and each miss leaves edits behind that blur the next attempt. Diagnosis is done when you can say why the failure happens and why the nearby cases do not fail.
 
-A fix you cannot explain is not a fix. If you cannot say why the failure happened, you do not know whether your change addressed it or just perturbed the timing.
+## 1. Collect the evidence
 
-Following the letter of this process while skipping its spirit (a token glance at the traceback, then the guess you were going to make anyway) is not following it.
+Propose no fix in this step.
 
-## Phase 1: investigate
+- Read the whole error: message, type, the innermost frame of your own code, line numbers. The wording carries information: in JavaScript, "x is not a function" and "Cannot read properties of undefined (reading 'x')" are different mistakes.
+- For a failing CI job, save the failed job's log to a file with the CI's command-line tool (on GitHub: gh run view <run-id> --log-failed) and read around the first error; without such a tool, ask the user for that part of the log.
+- Write down what happens and what should happen: the input, the place, how often. Sometimes the expectation turns out to be the mistake.
+- Look at what changed since it last worked: commits, dependency versions, configuration, data, environment.
+- Make it fail on demand, or record that you could not: a failure that comes and goes points at timing, ordering, caching, clocks or data.
+- In a system of several parts (CI, build and deploy; client, service and database), record what crosses each boundary during one run, so the run shows which part goes wrong instead of a guess.
+- Follow a bad value back to where it is first produced; the fix belongs there, not where it surfaced.
 
-Propose no fix before finishing this phase.
+## 2. Compare with a case that works
 
-1. Read the actual error: full message, exception type, innermost frame, line numbers. The exact words matter: "undefined is not a function" and "cannot read property of undefined" point at different mistakes. Errors often contain the answer. For a failing CI check, get the failed job's log first: with gh, save gh run view <run-id> --log-failed to a file and read the part around the first error instead of printing the whole log; without gh, ask the user to paste the failing part.
-2. State observed versus expected: what happens, where, how often, on what input, and what should happen. Sometimes the bug dissolves here: the code is right and the expectation was wrong.
-3. Check what changed. "It worked yesterday" is a gift: recent commits, a dependency bump, a config or data change, a different environment.
-4. Reproduce, or say you cannot. A reliable reproduction turns debugging from argument into experiment. Failing to reproduce is evidence too: intermittent failures point to concurrency, ordering, caching, clocks or data dependence.
-5. Instrument across boundaries when the system has layers. For a multi-component failure (CI, build, deploy; API, service, database), do not guess which layer is wrong: log what enters and exits each boundary, run once, and let the evidence name the failing component.
-6. Trace bad values backward to where they originate, and fix there, not where they finally exploded.
+Find the closest thing that works: another caller, a passing test, a reference implementation, the previous release. Write down every difference between the two, including the ones that look irrelevant. When a reference is the model, read all of it.
 
-## Phase 2: compare with something that works
+## 3. One hypothesis, tested
 
-Find the nearest working case: a similar call site, a passing test, the reference implementation. List every difference, including the ones that "can't matter"; that is usually where it is. When following a reference pattern, read it completely instead of adapting from a skim.
+Name a single cause and the evidence for it in one sentence ("the cache returns the old entry because its key ignores the locale"). It has to account for everything you collected, including why the working case works. Test it with the smallest probe (a log line, a breakpoint, a narrowed test, a short script), changing one thing at a time. If evidence only the user has would settle it, ask for that one item. Where you do not understand something, say so.
 
-## Phase 3: hypothesize and test
+## 4. Fix the cause and prove it
 
-State one hypothesis: "X is the root cause because Y." It must explain all the evidence, including why the neighboring case works; a hypothesis that explains the error but not the neighbor's success is usually wrong.
+- In a project with tests, first add a test that reproduces the failure and watch it fail for this reason (trustworthy-tests).
+- Change as little as the cause needs. Show that the original failure is gone by the same means that showed it, then look for the same pattern elsewhere.
+- A fix that does not work sends you back to step 1 with what it taught you; do not stack a second fix on it. After two failed fixes, stop and restate the evidence and your assumptions. When each fix moves the problem somewhere else, the design is wrong rather than a line: say so.
 
-Test it before fixing (a log line, a breakpoint, a one-off script, a narrowed test), changing one variable at a time. When you need evidence the user has, ask for it with one specific request ("what is the full traceback above that line?"); it is worth more than three speculative fixes. If you do not understand something, say so instead of filling the gap with a confident guess.
+## Signs you are guessing
 
-## Phase 4: fix and verify
+Go back to step 1 when you catch yourself planning to investigate after the fix, changing something to see what happens, changing several things in one run, fixing a cause you cannot explain, working from a skim of a reference, or listing fixes before tracing where the bad value comes from. The user is saying the same when they ask whether something is really happening or say the work is going in circles.
 
-In a project with tests, first write a test that reproduces the failure and see it fail for the right reason (trustworthy-tests). Then make the minimum change that addresses the root cause. Verify the original failure is gone by the same means that showed it, then check the obvious neighbors: other call sites, the same pattern elsewhere.
+## Fixes that hide the bug
 
-Count your attempts. If a fix does not work, return to Phase 1 with the new information instead of stacking another fix. After two failed fixes, stop fixing: restate your assumptions and the evidence, and change approach. When each fix reveals a new problem somewhere else, that is the signature of a wrong design, not a wrong line: say so and discuss the structure.
-
-## Red flags: stop and return to Phase 1
-
-- "Quick fix now, investigate later."
-- "Just try changing X and see."
-- "It's probably X, let me fix that."
-- "I'll change these three things and run it."
-- "I don't fully understand this but it might work."
-- "The reference is long, I'll adapt the gist."
-- "One more attempt", after two failed ones.
-- Listing candidate fixes before tracing the data flow.
-
-The user signals the same when they say: "stop guessing", "is that actually happening?", "will that even show us anything?", "are we stuck?"
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "It's simple, skip the process" | Simple bugs have root causes too, and the process is fast on them. |
-| "Emergency, no time to investigate" | Diagnosis is faster than guess-and-check thrashing. |
-| "Try this first, then investigate" | The first fix sets the pattern for the whole session. |
-| "Multiple changes at once save time" | If it starts working you learned nothing and carry changes you did not need. |
-| "I can see the problem" | Seeing the symptom is not understanding the cause. |
-| "I'll just add a retry or a try/except" | That hides the current bug and the next one. |
-| "One more fix attempt" (after two) | Repeated failure means the model of the problem is wrong. |
-
-## Symptom patches to refuse
-
-Swallowing the exception, wrapping a race in a retry, special-casing the input that crashed, defaulting a key that was legitimately missing, broad defensive try/except with no failure mode in mind. Each turns a loud bug into a silent one.
+Do not swallow the exception, retry around a race, special-case the input that crashed, default a value that was missing for a reason, or wrap code in a broad try/except with no failure in mind. Each turns a visible failure into a silent one.
 
 ## Output
 
-1. Root cause: what is wrong, in a sentence or two, with the evidence that establishes it.
-2. Fix: as small as it can be.
+1. Cause: what is wrong, in one or two sentences, with the evidence that shows it.
+2. Fix: as small as the cause allows.
 3. Verification: how it was confirmed, or how to confirm it.
-4. Remaining uncertainty, only if material (for example "this fits the traceback but I couldn't reproduce it locally").
+4. What is still uncertain, only when it matters (for example "this fits the traceback, but I could not reproduce it locally").
 
-Keep narration short. Say "likely" when it is likely.
+Say "likely" when it is likely, and keep the narration short.
 
 Example: an intermittent KeyError: 'user_id' in a request handler.
-Weak: replace the lookup with a default value; now it silently returns wrong data.
-Strong: the key is absent only on requests that bypass the session middleware, which is why it happens on the health-check path: that route is registered outside the middleware stack. Register it inside, or exclude the path in the handler. Reproduced on demand by calling /health.
+Weak: replace the lookup with a default value, so the handler now returns wrong data without an error.
+Strong: the key is missing only on requests that skip the session middleware, which is why it happens on the health-check path: that route is registered outside the middleware stack. Register it inside, or exclude the path in the handler. Reproduced on demand by calling /health.
 
 ## Related
 
