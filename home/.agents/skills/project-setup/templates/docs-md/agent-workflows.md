@@ -101,7 +101,7 @@ Verify before use (files and symbols the next session depends on):
 ```
 
 A handoff that must outlive the session goes to
-.private/handoff/<date>-<slug>.md. Missing commands are never fine.
+.private/handoff/<date>-<slug>.md. Commands still needed lists every documented gate not run since the last change, never empty by omission.
 
 ## Progress log template
 
@@ -127,7 +127,7 @@ Deviations from the spec or plan:
 Open questions:
 ```
 
-Every implementation that needs a plan keeps one at
+Every implementation keeps one at
 .private/progress/<slug>.md, updated after each step and when each decision is
 taken, from what happened rather than from intent. Decisions by the agent stay
 "Review: pending" until the maintainer keeps or changes them. It is local and

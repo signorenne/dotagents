@@ -8,11 +8,11 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 ## 1. Requirements
 
-If given a spec path, read the whole spec; it is the source of requirements, and anything it leaves open goes to the user as a question (decide skill), not a guess. Otherwise restate the task in one line with explicit success criteria. Read the project's decision log if it has one. If a progress log for this task exists (section 5), read it before anything else: it says which steps are done and which decisions were taken. It is a map, so check it against git log and the code in step 3.
+If a progress log for this task exists (section 5), read it first: it says which steps are done and which decisions were taken, and it is a map, so check it against git log and the code in step 3. If given a spec path, read the whole spec; it is the source of requirements. Anything it leaves open that belongs to the user (scope, public API, architecture, trade-offs) goes to the user (decide skill), not a guess; routine engineering choices are yours and go in the progress log as by agent. Without a spec, restate the task in one line with explicit success criteria. Read the project's decision log if it has one.
 
 ## 2. Workflow
 
-Pick the matching workflow from the project's docs (its AGENTS.md recipes and agent workflows doc). Its steps and exit criteria are binding; when none matches, follow this skill's steps.
+Pick the matching workflow from the project's docs (its AGENTS.md recipes and agent workflows doc). Its steps and exit criteria are binding and add to this skill's steps; where they conflict, the project's workflow wins. When none matches, follow this skill's steps.
 
 ## 3. Ground in the current code
 
@@ -24,7 +24,7 @@ List the steps. Each step is one logical change that becomes one commit, with it
 
 ## 5. Progress log
 
-Once the plan is approved (or needs no approval), create the task's progress log in the project's working-notes location: .private/progress/<slug>.<ext> when .private/ is git-ignored, otherwise ask once where it goes. Use the project's progress template when it has one, in the project's prose format; the slug is the spec's slug, or without a spec the slug of the branch that section 6 creates. The log is how the user reviews the work and how a later session resumes it, so keep it current as you go, not at the end:
+Once the plan is approved (or needs no approval), create the task's progress log in the project's working-notes location: .private/progress/<slug>.<ext> when .private/ is git-ignored, otherwise ask once where it goes. Use the project's progress template when it has one, in the project's prose format; the slug is the spec's slug, or without a spec a short kebab-case name of the task, also used for the branch in section 6. The log is how the user reviews the work and how a later session resumes it, so keep it current as you go, not at the end:
 
 - Before editing for a step: set its status to in progress with the files it will change. A later session that finds a step in progress with no matching commit shows the diff of those files and asks the user whether to finish or discard it; it discards nothing without that answer. When the user said not to commit, a finished step is done with "not committed" in place of the hash.
 - After each step: its status, commit hash and subject, the check run with its result, and for each behavior a new or changed test pins, the run that showed its test failing first (none for a test only moved or renamed).
@@ -42,7 +42,7 @@ If on main or master, create a branch first: <type>/<slug>, with the type from t
 ## 7. Build each step
 
 - Announce in one line what you will change and where, then edit. Re-read a file before editing it again after a formatter or another tool touched it.
-- Behavior change: write or update the test first, following the trustworthy-tests skill if it is available, and see it fail for the right reason before writing the code that makes it pass. Bug: make the test fail on the unfixed code before the fix. Change an existing test's expected value only with the evidence the global rules require; a test that would pass only if deleted, skipped or loosened is a question for the user, not an edit.
+- Behavior change: write or update the test first, following the trustworthy-tests skill if it is available, and see it fail for the right reason before writing the code that makes it pass. Bug: make the test fail on the unfixed code before the fix. Change an existing test's expected value only with the evidence the global rules require; a failing test that could pass only by being deleted, skipped or loosened is a question for the user, not an edit, except deleting the test of a behavior the approved spec or plan removes.
 - Keep the project's deliverable set in sync within the step (for example header and API docs, test, example, guide, build lists, umbrella include).
 - Run the narrowest check (one test binary or test case). Run short commands directly; delegate to gate-runner when output is long.
 - Commit the step in the project's convention, unless the user said not to commit.

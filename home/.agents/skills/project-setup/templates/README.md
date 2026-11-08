@@ -12,7 +12,7 @@ it writes them down.
 | AGENTS.md.template | AGENTS.md at the repository root | yes |
 | docs-md/ or docs-org/ | the project's docs folder (decisions, agent-workflows) | yes, in the project's prose format |
 | gitignore-snippet.txt | appended to .gitignore | yes |
-| bridges/GEMINI.md.template | GEMINI.md, only if contributors use Gemini CLI without the global setup | no |
+| bridges/GEMINI.md.template | GEMINI.md, only if contributors use Gemini CLI without context.fileName including AGENTS.md | no |
 | bridges/CLAUDE.md.template | CLAUDE.md, only for notes that apply to Claude Code alone | no |
 | claude/settings.json | .claude/settings.json, for fewer permission prompts | no |
 | project-skill/SKILL.md.template | .agents/skills/<name>/SKILL.md, plus the symlink .claude/skills/<name> | no |
@@ -28,6 +28,6 @@ it writes them down.
 ## Why AGENTS.md alone
 
 Claude Code (when no CLAUDE.md exists), Codex, Copilot and Cursor read AGENTS.md
-natively; Gemini CLI reads it through the global setup (context.fileName). Bridges
-help only people without that setup, and every extra bridge makes Copilot CLI and
+natively; Gemini CLI reads it when its context.fileName setting includes AGENTS.md.
+Bridges help only people without that setting, and every extra bridge makes Copilot CLI and
 Cursor, which also read CLAUDE.md, load the same rules twice.

@@ -48,10 +48,9 @@ For any task, read this file, then only the docs the task needs:
 ## Hard rules
 
 <FILL: only rules whose removal would cause mistakes: language standard, naming,
-error model, dependency policy, doc format, commit subject format. One line each,
+error model, dependency policy, doc format, commit subject format, a typography rule the project enforces. One line each,
 with the owning doc linked.>
 
-- No em dash or en dash characters in code, docs, comments or commits.
 
 ## Validation commands
 
