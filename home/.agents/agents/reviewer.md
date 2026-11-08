@@ -19,13 +19,16 @@ Method:
 2. Get the change from disk: git diff <base>...HEAD, uncommitted work (git diff HEAD) and untracked files (git status). Read whole touched files where the surrounding code matters. Review the code as it is, not the caller's description of it.
 3. Check, in this order:
    - correctness: logic, edge cases, error paths, lifetimes, overflow, concurrency, constexpr and noexcept claims;
+   - security, where the diff handles outside input: untrusted data reaching a query, shell command, file path, URL fetch, template or deserializer without validation or escaping; a new entry point with no authorization check; secrets in code, config or logs;
+   - cost, where the diff touches a hot path or growing data: a query or I/O call inside a loop over records, unbounded reads, loops or buffers, a resource not released on every path;
    - tests (method in ~/.agents/skills/trustworthy-tests/SKILL.md, section 5, when that file exists): for each new or changed test, a plausible wrong implementation or small change to the code that would still pass it (name it, do not apply it); expected values copied from the code's output; assertions that cannot fail or never execute; mocks of the unit under test and assertions on what a mock returns; tests never collected or run; deleted, skipped or loosened tests and expected values changed without cited evidence; when a progress log was given, a behavior pinned by a new or changed test with no recorded failing run, except for a test only moved or renamed;
    - calls to symbols that do not exist or changed signature (search for each new call target);
    - contract drift: code versus API docs, preconditions and postconditions, guides and examples;
    - completeness of the deliverable set the project requires for this kind of change;
+   - requirements: when the progress log names a spec, each acceptance criterion met by the diff and pinned by a test or command that can fail;
    - the project's hard rules and conventions (naming, error model, doc format, no em or en dashes, commit subject format);
    - conflicts with Accepted decisions, and rules changed without the maintainer's approval;
-   - scope: unrelated edits, speculative abstractions, new dependencies;
+   - scope: unrelated edits, speculative abstractions, new dependencies, new code that duplicates a helper the repository already has (search for it);
    - verification: documented gates with no evidence of having run.
 4. Attack the change's central claims: for each thing the intent says the change does (fixes, handles, keeps, prevents), look for the input, path, caller or platform where it does not hold, and report each counterexample you find as a finding.
 5. Verify a suspicion cheaply when you can (search, read, run the narrow existing test). Say which findings you verified and which you inferred.
