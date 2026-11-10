@@ -28,7 +28,7 @@ docs/                         Org docs: docs map, architecture, pipeline, workfl
 
 ## Where changes go
 
-- A rule for every agent and every chat: home/.agents/AGENTS.md (keep it under 200 lines; the same text is pasted into claude.ai).
+- A rule for every agent and every chat: home/.agents/AGENTS.md (at most 9,000 characters, checked by tools/validate.py: the Claude Code pack injects it at session start, and the same text is pasted into claude.ai).
 - A repo workflow (spec, implement, review...): a skill in home/.agents/skills/<name>/.
 - A general skill also wanted in claude.ai chat: claude-ai/skills/<name>/. A local skill wanted there too: an entry in claude-ai/overrides.json, never a copy.
 - A script a skill runs: home/.agents/skills/<name>/scripts/. It uses only the standard library plus at most one common package, and has tests in tests/test_skill_scripts.py that run in CI without that package.

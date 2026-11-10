@@ -46,6 +46,16 @@ class Tools(unittest.TestCase):
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_validate_holds_the_global_rules_under_the_session_hook_cap(self):
+        rules = self.repo / "home/.agents/AGENTS.md"
+        text = rules.read_text()
+        rules.write_text(text + "x" * (9000 - len(text)))
+        self.assertEqual(self.run_tool("validate.py").returncode, 0)
+        rules.write_text(text + "x" * (9001 - len(text)))
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("FAIL home/.agents/AGENTS.md: 9001 characters (limit 9000", result.stdout)
+
     def test_validate_rejects_a_toml_end_marker_in_a_subagent(self):
         scout = self.repo / "home/.agents/agents/scout.md"
         scout.write_text(scout.read_text() + "\nA TOML end marker: '''\n")

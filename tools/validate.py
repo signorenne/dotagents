@@ -72,6 +72,9 @@ CLAUDE_AI_LIMIT = 200
 # After compaction Claude Code keeps the first 5,000 tokens of each invoked skill:
 # 20,000 bytes is that budget at about 4 bytes per token.
 SKILL_BODY_LIMIT = 20000
+# The Claude Code pack injects the global rules through a SessionStart hook, whose output
+# Claude Code caps at 10,000 characters (over it the model sees a 2,000-character preview).
+GLOBAL_RULES_LIMIT = 9000
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}  # Claude Code's subagent effort levels
@@ -469,9 +472,10 @@ def main() -> int:
             except SyntaxError as error:
                 errors.append(f"{rel}: {error}")
 
-    lines = len((HOME / "AGENTS.md").read_text(encoding="utf-8").splitlines())
-    if lines > 200:
-        errors.append(f"home/.agents/AGENTS.md: {lines} lines (limit 200)")
+    rules = (HOME / "AGENTS.md").read_text(encoding="utf-8")
+    if len(rules) > GLOBAL_RULES_LIMIT:
+        errors.append(f"home/.agents/AGENTS.md: {len(rules)} characters (limit {GLOBAL_RULES_LIMIT}: "
+                      "the Claude Code pack injects it at session start)")
 
     for error in errors:
         print(f"FAIL {error}")
