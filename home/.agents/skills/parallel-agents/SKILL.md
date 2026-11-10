@@ -14,8 +14,8 @@ You are the coordinator: you split the work, brief the agents, merge their branc
 - Start with up to 3 writers and never run more than 5: beyond that, results get worse, not faster.
 - Settle the choices that belong to the user before launching (decide skill): an agent that meets an open choice guesses, and two agents guess differently.
 - A change that applies one rule across many files splits by the mechanical-changes skill.
-- Show the split before launching (the agents, the files each owns, the base, the target branch, the gates) and wait for the user's approval. The target is an integration branch unless the user asked to merge into main or master. With the implement skill, you do its sections 1 to 4 for the whole task and each brief carries its approved plan steps, so an agent starts at section 5 and needs no approval of its own.
-- Keep your own progress log for the whole task (implement section 5): the split, the target, the merge order, how you resolved each conflict, and after each rebase which landed commit each agent commit became (the agents' logs name the hashes from before the rebase).
+- Show the split before launching (the agents, the files each owns, the base, the target branch, the gates) and wait for the user's approval. The target is an integration branch unless the user asked to merge into main or master. With the build skill, you do its sections 1 to 4 for the whole task (one plan, approved once) and give each agent its own plan file holding its approved steps, so it starts at build section 5 and needs no approval of its own.
+- Keep the whole task's plan file yourself: the split, the target, the merge order, how you resolved each conflict, and after each rebase which landed commit each agent commit became (the agents' plans name the hashes from before the rebase).
 
 ## 2. Isolate each agent
 
@@ -25,7 +25,7 @@ You are the coordinator: you split the work, brief the agents, merge their branc
 | build directory | one per worktree, used only with the toolchain that configured it (a build directory made inside a container is built only inside it) |
 | scratch files | one subfolder per agent, named in its brief |
 | source files | one owner per file. Two tasks that need the same file run one after the other: the second starts from the target after the first is merged |
-| target branch and main checkout | only the coordinator touches them, except each agent's own progress log in the main checkout's .private/ |
+| target branch and main checkout | only the coordinator touches them, except each agent's own plan file and log in the main checkout's .private/plans/ |
 
 Keep the machine awake during long runs: a session caught by sleep mid-response can come back unresponsive.
 
@@ -34,10 +34,10 @@ Keep the machine awake during long runs: a session caught by sleep mid-response 
 An agent knows this conversation only through its brief (it does load the project's instruction files). Each brief holds:
 
 - the goal and why it matters, the acceptance criteria this agent owns, the user's binding decisions quoted, and what was ruled out;
-- its worktree path, branch, base commit, scratch folder and progress log path (the absolute path of .private/progress/<slug>-<agent>.<ext> in the main checkout, so the logs of agents on one spec do not collide); the files it owns and the folders it must not touch; the other agents running and what they own;
+- its worktree path, branch, base commit, scratch folder and plan file path (the absolute path of .private/plans/<slug>-<agent>.<ext> in the main checkout, so the agents of one task do not collide); the files it owns and the folders it must not touch; the other agents running and what they own;
 - where to start (files and lines), as a starting point: it reports where it had to go beyond it;
 - the build and test commands for its worktree, the commit style and the gates;
-- the rules: follow the implement skill from section 5 with the plan steps in this brief, when available; commit each verified step; never merge, push, or touch the target branch or the main checkout, except its progress log in the main checkout's .private/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
+- the rules: follow the build skill from section 5 with the steps of its plan file, when available; commit each verified step; never merge, push, or touch the target branch or the main checkout, except its plan file and log in the main checkout's .private/plans/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
 - what to return: its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
 
 ## 4. Watch
@@ -51,10 +51,10 @@ An agent knows this conversation only through its brief (it does load the projec
 
 Land into the target of the approved split, one branch at a time, the one others depend on first. git merge-tree --write-tree <target> <branch> shows conflicts without changing anything.
 
-1. Copy any git-ignored notes the agent left in its worktree into the main checkout's .private/ under their own names, because removing a worktree deletes its ignored files; its progress log is already there.
+1. Copy any git-ignored notes the agent left in its worktree into the main checkout's .private/ under their own names, because removing a worktree deletes its ignored files; its plan file is already there.
 2. Land the branch as the isolated-work skill says (section 3: pin, rebase onto the target's tip, gate the pinned commit, fast-forward, remove the worktree and the branch), and note in your log which agent commit became which landed commit.
 3. The branches still open rebase onto the new tip before their own landing: two branches that pass alone can fail together.
 
 ## 6. Report
 
-With the implement skill, once the last branch has landed, run its review and report (sections 9 and 10) on the integrated result: everything the target gained since the base commit of the split. Then, for each agent: its branch, the merged commit, the gate results on it, what is left open, and the decisions waiting for the user, including the agent decisions its progress log marks Review: pending. Then what is still running, and the worktrees and branches left to clean up.
+With the build skill, once the last branch has landed, run its review and finish (sections 7 and 8) on the integrated result: everything the target gained since the base commit of the split. Then, for each agent: its branch, the merged commit, the gate results on it, what is left open, and the decisions waiting for the user, including the rulings its plan file marks pending. Then what is still running, and the worktrees and branches left to clean up.

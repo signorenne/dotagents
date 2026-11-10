@@ -24,13 +24,15 @@ Propose no fix in this step.
 
 Find the closest thing that works: another caller, a passing test, a reference implementation, the previous release. Write down every difference between the two, including the ones that look irrelevant. When a reference is the model, read all of it.
 
+When an older commit works and the history between is long, let git find the first bad commit instead of reading the history: git bisect start <bad> <good>, then git bisect run <a command that exits 0 on good and 1 on bad>, then git bisect reset. The command must test only the failure, so an unrelated breakage on the way does not mislead it (exit 125 skips a commit that cannot be tested).
+
 ## 3. One hypothesis, tested
 
 Name a single cause and the evidence for it in one sentence ("the cache returns the old entry because its key ignores the locale"). It has to account for everything you collected, including why the working case works. Test it with the smallest probe (a log line, a breakpoint, a narrowed test, a short script), changing one thing at a time. If evidence only the user has would settle it, ask for that one item. Where you do not understand something, say so.
 
 ## 4. Fix the cause and prove it
 
-- In a repository where the fix goes through the implement skill, stop at the cause and the reproduction: implement writes the failing test and the fix.
+- In a repository where the fix goes through the build skill, stop at the cause and the reproduction: build writes the failing test and the fix.
 - Otherwise, in a project with tests, first add a test that reproduces the failure and watch it fail for this reason (trustworthy-tests).
 - Change as little as the cause needs. Show that the original failure is gone by the same means that showed it, then look for the same pattern elsewhere.
 - A fix that does not work sends you back to step 1 with what it taught you; do not stack a second fix on it. When each fix moves the problem somewhere else, the design is wrong rather than a line: say so.
@@ -67,4 +69,4 @@ Strong: the key is missing only on requests that skip the session middleware, wh
 
 ## Related
 
-Once the cause is established, apply the fix with the implement skill where it is available and the fix is more than a one-sentence change, otherwise with minimal-editing. Before saying it is fixed, apply verifying-before-claiming-done.
+Once the cause is established, apply the fix with the build skill where it is available and the fix is more than a one-sentence change, otherwise with minimal-editing. Before saying it is fixed, apply verifying-before-claiming-done.

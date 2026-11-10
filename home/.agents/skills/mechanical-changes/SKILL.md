@@ -8,7 +8,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LIC
 
 Goal: one transformation applied at every site, nothing else changed, every step provable. A change that also alters behavior is two changes: make the behavior change in its own commits, before or after.
 
-Run it as an implement task when that skill is available: the rulebook, the site count and the shards are the plan, the trial in section 4 is its first step, each shard is one step and one commit on the task branch (or, split across agents, lands from its agent's branch), and the review in check 6 goes to the reviewer subagent.
+Run it as a build task, in the full lane, when that skill is available: the rulebook, the site count and the shards are the plan, the trial in section 4 is its first step, each shard is one step and one commit on the task branch (or, split across agents, lands from its agent's branch), and the review in check 6 goes to the reviewer subagent.
 
 ## 1. Baseline and rulebook
 

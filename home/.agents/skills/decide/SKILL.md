@@ -1,6 +1,6 @@
 ---
 name: decide
-description: "Guides the user to a project decision step by step with maieutic (Socratic) questions instead of deciding for them: establishes what is known, isolates the missing information that would change the choice, asks one question at a time with a recommended option and its consequences, then confirms and records the decision. Use when the user asks for help to decide, choose or settle a design, scope, API, architecture, workflow or adoption question in a project (including which library, tool or service it adopts), when a plan or spec reaches a choice that belongs to the user, or when the user invokes decide."
+description: "Guides the user to a project decision step by step with maieutic (Socratic) questions instead of deciding for them: establishes what is known as an assumptions table, isolates the missing information that would change the choice, asks only those questions (in one batch when independent) each with a recommended option and its consequences, then confirms and records the decision. Use when the user asks for help to decide, choose or settle a design, scope, API, architecture, workflow or adoption question in a project (including which library, tool or service it adopts), when a plan or spec reaches a choice that belongs to the user, or when the user invokes decide."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
@@ -18,14 +18,16 @@ State in one line: the decision, its scope, and why it is needed now. If the req
 
 Collect what the sources already settle: current code and docs (re-read them, do not rely on memory), the project's decision log (Accepted entries bind), and the user's earlier answers in this session. Label each item: fact (with its source), user's statement, or your inference. Check each factual statement and inference the choice rests on against the sources (the user's preferences and goals are inputs, not claims to test): when a fact contradicts one, say so with the evidence in your next question instead of building on it; when one that would change the choice cannot be checked, say that it is untested.
 
+Show the result first, as the assumptions table: each item the choice rests on, its evidence, what breaks if it is wrong, and how sure it is (sure, likely, unclear). The user corrects a wrong row before any question is asked.
+
 ## 3. Isolate the delta
 
 List the open points. Keep only those whose answer would change the choice. If none remain, go to step 5.
 If a question depends on a concept the user may not know (judge by evidence in the session, not by a default level), add the missing prerequisite in one sentence inside the question.
 
-## 4. Ask, one question per turn
+## 4. Ask, in one batch
 
-Ask the open point whose answer removes the most uncertainty. The user must be able to answer it with what they already know. Use this shape:
+Ask the open points together when their answers do not depend on each other; a point whose options depend on another answer comes after it. Lead with the point that removes the most uncertainty. The user must be able to answer it with what they already know. Use this shape:
 
 ```
 Question: one sentence.
@@ -35,13 +37,13 @@ B) <option>: consequence in one line.
 If you say "decide": I will take A.
 ```
 
-Use the tool's multiple-choice question interface when it has one, otherwise plain text. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Group questions only when they are independent and low stakes, at most four, each with its default.
+Use the tool's multiple-choice question interface when it has one, otherwise plain text. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Each question in a batch carries its own default, so the user can answer only the ones they care about.
 
 After each answer, update the established list in one line. If the answer contradicts an earlier answer, an Accepted decision or a fact, show both sides and ask which one holds; never resolve a contradiction silently.
 
 ## 5. Converge
 
-Stop asking when the remaining unknowns would not change the outcome. If more than five questions seem necessary, the decision is too large: split it, or propose a spec first.
+Stop asking when the remaining unknowns would not change the outcome. If more than five questions seem necessary, the decision is too large: split it, or propose a design first.
 Then state:
 
 ```

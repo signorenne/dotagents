@@ -1,6 +1,6 @@
 ---
 name: notes-from-work
-description: "Turns what a work session found (a bug's cause and fix, a workaround, a technique, a tool's surprising behavior) into short notes in the user's knowledge vault, each confirmed, attacked by an independent agent and landed on the vault's main only after the user approves. Use when the user asks to save, note, keep or harvest what was learned, found or fixed into their notes, vault, knowledge base or memex; prefer it over atomic-notes for findings from work. Not for the state of the work for the next session (session-close) or for notes on how to work in one project, which stay in its docs."
+description: "Turns what a work session found (a bug's cause and fix, a workaround, a technique, a tool's surprising behavior) into short notes in the user's knowledge vault, each confirmed, attacked by an independent agent and landed on the vault's main only after the user approves. Use when the user asks to save, note, keep or harvest what was learned, found or fixed into their notes, vault, knowledge base or memex; prefer it over atomic-notes for findings from work. Not for the state of the work for the next session (close) or for notes on how to work in one project, which stay in its docs."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
@@ -12,7 +12,7 @@ The vault is the one the user's global instructions name, or the one the user na
 
 ## 1. Collect
 
-- Take the findings from the current session, or from what the user points at: a progress log, a handoff, an agent memory file.
+- Take the findings from the current session, or from what the user points at: a plan file, a handoff, an agent memory file.
 - Keep a finding that holds beyond this task: a bug's cause and fix, a workaround, a technique, a tool's surprising behavior. Leave out how to work in one project (its paths, what not to touch): that stays in the project's docs.
 - State each as one claim in general terms with its conditions: the tool and version, the setup, what was being done.
 - Leave out secrets, tokens, internal hostnames and client code. A finding from work under a confidentiality duty is stated only in general terms, and the user decides whether it goes in at all.

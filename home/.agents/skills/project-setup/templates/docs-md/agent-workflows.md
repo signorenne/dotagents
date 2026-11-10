@@ -4,56 +4,64 @@ Owns the reusable multi-step workflows for AI agents and human contributors.
 AGENTS.md carries the short working-memory floor; this file carries the
 playbooks.
 
-## Common sequence
+## Lanes
 
-1. Scout: read the docs the task needs, inspect the touched area, identify
-   owners, nearby tests and examples, risks, existing components worth reusing,
-   and the Accepted decisions that constrain the task.
-2. Plan: choose files, steps, validation commands, and the smallest coherent
-   scope. Each step becomes one commit.
-3. Implement: re-read the code before each edit, then change code, tests,
-   examples and docs together. Log each step and each
-   decision (by the maintainer or by the agent) in the progress log.
-4. Review: inspect the diff for behavior, missing coverage, drift, and commands
-   that still need to run.
+The agent investigates first (the docs the task needs, the touched area, its
+owners, nearby tests and examples, reusable components, and the accepted
+entries in the decision log), asking nothing the files can
+settle, then names the lane, which the maintainer can override in one word:
 
-## Spec workflow
+- direct: one sentence, one or two known files. Change, narrow check,
+  report; no plan file.
+- quick: about 100 changed lines or fewer, no risk surface, no choice that
+  is the maintainer's. A short plan file, announced and not awaited, one quick
+  review.
+- full: anything larger, or any risk surface (public API, data migration,
+  security, new dependency, threading, the build, an irreversible step). The
+  plan file, one approval that holds every question, the full review.
 
-Use this before a new module, a public component with open design choices, or
-any change that spans modules. Skip it when the diff fits in one sentence.
+A lane goes up when the work proves larger, never down. Each step is one
+commit with its check. During the work the agent stops only for a change to
+the approved intent, an unplanned public API, architecture, dependency or
+migration, an irreversible or security-sensitive action, a test that would
+pass only by being weakened, a conflict with an accepted decision, or two
+failed approaches; other choices are rulings recorded in the plan for the
+maintainer's review.
+
+## Design workflow
+
+Use this when a change needs several plans: a new module, a public component
+with open design choices, or a change across modules.
 
 1. Scout the area, including the decision log.
-2. Settle each open design choice with the maintainer, one question at a time,
-   with a recommended option and the consequence of each option. Ask only what
-   no owning doc or Accepted decision settles.
-3. Write a self-contained implementation spec to .private/specs/<slug>.md with
-   the sections below. A reader without access to the discussion must be able
-   to implement it: name files, types, functions, error behavior and commands.
-4. Record each new decision that meets the bar in the decision log's "When to
-   record", following its authority rules.
-5. Verify the spec before handing it over: a subagent that did not write it,
-   told not to edit anything, checks every file, symbol, signature, command and
-   external fact the spec names against the current code and the cited
-   documentation, and reports each claim that is wrong or unverifiable with its
-   evidence (without subagents, do the check yourself after re-reading each
-   source). Fix the spec; before keeping any change to a requirement or
-   decision already settled, show it to the maintainer.
-6. Stop. Implement from the spec in a fresh session in the same checkout.
-   .private/ is untracked, so the spec does not follow into a new worktree or
-   clone; pass it by absolute path there.
+2. Show the assumptions (evidence, what breaks if wrong, how sure) and the
+   open design choices that are the maintainer's, each with options,
+   consequences and a recommendation, in one batch when they are independent.
+3. Write the design to .private/designs/<slug>.md with the sections below.
+   A reader without access to the discussion must be able to build from it:
+   name files, types, functions, error behavior and commands.
+4. Record each new decision that meets the bar in "When to record" of
+   the decision log, following its authority rules.
+5. Verify the design before handing it over: a subagent that did not write
+   it, told not to edit anything, first paraphrases it, then checks every
+   file, symbol, signature, command and external fact it names against the
+   current code and the cited documentation (without subagents, do it
+   yourself after re-reading each source). Fix the design; show the
+   maintainer any change to a requirement or decision already settled.
+6. Stop. Each plan of the design is then built in a fresh session.
+   .private/ is untracked, so the design does not follow into a new
+   worktree or clone; pass it by absolute path there.
 
 ```text
 Objective:
 Non-goals:
 Affected areas and dependency constraints:
 Public surface (types, functions, error model):
-Reuse (existing components composed or extended):
+Decisions (accepted ids relied on, new ones proposed):
 Behavior and edge cases:
-Deliverables (tests, examples, docs, build wiring):
-Decisions (Accepted ids relied on, new ones proposed):
+Unchanged behavior (WHEN <condition> the system SHALL CONTINUE TO <behavior>, with its test):
 Acceptance criteria:
-Verification commands:
-Open questions:
+Plans, in order (scope, criteria owned, lane, risk, depends on, interface produced):
 ```
 
 ## Component change workflow
@@ -78,8 +86,9 @@ the exit criteria.>
 Review starts with findings, not summary. Check behavior and edge cases, calls
 to symbols that no longer exist, missing tests or examples, tests a wrong
 implementation would still pass, docs drift, build wiring, dependency policy,
-conflicts with Accepted decisions, and validation commands that were skipped.
-When there are no findings, say so and name the residual risk.
+conflicts with accepted decisions, and validation commands that were skipped.
+Each finding states its practical consequence; when there are no findings, say
+so and name the residual risk.
 
 ## Parallel work
 
@@ -87,52 +96,58 @@ Parallel work helps only when scopes do not touch the same files. Use separate
 git worktrees for parallel implementation, with one merge owner who integrates,
 resolves conflicts and runs the wider validation.
 
+## Plan file template
+
+```text
+# Plan: <change>
+
+- Status: draft | approved | in progress | in review | built | landed | blocked | dropped
+- Lane: quick | full
+- Risk: low | medium | high
+- Base: <short hash>
+- Branch: <type>/<slug>
+- Review: quick | full
+- Next: <one line a fresh session acts on>
+
+## Intent
+(frozen at approval: problem, approach, what must hold, out of scope,
+acceptance criteria, unchanged behavior with its tests, who approved and when)
+## Code map
+## Assumptions
+| Nr | Assumption | Check | Result |
+## Steps
+| Nr | Step | Files | Check | Status | Commit |
+## Verification
+## Rulings
+| Nr | Ruling | Why | Alternative | Cost if wrong | Review |
+## Dead ends
+## Review
+| Nr | Source | Severity | Location | Finding | Verdict | Evidence |
+```
+
+Every quick or full change keeps one at .private/plans/<slug>.md, updated
+as each step, ruling and finding happens, from what happened rather than from
+intent; the facts a command can record (checks, failing-first runs, gates,
+commits) go to <slug>.log beside it through scripts and hooks. Rulings stay
+"pending" until the maintainer keeps or changes them. A later session resumes
+from its Status and Next. It is local and never committed.
+
 ## Handoff template
+
+Only for a session whose state no plan file holds (research, an
+investigation):
 
 ```text
 Goal:
-Files touched:
+State:
 Decisions (log id and status):
 Open questions:
 Commands run:
 Commands still needed:
 Risks:
-Refuted assumptions (assumed, check that broke it, what changed):
 Verify before use (files and symbols the next session depends on):
-How to check it (per acceptance criterion: command or steps, expected visible result; mark what needs a human look):
+How to check it (per result: command or steps, expected visible result; mark what needs a human look):
 ```
 
-A handoff that must outlive the session goes to
-.private/handoff/<date>-<slug>.md. Commands still needed lists every documented gate not run since the last change, never empty by omission.
-
-## Progress log template
-
-```text
-Task:
-Spec: (path, or none)
-Branch:
-Plan approval: (by the maintainer on <date>, or not required: <reason>)
-Baseline: <command> on <commit> -> <result>
-
-Steps:
-1. <step> | status: todo, in progress or done | commit: <hash> <subject> | check: <command> -> <result>
-   failing run per behavior of new or changed tests: <command> -> <failing line>
-
-Decisions (newest last):
-P1 <date> by maintainer | by agent: <decision>
-   Why: <reason>
-   Alternative not taken: <option>
-   Decision log: <id and status, or below the recording bar>
-   Review: pending, kept, or changed (by P<n>)
-
-Refuted assumptions (assumed, check that broke it, what changed):
-Failed attempts (what was tried, the result, why it was dropped):
-Deviations from the spec or plan:
-Open questions:
-```
-
-Every implementation keeps one at
-.private/progress/<slug>.md, updated after each step and when each decision is
-taken, from what happened rather than from intent. Decisions by the agent stay
-"Review: pending" until the maintainer keeps or changes them. It is local and
-never committed.
+It goes to .private/handoff/<date>-<slug>.md. Commands still needed lists
+every documented gate not run since the last change, never empty by omission.

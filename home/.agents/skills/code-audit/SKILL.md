@@ -43,4 +43,4 @@ Give each candidate a check that could fail: a failing test, a command and its o
 3. Questions for the user: what was seen (file:line), why it is unclear, and the answer that would settle it, with no severity.
 4. Not checked: areas, configurations and risks left out.
 
-Fix nothing and commit nothing: a finding the user wants fixed goes through the implement skill, starting with a failing test.
+Fix nothing and commit nothing: a finding the user wants fixed goes through the build skill, starting with a failing test.

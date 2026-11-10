@@ -50,7 +50,7 @@ Run them in CI, not only by hand. When adopting the rules in an existing codebas
 
 ## Adding a feature
 
-Under spec or implement, these are the plan's steps.
+Under design or build, these are the plan's steps.
 
 1. Domain: the entities, value objects and rules it needs, with unit tests that need no framework.
 2. Application: the use case, its request and result types and any new port, tested with fakes of the ports.

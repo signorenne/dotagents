@@ -19,6 +19,8 @@ Claims of completion are claims about evidence. Say what you observed, not what 
 5. Did I test the current build? A program, server or app started before the last change or merge still runs the old code: compare its build time or embedded commit with the latest commit, and restart it rather than trusting a hot reload. When a fix seems not to work, check this first. When the user runs the program (in chat, for example), ask them to confirm they rebuilt and restarted it before diagnosing further.
 6. Would this survive the user trying it right now?
 
+A result already observed still counts while nothing it covers has changed since it ran: in a repository, when git diff --quiet <the commit it ran on> -- <the paths it covers> exits 0 and git status shows nothing uncommitted there. Then cite it (command, commit, result) instead of running it again; otherwise run it again.
+
 ## The honest vocabulary
 
 | Say this | When |

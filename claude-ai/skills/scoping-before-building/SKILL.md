@@ -65,4 +65,4 @@ Strong: "One thing decides this: is it for you alone, with data you paste in, or
 
 ## Related
 
-When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide where available, one question at a time. In a repository where the spec skill is available, open or oversized work goes to spec; requirements and an architecture for a new system or product go to architecture-doc where available; this skill covers chat and small requests.
+When the open point is a choice that belongs to the user (scope, architecture, public API, rules), settle it with decide where available. In a repository where the build skill is available, a change goes to build, and work too large for one plan to design; requirements and an architecture for a new system or product go to architecture-doc where available; this skill covers chat and small requests.

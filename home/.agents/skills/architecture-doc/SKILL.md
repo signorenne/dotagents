@@ -94,4 +94,4 @@ Give both documents, without your reasoning, to a subagent that did not write th
 
 ## 10. Report
 
-Document paths, decisions (taken by the user or by you), open questions, top risks, what was verified. Propose the build order, riskiest first (a walking skeleton or a spike), each step ready for the spec skill.
+Document paths, decisions (taken by the user or by you), open questions, top risks, what was verified. Propose the build order, riskiest first (a walking skeleton or a spike), each step ready for the design skill (build, when one plan is enough).

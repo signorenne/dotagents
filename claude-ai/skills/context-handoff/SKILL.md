@@ -57,4 +57,4 @@ The test before returning it: hand only this text to someone competent who never
 
 ## Related
 
-In a repository with the session-close skill, closing or handing off a session goes to session-close, which writes the project's handoff file from git and the commands actually run; this brief is for chat and for work outside a repository.
+In a repository with the close skill, closing or handing off a session goes to close, which brings the plan files up to date from git and the commands actually run; this brief is for chat and for work outside a repository.
