@@ -93,21 +93,42 @@ class Install(unittest.TestCase):
         mine.mkdir(parents=True)
         (mine / "SKILL.md").write_text("---\nname: my-review\n---\n", encoding="utf-8")
         (self.home / ".claude/skills").mkdir(parents=True)
-        for holder in ("Nicolò Plebani (nexenne)", "Nicolò Plebani (nexenne, signorenne)"):
-            with self.subTest(holder=holder):
-                old = self.home / ".agents/skills/review"
-                old.mkdir(parents=True)
-                (old / "SKILL.md").write_text('---\nname: review\nlicense: "MIT, Copyright (c) 2026 '
-                                              f'{holder}. See LICENSE.txt"\n---\n', encoding="utf-8")
-                (self.home / ".claude/skills/review").unlink(missing_ok=True)
-                (self.home / ".claude/skills/review").symlink_to(old)
-                self.install()
-                self.assertFalse(old.exists())
-                self.assertFalse((self.home / ".claude/skills/review").is_symlink())
-                self.assertTrue((self.home / ".claude/skills/branch-review").is_symlink())
-                self.assertTrue((mine / "SKILL.md").is_file())
-                saved = [path.read_text(encoding="utf-8") for path in (self.home / ".agents-backup").rglob("review/SKILL.md")]
-                self.assertTrue(any(f"{holder}. See" in text for text in saved), saved)
+        for name in ("review", "implement", "spec", "session-close"):
+            for holder in ("Nicolò Plebani (nexenne)", "Nicolò Plebani (nexenne, signorenne)"):
+                with self.subTest(name=name, holder=holder):
+                    (self.home / ".agents" / install.MANIFEST_NAME).unlink(missing_ok=True)  # an older install
+                    old = self.home / ".agents/skills" / name
+                    old.mkdir(parents=True)
+                    (old / "SKILL.md").write_text(f'---\nname: {name}\nlicense: "MIT, Copyright (c) 2026 '
+                                                  f'{holder}. See LICENSE.txt"\n---\n', encoding="utf-8")
+                    (self.home / ".claude/skills" / name).unlink(missing_ok=True)
+                    (self.home / ".claude/skills" / name).symlink_to(old)
+                    self.install()
+                    self.assertFalse(old.exists())
+                    self.assertFalse((self.home / ".claude/skills" / name).is_symlink())
+                    self.assertTrue((self.home / ".claude/skills/branch-review").is_symlink())
+                    self.assertTrue((self.home / ".claude/skills/build").is_symlink())
+                    self.assertTrue((mine / "SKILL.md").is_file())
+                    saved = [path.read_text(encoding="utf-8")
+                             for path in (self.home / ".agents-backup").rglob(f"{name}/SKILL.md")]
+                    self.assertTrue(any(f"{holder}. See" in text for text in saved), saved)
+
+    def test_the_renamed_stop_hook_leaves_no_file_and_no_entry(self):
+        # progress_check.py became step_log.py: an older install's script and its Stop
+        # entries would keep running a stale copy.
+        hooks = self.home / ".agents/hooks"
+        hooks.mkdir(parents=True)
+        (hooks / "progress_check.py").write_text("# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)\n")
+        old = {"type": "command", "command": 'python3 "$HOME/.agents/hooks/progress_check.py" || true', "timeout": 10}
+        for path in (self.home / ".claude/settings.json", self.home / ".codex/hooks.json"):
+            path.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [old, USER_HOOK]}]}}))
+        self.install("--tools", "claude,codex")
+        self.assertFalse((hooks / "progress_check.py").exists())
+        for path in (self.home / ".claude/settings.json", self.home / ".codex/hooks.json"):
+            text = path.read_text()
+            self.assertNotIn("progress_check.py", text, path)
+            self.assertIn("step_log.py", text, path)
+            self.assertIn("my_own.py", text, path)
 
     def test_a_folder_of_the_same_name_that_is_not_ours_stays(self):
         theirs = self.home / ".agents/skills/review"
@@ -166,13 +187,23 @@ class Install(unittest.TestCase):
         self.assertEqual(self.snapshot(), before)
         self.assertFalse((self.home / ".agents").exists())
 
-    def test_a_replaced_file_counts_as_one_change(self):
+    def test_a_file_changed_by_hand_is_kept_unless_forced(self):
+        # The manifest records each file's hash: an upgrade never overwrites the user's edit
+        # silently; --force backs it up and replaces it, one change.
         self.install()
-        (self.home / ".agents/AGENTS.md").write_text("edited by hand\n")
+        rules = self.home / ".agents/AGENTS.md"
+        rules.write_text("edited by hand\n")
         out = self.install()
+        self.assertEqual(rules.read_text(), "edited by hand\n")
+        self.assertIn("0 change(s).", out.splitlines())
+        self.assertIn(f"- Kept {rules}: it was changed by hand since the last install. Run install.py "
+                      "--force to back it up and replace it.", out.splitlines())
+        out = self.install("--force")
         summary = [line for line in out.splitlines() if "change(s)." in line]
         self.assertEqual(len(summary), 1, out)
         self.assertTrue(summary[0].startswith("1 change(s). "), summary[0])
+        self.assertEqual(rules.read_bytes(), (ROOT / "home/.agents/AGENTS.md").read_bytes())
+        self.assertIn("edited by hand\n", [p.read_text() for p in (self.home / ".agents-backup").rglob("AGENTS.md")])
 
     def test_shared_source_and_claude_links(self):
         self.install()
@@ -248,7 +279,8 @@ class Install(unittest.TestCase):
         merged = json.loads(settings.read_text())
         self.assertEqual(merged["model"], "opus")
         self.assertIn("Bash(npm test *)", merged["permissions"]["allow"])
-        self.assertIn("Bash(cmake --build *)", merged["permissions"]["allow"])
+        self.assertIn("Bash(git status *)", merged["permissions"]["allow"])
+        self.assertNotIn("Bash(cmake --build *)", merged["permissions"]["allow"])  # the personal layer's
         self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PostToolUseFailure", "PreCompact", "PreToolUse",
                                                   "SessionStart", "Stop"])
         self.install()
@@ -905,6 +937,206 @@ class Install(unittest.TestCase):
         out = self.install("--tools", "claude")
         self.assertIn("Could not parse", out)
         self.assertNotIn("skillOverrides", out)
+
+
+class Descriptions(unittest.TestCase):
+    """One suite for every tool description: what it declares is installed, its hooks name
+    scripts that exist with timeouts in its unit, a second run changes nothing, and
+    --uninstall leaves the folder as it was before the install."""
+
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.home)
+
+    def run_install(self, *args):
+        env = {**{k: v for k, v in os.environ.items() if k != "COPILOT_HOME"}, "HOME": str(self.home),
+               "PATH": "/usr/bin:/bin"}
+        result = subprocess.run([sys.executable, "-B", str(INSTALL), *args], env=env, capture_output=True,
+                                text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        return result.stdout
+
+    def tree(self) -> dict:
+        """Each file's content (a JSON file's parsed value, since a merge may re-indent it)
+        or link target, without the backups."""
+        def content(p: Path):
+            if p.is_symlink():
+                return os.readlink(p)
+            return json.loads(p.read_text()) if p.suffix == ".json" else p.read_bytes()
+        return {str(p.relative_to(self.home)): content(p) for p in sorted(self.home.rglob("*"))
+                if (p.is_file() or p.is_symlink()) and ".agents-backup" not in p.parts}
+
+    def hook_handlers(self, tool: str, spec: dict) -> list:
+        """(command, timeout) of each handler the tool's installed hook file holds."""
+        path = install.TOOL_DESCRIPTIONS[tool]
+        base = self.home / ".copilot" if spec["base"] == "$COPILOT_HOME" else self.home / spec["base"]
+        data = json.loads((base / spec["hooks"]["file"]).read_text())
+        if spec["hooks"]["how"] == "named":
+            events = [e for name, entry in data.items() if name.startswith("dotagents-") for e in entry.values()]
+        else:
+            events = list(data["hooks"].values())
+        found = []
+        for groups in events:
+            for group in groups:
+                for handler in group.get("hooks", [group]):
+                    found.append((handler.get("command") or handler.get("bash"),
+                                  handler.get("timeout", handler.get("timeoutSec"))))
+        return found
+
+    def test_every_description_installs_and_uninstalls_cleanly(self):
+        sources = sorted(p.name for p in (ROOT / "home/.agents/hooks").glob("*.py"))
+        for tool, spec in install.TOOL_DESCRIPTIONS.items():
+            with self.subTest(tool=tool):
+                for folder in spec["detect"]:
+                    (self.home / folder.replace("$COPILOT_HOME", ".copilot")).mkdir(parents=True, exist_ok=True)
+                (self.home / ".claude/settings.json").parent.mkdir(exist_ok=True)
+                (self.home / ".claude/settings.json").write_text('{"model": "mine"}\n')
+                before = self.tree()
+                self.run_install("--tools", tool)
+                base = self.home / spec["base"].replace("$COPILOT_HOME", ".copilot")
+                rules = spec.get("rules")
+                if rules and rules["how"] == "link":
+                    self.assertEqual(os.readlink(base / rules["file"]), str(self.home / ".agents/AGENTS.md"))
+                elif rules:
+                    self.assertIn("@~/.agents/AGENTS.md", (base / rules["file"]).read_text())
+                for name in AGENTS if spec.get("agents") else []:
+                    self.assertTrue((base / spec["agents"]["folder"] / spec["agents"]["file"].format(name=name))
+                                    .is_file(), name)
+                if spec.get("hooks"):
+                    limits = {"s": range(1, 601), "ms": range(1000, 600001)}[spec["hooks"]["unit"]]
+                    handlers = self.hook_handlers(tool, spec)
+                    self.assertTrue(handlers)
+                    for command, timeout in handlers:
+                        script = re.search(r"\.agents/hooks/([\w.]+\.py)", command).group(1)
+                        self.assertIn(script, sources, command)
+                        self.assertIn(timeout, limits, command)
+                self.assertIn("0 change(s).", self.run_install("--tools", tool).splitlines())
+                self.run_install("--uninstall")
+                self.assertEqual(self.tree(), before)
+
+    def test_uninstall_without_a_manifest_changes_nothing(self):
+        env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
+        result = subprocess.run([sys.executable, "-B", str(INSTALL), "--uninstall"], env=env,
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("No manifest", result.stderr)
+        self.assertEqual(list(self.home.iterdir()), [])
+
+
+class Manifest(unittest.TestCase):
+    def setUp(self):
+        self.home = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.home)
+        (self.home / ".claude").mkdir()
+
+    def run_install(self, *args, code=0):
+        env = {**{k: v for k, v in os.environ.items() if k != "COPILOT_HOME"}, "HOME": str(self.home),
+               "PATH": "/usr/bin:/bin"}
+        result = subprocess.run([sys.executable, "-B", str(INSTALL), "--tools", "claude", *args], env=env,
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, code, result.stderr)
+        return result.stdout
+
+    def manifest(self) -> dict:
+        return json.loads((self.home / ".agents" / install.MANIFEST_NAME).read_text())
+
+    def add_owned(self, rel: str, text: str, link: str = None) -> Path:
+        """Pretend the last install wrote rel: a file with text, or a link."""
+        path = self.home / rel
+        data = self.manifest()
+        folder = path.parent
+        while not folder.exists():  # the folders that install made, as it records them
+            data["dirs"].append(str(folder))
+            folder = folder.parent
+        path.parent.mkdir(parents=True, exist_ok=True)
+        if link:
+            path.symlink_to(link)
+            data["files"][str(path)] = {"scope": "claude", "link": link}
+        else:
+            path.write_text(text)
+            data["files"][str(path)] = {"scope": "shared", "sha256": install.digest(text.encode())}
+        (self.home / ".agents" / install.MANIFEST_NAME).write_text(json.dumps(data))
+        return path
+
+    def test_what_this_version_no_longer_installs_is_removed_unless_changed(self):
+        self.run_install()
+        gone = self.add_owned(".agents/skills/gone/SKILL.md", "old skill\n")
+        link = self.add_owned(".claude/skills/gone", "", link=str(self.home / ".agents/skills/gone"))
+        edited = self.add_owned(".agents/skills/edited/SKILL.md", "old\n")
+        edited.write_text("mine now\n")
+        out = self.run_install()
+        self.assertFalse(gone.exists() or gone.parent.exists())
+        self.assertFalse(link.is_symlink())
+        self.assertEqual(edited.read_text(), "mine now\n")
+        self.assertIn(f"- Kept {edited}: this version no longer installs it, and it was changed by hand.",
+                      out.splitlines())
+        self.assertIn(str(edited), self.manifest()["files"])
+        self.assertNotIn(str(gone), self.manifest()["files"])
+
+    def test_the_personal_layer_is_recorded_reused_and_dropped_on_request(self):
+        layer = self.home / "layer"
+        layer.mkdir()
+        (layer / "AGENTS.md").write_text("## Personal\n\n- My vault is ~/v.\n")
+        (layer / "claude-settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash(make *)"]}}))
+        rules = self.home / ".agents/AGENTS.md"
+        settings = self.home / ".claude/settings.json"
+        self.run_install("--personal", str(layer))
+        self.assertTrue(rules.read_text().endswith("\n\n## Personal\n\n- My vault is ~/v.\n"))
+        self.assertTrue(rules.read_text().startswith((ROOT / "home/.agents/AGENTS.md").read_text()))
+        self.assertIn("Bash(make *)", json.loads(settings.read_text())["permissions"]["allow"])
+        self.assertEqual(self.manifest()["personal"], str(layer))
+        self.assertIn("0 change(s).", self.run_install().splitlines())  # reused from the manifest
+        self.run_install("--no-personal")
+        self.assertEqual(rules.read_bytes(), (ROOT / "home/.agents/AGENTS.md").read_bytes())
+        self.assertIsNone(self.manifest()["personal"])
+
+    def test_uninstall_takes_back_the_personal_layer_too(self):
+        # The shared fragment adds the permissions key whole and the personal layer adds
+        # items to it; both come out, and a settings file the install created goes away.
+        layer = self.home / "layer"
+        layer.mkdir()
+        (layer / "claude-settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash(make *)"]},
+                                                                "enabledPlugins": {"x@y": False}}))
+        self.run_install("--personal", str(layer))
+        self.run_install("--uninstall")
+        self.assertFalse((self.home / ".claude/settings.json").exists())
+        self.assertEqual(sorted(p.name for p in self.home.iterdir()), [".agents-backup", ".claude", "layer"])
+
+    def test_a_personal_layer_with_hooks_is_refused_before_writing(self):
+        layer = self.home / "layer"
+        layer.mkdir()
+        (layer / "claude-settings.json").write_text(json.dumps({"hooks": {}}))
+        self.run_install("--personal", str(layer), code=1)
+        self.assertFalse((self.home / ".agents").exists())
+
+    def test_a_generic_target_gets_the_skills_and_the_rules_and_keeps_them(self):
+        opencode, qwen = self.home / ".config/opencode", self.home / ".qwen"
+        self.run_install("--target", str(opencode), "--target", f"{qwen}:QWEN.md")
+        for folder, rules in ((opencode, "AGENTS.md"), (qwen, "QWEN.md")):
+            self.assertEqual(os.readlink(folder / rules), str(self.home / ".agents/AGENTS.md"))
+            for name in PACK_SKILLS + ONLINE_SKILLS:
+                self.assertEqual(os.readlink(folder / "skills" / name), str(self.home / ".agents/skills" / name))
+        self.assertIn("0 change(s).", self.run_install().splitlines())
+        (opencode / "skills/build").unlink()  # as a skill new to this version would be missing
+        self.run_install()  # no --target: the recorded targets are installed again
+        self.assertEqual(os.readlink(opencode / "skills/build"), str(self.home / ".agents/skills/build"))
+        self.run_install("--uninstall")
+        self.assertFalse(opencode.exists() or qwen.exists())
+
+    def test_uninstall_keeps_the_users_values_and_files(self):
+        settings = self.home / ".claude/settings.json"
+        mine = {"model": "opus", "permissions": {"allow": ["Bash(npm test *)"]},
+                "hooks": {"Stop": [{"hooks": [USER_HOOK]}]}}
+        settings.write_text(json.dumps(mine))
+        self.run_install()
+        edited = self.home / ".claude/agents/scout.md"
+        edited.write_text("my scout\n")
+        out = self.run_install("--uninstall")
+        self.assertEqual(json.loads(settings.read_text()), mine)
+        self.assertEqual(edited.read_text(), "my scout\n")
+        self.assertIn(f"- Kept {edited}: changed by hand since the install.", out.splitlines())
+        self.assertFalse((self.home / ".claude/skills").exists())
+        self.assertFalse((self.home / ".agents" / install.MANIFEST_NAME).exists())
 
 
 if __name__ == "__main__":

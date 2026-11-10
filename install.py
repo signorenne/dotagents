@@ -9,16 +9,23 @@ repository, then run this script again to regenerate the per-tool copies.
   python3 install.py              install for the agents detected on this machine
   python3 install.py --dry-run    show what would change, change nothing
   python3 install.py --tools claude,codex,gemini,antigravity,copilot,cursor   choose explicitly
+  python3 install.py --personal DIR   also apply a personal layer (recorded for later runs)
+  python3 install.py --target DIR[:RULES]   also link the skills and rules into any folder
   python3 install.py --audit      list what in the agents' folders does not come from
                                   this repository, and broken links; changes nothing
+  python3 install.py --uninstall  remove what the manifest records and nobody changed since
 
 Every agent gets every skill from this repository. In Claude Code, the copies that
 claude.ai syncs of the same skills are turned off, so each skill loads once, from here.
 
+Every file this script writes is recorded with its hash in ~/.agents/.dotagents-manifest.json:
+a later run replaces only files still as installed (--force replaces the others too),
+removes what this version no longer installs, and --uninstall removes what it owns.
 Every file this script replaces is moved to ~/.agents-backup/<timestamp>/ first.
 """
 
 import argparse
+import hashlib
 import json
 import os
 import re
@@ -38,7 +45,6 @@ UPLOADED_EXTRA = PACK / "claude-ai" / "overrides.json"
 PATH_RULES = SRC / "path-rules.json"
 RULE_PREFIX = "dotagents-"
 SYNCED_PREFIX = "anthropic-skills:"
-TOOLS = ("claude", "codex", "gemini", "antigravity", "copilot", "cursor")
 # Hook scripts this repository installs, and those an older version kept in ~/.claude/hooks.
 OUR_HOOK_SCRIPTS = sorted(p.name for p in (SRC / "hooks").glob("*.py"))
 OLD_HOOK_SCRIPTS = ("guard_bash.py", "after_edit.py")
@@ -48,9 +54,10 @@ OUR_HOOK = re.compile(r"(?:{})(?![\w.-])".format("|".join(
     [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS + list(RETIRED_HOOK_SCRIPTS)]
     + [re.escape(f"/.claude/hooks/{name}") for name in OLD_HOOK_SCRIPTS])))
 OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
-# Skills this repository renamed or dropped (review became branch-review): an old copy
-# would still load in every tool that reads ~/.agents/skills.
-RETIRED_SKILLS = ("review",)
+# Skills this repository renamed or dropped before the manifest existed (review became
+# branch-review; implement, spec and session-close became build, design and close): an old
+# copy would still load in every tool that reads ~/.agents/skills.
+RETIRED_SKILLS = ("review", "implement", "spec", "session-close")
 OUR_LICENSE = "Nicolò Plebani (nexenne"  # matches "(nexenne)" before 7 November 2026 and "(nexenne, signorenne)" since
 CLAUDE_IMPORT = "@~/.agents/AGENTS.md"
 CLAUDE_MD = (
@@ -383,29 +390,200 @@ def merge_event_hooks(existing, ours: dict) -> dict:
     return result
 
 
-def merge_values(base, extra):
-    """Add keys and list items from extra; existing scalar values win."""
+def merge_values(base, extra, added: list = None, path: tuple = ()):
+    """Add keys and list items from extra; existing scalar values win. When added is a list,
+    each addition is recorded in it for --uninstall: ["key", path, value] for a new key,
+    ["item", path, value] for a new list item."""
     if isinstance(base, dict) and isinstance(extra, dict):
         for key, value in extra.items():
-            base[key] = merge_values(base[key], value) if key in base else value
+            if key in base:
+                base[key] = merge_values(base[key], value, added, path + (key,))
+            else:
+                base[key] = value
+                if added is not None:  # a copy: a later merge may change the value in place
+                    added.append(["key", list(path + (key,)), json.loads(json.dumps(value))])
         return base
     if isinstance(base, list) and isinstance(extra, list):
-        return base + [item for item in extra if item not in base]
+        new = [item for item in extra if item not in base]
+        if added is not None:
+            added += [["item", list(path), item] for item in new]
+        return base + new
     return base
 
 
+def at(data, path: list):
+    """The value at path in nested dicts, or None."""
+    for key in path:
+        data = data.get(key) if isinstance(data, dict) else None
+    return data
+
+
+def take_back(data: dict, record: list) -> None:
+    """Undo one recorded addition (merge_values) in data, when it is still there as added."""
+    kind, path = record[0], record[1]
+    parent = at(data, path[:-1]) if kind != "item" else at(data, path)
+    if kind == "item":
+        if isinstance(parent, list) and record[2] in parent:
+            parent.remove(record[2])
+    elif isinstance(parent, dict) and path[-1] in parent:
+        value = parent[path[-1]]
+        if kind == "own" or (kind == "key" and value == record[2]) or \
+                (kind == "container" and value in ({}, [])):
+            del parent[path[-1]]
+
+
+def empty(data) -> bool:
+    """True for a value made only of empty dicts and lists."""
+    if isinstance(data, dict):
+        return all(empty(v) for v in data.values())
+    if isinstance(data, list):
+        return all(empty(v) for v in data)
+    return False
+
+
+def digest(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+# Tool descriptions -----------------------------------------------------------
+# Each tool is data: its base folder; where its global rules go ("link" to ~/.agents/AGENTS.md
+# or Claude Code's "import" file); how it gets the skills ("link" each into a folder, "reads"
+# ~/.agents/skills itself, or a "manifest" entry); its subagent folder, file name and format;
+# its hooks (a "settings" JSON whose "hooks" key takes events, a whole "file", or Antigravity's
+# "named" entries) with their timeout unit; extra steps the engine runs; and notes.
+# tests/test_install.py checks every description with one suite (Descriptions).
+CONVERTERS = {"claude": lambda meta, body, text: text,
+              "codex": lambda meta, body, text: codex_agent(meta, body),
+              "gemini": lambda meta, body, text: gemini_agent(meta, body),
+              "copilot": lambda meta, body, text: copilot_agent(meta, body)}
+TOOL_DESCRIPTIONS = {
+    "claude": {
+        "label": "Claude Code", "base": ".claude", "detect": [".claude"], "programs": ["claude"],
+        "rules": {"how": "import", "file": "CLAUDE.md"},
+        "skills": {"how": "link", "folder": "skills"},
+        "agents": {"folder": "agents", "file": "{name}.md", "format": "claude"},
+        "hooks": {"how": "settings", "file": "settings.json", "events": "adapters/claude/settings.json",
+                  "unit": "s"},
+        "steps": ["claude_settings", "path_rules", "claude_leftovers"],
+    },
+    "codex": {
+        "label": "Codex", "base": ".codex", "detect": [".codex"], "programs": ["codex"],
+        "rules": {"how": "link", "file": "AGENTS.md"},
+        "skills": {"how": "reads"},
+        "agents": {"folder": "agents", "file": "{name}.toml", "format": "codex"},
+        "hooks": {"how": "settings", "file": "hooks.json", "events": CODEX_HOOKS, "unit": "s"},
+        "steps": ["codex_rules"],
+        "notes": ["Codex: review and trust ~/.codex/hooks.json when Codex asks; user hooks run only after review."],
+    },
+    "gemini": {
+        "label": "Gemini CLI", "base": ".gemini", "detect": [".gemini"], "programs": ["gemini"],
+        "rules": {"how": "link", "file": "GEMINI.md"},
+        "skills": {"how": "reads"},
+        "agents": {"folder": "agents", "file": "{name}.md", "format": "gemini"},
+        "hooks": {"how": "settings", "file": "settings.json", "events": GEMINI_HOOKS, "unit": "ms",
+                  "also": "gemini_context"},
+    },
+    "antigravity": {
+        "label": "Antigravity CLI", "base": ".gemini", "detect": [".gemini/antigravity-cli"], "programs": ["agy"],
+        "rules": {"how": "link", "file": "GEMINI.md"},
+        "skills": {"how": "manifest", "file": "config/skills.json"},
+        "hooks": {"how": "named", "file": "config/hooks.json", "events": ANTIGRAVITY_HOOKS, "unit": "s"},
+        "notes": ["Antigravity CLI: check the hooks with /hooks. It documents no reply that reaches the agent "
+                  "after an edit, so dash reports stay in the hook's stderr there; it gets no session refresh "
+                  "and no subagents."],
+    },
+    "copilot": {
+        "label": "Copilot CLI", "base": "$COPILOT_HOME", "detect": ["$COPILOT_HOME"], "programs": ["copilot"],
+        "rules": {"how": "link", "file": "copilot-instructions.md"},
+        "skills": {"how": "reads"},
+        "agents": {"folder": "agents", "file": "{name}.agent.md", "format": "copilot"},
+        "hooks": {"how": "file", "file": "hooks/agents-global.json", "events": COPILOT_HOOKS, "unit": "s"},
+    },
+    "cursor": {
+        "label": "Cursor", "base": ".cursor", "detect": [".cursor"], "programs": ["cursor-agent", "cursor"],
+        "skills": {"how": "reads"},
+        "steps": ["cursor_note"],
+    },
+}
+TOOLS = tuple(TOOL_DESCRIPTIONS)
+MANIFEST_NAME = ".dotagents-manifest.json"
+# The personal layer: what is one person's alone, applied after the shared layer. Every
+# file is optional. AGENTS.md is appended to the installed global rules; claude-settings.json
+# is merged into Claude Code's settings after the shared fragment (values only, no hooks).
+PERSONAL_RULES = "AGENTS.md"
+PERSONAL_CLAUDE = "claude-settings.json"
+
+
+def check_personal(folder: Path) -> list:
+    problems = []
+    if not folder.is_dir():
+        return [f"personal layer {folder}: not a folder"]
+    settings = folder / PERSONAL_CLAUDE
+    if settings.is_file():
+        try:
+            data = json.loads(settings.read_text(encoding="utf-8"))
+        except ValueError as error:
+            return [f"{settings}: {error}"]
+        if not isinstance(data, dict):
+            problems.append(f"{settings}: not a JSON object")
+        elif "hooks" in data:
+            problems.append(f"{settings}: hooks belong in the shared layer, not the personal one")
+    return problems
+
+
 class Installer:
-    def __init__(self, home: Path, dry_run: bool, tools=()):
+    def __init__(self, home: Path, dry_run: bool, tools=(), force: bool = False, personal: Path = None,
+                 targets=()):
         self.home = home
         self.dry = dry_run
         self.tools = tuple(tools)
+        self.force = force
+        self.personal = personal
+        self.targets = list(targets)
         self.backup_root = home / ".agents-backup" / time.strftime("%Y%m%d-%H%M%S")
         self.agents_home = home / ".agents"
+        self.manifest_path = self.agents_home / MANIFEST_NAME
         self.copilot_home = copilot_folder(home)
         self.changes = 0
         self.backups = 0
         self.notes = []
         self.linked = set()  # (link, target) pairs done in this run, which a dry run cannot see on disk
+        self.old = self.read_manifest()
+        self.owned = {}  # path -> {"scope", "sha256" | "link"}: what this run installs
+        self.merged = {}  # JSON path -> {"scope", "created", "added": [records]}
+        self.made = set(self.old.get("dirs", []))  # folders an install created, the only ones it removes
+        self.scope = "shared"
+
+    # Manifest ---------------------------------------------------------------
+
+    def read_manifest(self) -> dict:
+        try:
+            data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return {}
+        return data if isinstance(data, dict) and isinstance(data.get("files"), dict) else {}
+
+    def write_manifest(self) -> None:
+        files = dict(self.owned)
+        merged = dict(self.merged)
+        installed = {"shared", *self.tools, *(f"target:{t}" for t in self.targets)}
+        for path, entry in self.old.get("files", {}).items():  # tools not installed this run keep theirs
+            if path not in files and entry.get("scope") not in installed:
+                files[path] = entry
+        for path, entry in self.old.get("merged", {}).items():
+            if path in merged:
+                kept = [r for r in entry.get("added", []) if r not in merged[path]["added"]]
+                merged[path] = {**merged[path], "added": kept + merged[path]["added"],
+                                "created": entry.get("created", False) or merged[path]["created"]}
+            else:
+                merged[path] = entry
+        data = {"version": 1, "source": str(PACK), "personal": str(self.personal) if self.personal else None,
+                "targets": self.targets, "files": files, "merged": merged, "dirs": sorted(self.made)}
+        if not self.dry:
+            self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
+            self.manifest_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+
+    # File operations --------------------------------------------------------
 
     def say(self, action: str, text: str, change: bool = True) -> None:
         self.changes += change
@@ -426,28 +604,58 @@ class Installer:
         self.say("backed up", f"{path} -> {target}", change=not replacing)
         return target
 
+    def make_parents(self, path: Path) -> None:
+        """Create path's missing parent folders, recording each as made by the install."""
+        folder = path.parent
+        while not folder.exists() and folder != self.home:
+            self.made.add(str(folder))
+            folder = folder.parent
+        if not self.dry:
+            path.parent.mkdir(parents=True, exist_ok=True)
+
+    def changed_by_hand(self, path: Path) -> bool:
+        """True when the manifest owns path and it no longer holds what was installed."""
+        entry = self.old.get("files", {}).get(str(path))
+        if not entry or not (path.exists() or path.is_symlink()):
+            return False  # not ours, or gone: nothing of the user's to keep
+        if "link" in entry:
+            return not (path.is_symlink() and os.readlink(path) == entry["link"])
+        try:
+            return path.is_symlink() or digest(path.read_bytes()) != entry.get("sha256")
+        except OSError:
+            return False
+
+    def refuse(self, path: Path) -> bool:
+        if self.force or not self.changed_by_hand(path):
+            return False
+        self.notes.append(f"Kept {path}: it was changed by hand since the last install. Run install.py "
+                          "--force to back it up and replace it.")
+        self.owned[str(path)] = self.old["files"][str(path)]
+        return True
+
     def write(self, path: Path, data, executable: bool = False):
         """Write path, backing up what it replaces; return the backup path, if any."""
         data = data.encode("utf-8") if isinstance(data, str) else data
-        saved = None
-        if path.is_symlink():
-            saved = self.backup(path, replacing=True)
-        elif path.exists():
-            if path.read_bytes() == data:
-                if executable and not self.dry:
-                    path.chmod(0o755)
-                return None
-            saved = self.backup(path, replacing=True)
+        if path.exists() and not path.is_symlink() and path.read_bytes() == data:
+            if executable and not self.dry:
+                path.chmod(0o755)
+            self.owned[str(path)] = {"scope": self.scope, "sha256": digest(data)}
+            return None
+        if self.refuse(path):
+            return None
+        saved = self.backup(path, replacing=True) if path.exists() or path.is_symlink() else None
+        self.make_parents(path)
         if not self.dry:
-            path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             if executable:
                 path.chmod(0o755)
+        self.owned[str(path)] = {"scope": self.scope, "sha256": digest(data)}
         self.say("wrote", str(path))
         return saved
 
     def link(self, path: Path, target: Path) -> None:
         if (path, target) in self.linked or (path.is_symlink() and os.readlink(path) == str(target)):
+            self.owned[str(path)] = {"scope": self.scope, "link": str(target)}
             return
         self.linked.add((path, target))
         if real_path(path) is not None and real_path(path) == real_path(target):
@@ -455,67 +663,52 @@ class Installer:
             # would move the target away and leave a link to itself.
             self.notes.append(f"{path} resolves to {target}; left as it is.")
             return
+        if self.refuse(path):
+            return
         if path.exists() or path.is_symlink():
             self.backup(path, replacing=True)
+        self.make_parents(path)
         if not self.dry:
-            path.parent.mkdir(parents=True, exist_ok=True)
             path.symlink_to(target)
+        self.owned[str(path)] = {"scope": self.scope, "link": str(target)}
         self.say("linked", f"{path} -> {target}")
 
     def merge_json(self, path: Path, mutate) -> bool:
-        """Merge our values into a JSON object file; False when it was left alone."""
-        old = {}
+        """Merge our values into a JSON object file; False when it was left alone. mutate(data,
+        added) changes data and records its additions in added (see merge_values)."""
+        old, created = {}, not path.exists()
         if path.exists():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
             except ValueError as error:
                 self.notes.append(f"Could not parse {path} ({error}); merge it by hand.")
                 return False
+        added = []
         try:
             if not isinstance(old, dict):
                 raise CannotMerge("it is not a JSON object")
-            new = mutate(json.loads(json.dumps(old)))
+            new = mutate(json.loads(json.dumps(old)), added)
         except CannotMerge as error:
             self.notes.append(f"Could not merge {path}: {error}; merge it by hand.")
             return False
+        entry = self.merged.setdefault(str(path), {"scope": self.scope, "created": created, "added": []})
+        entry["added"] += [record for record in added if record not in entry["added"]]
         if new != old:
-            self.write(path, json.dumps(new, indent=2, ensure_ascii=False) + "\n")
+            self.write_merged(path, new)
         return True
 
-    # Shared source --------------------------------------------------------
+    def write_merged(self, path: Path, data: dict) -> None:
+        """Write a JSON settings file we share with the user: backed up, never in the
+        files the manifest owns."""
+        text = (json.dumps(data, indent=2, ensure_ascii=False) + "\n").encode("utf-8")
+        if path.exists():
+            self.backup(path, replacing=True)
+        self.make_parents(path)
+        if not self.dry:
+            path.write_bytes(text)
+        self.say("wrote", str(path))
 
-    def install_source(self) -> None:
-        for src in sorted(SRC.rglob("*")):
-            if src.is_dir() or "__pycache__" in src.parts or src.suffix == ".pyc":
-                continue
-            rel = src.relative_to(SRC)
-            self.write(self.agents_home / rel, src.read_bytes(),
-                       executable=rel.parts[0] == "hooks")
-        if ONLINE.is_dir():
-            for src in sorted(ONLINE.rglob("*")):
-                if src.is_dir() or "__pycache__" in src.parts:
-                    continue
-                self.write(self.agents_home / "skills" / src.relative_to(ONLINE), src.read_bytes())
-        # Files left in our own skill folders by an older version of the pack.
-        for skill in [*(SRC / "skills").iterdir(), *(ONLINE.iterdir() if ONLINE.is_dir() else [])]:
-            installed = self.agents_home / "skills" / skill.name
-            if not installed.is_dir():
-                continue
-            for stale in sorted(installed.rglob("*")):
-                if stale.is_file() and "__pycache__" not in stale.parts \
-                        and not (skill / stale.relative_to(installed)).exists():
-                    self.backup(stale)
-        for name in RETIRED_HOOK_SCRIPTS:
-            stale = self.agents_home / "hooks" / name
-            if stale.is_file() and not stale.is_symlink() and OUR_LICENSE in stale.read_text(errors="replace"):
-                self.backup(stale)
-        for name in RETIRED_SKILLS:
-            installed = self.agents_home / "skills" / name
-            skill_md = installed / "SKILL.md"
-            if installed.is_dir() and not installed.is_symlink() and skill_md.is_file():
-                text = skill_md.read_text(encoding="utf-8", errors="replace")
-                if f"\nname: {name}\n" in text and OUR_LICENSE in text:
-                    self.backup(installed)
+    # Shared source ----------------------------------------------------------
 
     def subagents(self):
         for path in sorted((SRC / "agents").glob("*.md")):
@@ -537,39 +730,156 @@ class Installer:
             extra = list(json.loads(UPLOADED_EXTRA.read_text(encoding="utf-8"))["skills"])
         return sorted(set(self.online_skills()) | set(extra))
 
-    # Per tool -------------------------------------------------------------
+    def global_rules(self) -> bytes:
+        """The shared global rules, followed by the personal layer's when it has them."""
+        text = (SRC / "AGENTS.md").read_bytes()
+        extra = self.personal / PERSONAL_RULES if self.personal else None
+        if extra is not None and extra.is_file():
+            text = text.rstrip(b"\n") + b"\n\n" + extra.read_bytes().lstrip(b"\n")
+        return text
 
-    def install_claude(self) -> None:
-        base = self.home / ".claude"
-        claude_md = base / "CLAUDE.md"
+    def install_source(self) -> None:
+        self.scope = "shared"
+        for src in sorted(SRC.rglob("*")):
+            if src.is_dir() or "__pycache__" in src.parts or src.suffix == ".pyc":
+                continue
+            rel = src.relative_to(SRC)
+            data = self.global_rules() if rel == Path("AGENTS.md") else src.read_bytes()
+            self.write(self.agents_home / rel, data, executable=rel.parts[0] == "hooks")
+        if ONLINE.is_dir():
+            for src in sorted(ONLINE.rglob("*")):
+                if src.is_dir() or "__pycache__" in src.parts:
+                    continue
+                self.write(self.agents_home / "skills" / src.relative_to(ONLINE), src.read_bytes())
+        # Files left in our own skill folders by an older version that kept no manifest.
+        if not self.old:
+            for skill in [*(SRC / "skills").iterdir(), *(ONLINE.iterdir() if ONLINE.is_dir() else [])]:
+                installed = self.agents_home / "skills" / skill.name
+                if not installed.is_dir():
+                    continue
+                for stale in sorted(installed.rglob("*")):
+                    if stale.is_file() and "__pycache__" not in stale.parts \
+                            and not (skill / stale.relative_to(installed)).exists():
+                        self.backup(stale)
+        # Skills and hooks an older version installed under names this one dropped; ours
+        # carry our name line and license, so a folder of the same name that is the user's stays.
+        for name in RETIRED_SKILLS:
+            installed = self.agents_home / "skills" / name
+            skill_md = installed / "SKILL.md"
+            if installed.is_dir() and not installed.is_symlink() and skill_md.is_file():
+                text = skill_md.read_text(encoding="utf-8", errors="replace")
+                if f"\nname: {name}\n" in text and OUR_LICENSE in text:
+                    self.backup(installed)
+        for name in RETIRED_HOOK_SCRIPTS:
+            stale = self.agents_home / "hooks" / name
+            if stale.is_file() and not stale.is_symlink() and OUR_LICENSE in stale.read_text(errors="replace"):
+                self.backup(stale)
+
+    # Per tool ---------------------------------------------------------------
+
+    def base(self, tool: str) -> Path:
+        folder = TOOL_DESCRIPTIONS[tool]["base"]
+        return self.copilot_home if folder == "$COPILOT_HOME" else self.home / folder
+
+    def install_tool(self, tool: str) -> None:
+        self.scope = tool
+        spec, base = TOOL_DESCRIPTIONS[tool], self.base(tool)
+        if not base.is_absolute():
+            where = "COPILOT_HOME" if spec["base"] == "$COPILOT_HOME" else "its folder"
+            self.notes.append(f"{spec['label']}: skipped, because {where} ({base}) is a relative path; "
+                              "set an absolute one and run install.py again.")
+            return
+        rules = spec.get("rules")
+        if rules and rules["how"] == "link":
+            self.link(base / rules["file"], self.agents_home / "AGENTS.md")
+        elif rules and rules["how"] == "import":
+            self.claude_md(base / rules["file"])
+        skills = spec.get("skills", {})
+        if skills.get("how") == "link":
+            self.link_skills(base / skills["folder"], spec["label"])
+        elif skills.get("how") == "manifest":
+            self.skills_manifest(base / skills["file"])
+        agents = spec.get("agents")
+        if agents:
+            convert = CONVERTERS[agents["format"]]
+            for path, meta, body in self.subagents():
+                self.write(base / agents["folder"] / agents["file"].format(name=meta["name"]),
+                           convert(meta, body, path.read_text(encoding="utf-8")))
+        hooks = spec.get("hooks")
+        if hooks and hooks["how"] == "settings" and tool != "claude":
+            ours, also = hooks["events"], getattr(self, hooks["also"]) if hooks.get("also") else None
+
+            def mutate(data: dict, added: list) -> dict:  # one merge per file and run
+                data = self.with_hooks(data, ours, added)
+                return also(data, added) if also else data
+            self.merge_json(base / hooks["file"], mutate)
+        elif hooks and hooks["how"] == "named":
+            self.merge_json(base / hooks["file"], self.named_hooks(hooks["events"]))
+        elif hooks and hooks["how"] == "file":
+            self.write(base / hooks["file"], json.dumps(hooks["events"], indent=2) + "\n")
+        for step in spec.get("steps", []):
+            getattr(self, f"step_{step}")(base)
+        self.notes += spec.get("notes", [])
+
+    @staticmethod
+    def with_hooks(data: dict, ours: dict, added: list) -> dict:
+        if "hooks" not in data:
+            added.append(["container", ["hooks"]])
+        data["hooks"] = merge_event_hooks(data.get("hooks"), ours)
+        return data
+
+    @staticmethod
+    def named_hooks(events: dict):
+        def mutate(config: dict, added: list) -> dict:
+            for name, entry in events.items():
+                old = config.get(name)
+                config[name] = json.loads(json.dumps(entry))
+                if isinstance(old, dict) and isinstance(old.get("enabled"), bool):
+                    config[name]["enabled"] = old["enabled"]  # a hook turned off by hand stays off
+                added.append(["own", [name]])
+            return config
+        return mutate
+
+    def claude_md(self, claude_md: Path) -> None:
         current = claude_md.read_text(encoding="utf-8", errors="replace") if claude_md.is_file() else ""
         if CLAUDE_IMPORT not in current or current == OLD_CLAUDE_MD:
             saved = self.write(claude_md, CLAUDE_MD)
             if saved and current != OLD_CLAUDE_MD:
                 self.notes.append(f"Claude Code: replaced {claude_md}, which did not import "
                                   f"~/.agents/AGENTS.md; the old one {'would be' if self.dry else 'is'} in {saved}.")
-        for name in RETIRED_SKILLS:
-            retired = base / "skills" / name
-            if retired.is_symlink() and os.readlink(retired) == str(self.agents_home / "skills" / name):
-                self.backup(retired)
-        for name, marker in OLD_PACK_SKILLS.items():
-            old = base / "skills" / name / "SKILL.md"
-            if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
-                self.backup(old.parent)
-        skills, agents_home = base / "skills", real_path(self.agents_home)
+        elif str(claude_md) in self.old.get("files", {}):
+            self.owned[str(claude_md)] = self.old["files"][str(claude_md)]
+
+    def link_skills(self, skills: Path, label: str) -> None:
+        agents_home = real_path(self.agents_home)
         resolved = real_path(skills)
         if resolved and agents_home and (resolved == agents_home or agents_home in resolved.parents):
-            self.notes.append(f"Claude Code: {skills} resolves to {resolved}, inside {self.agents_home}; "
+            self.notes.append(f"{label}: {skills} resolves to {resolved}, inside {self.agents_home}; "
                               "the skills were not linked into it.")
-        else:
-            for name in self.skills() + self.online_skills():
-                self.link(skills / name, self.agents_home / "skills" / name)
-        for path, meta, body in self.subagents():
-            self.write(base / "agents" / path.name, path.read_text(encoding="utf-8"))
-        self.install_path_rules(base / "rules")
-        for old_hook in OLD_HOOK_SCRIPTS:
-            if (base / "hooks" / old_hook).is_file():
-                self.backup(base / "hooks" / old_hook)
+            return
+        for name in RETIRED_SKILLS:
+            retired = skills / name
+            if retired.is_symlink() and os.readlink(retired) == str(self.agents_home / "skills" / name):
+                self.backup(retired)
+        for name in self.skills() + self.online_skills():
+            self.link(skills / name, self.agents_home / "skills" / name)
+
+    def skills_manifest(self, path: Path) -> None:
+        # A personal skills manifest adds a folder to the skills Antigravity loads; it does
+        # not expand ~, so the path is absolute.
+        skills = str(self.agents_home / "skills")
+
+        def manifest(config: dict, added: list) -> dict:
+            entries = config.setdefault("entries", [])
+            if not isinstance(entries, list):
+                raise CannotMerge("its entries value is not a list")
+            if not any(isinstance(entry, dict) and entry.get("path") == skills for entry in entries):
+                entries.append({"path": skills})
+                added.append(["item", ["entries"], {"path": skills}])
+            return config
+        self.merge_json(path, manifest)
+
+    def step_claude_settings(self, base: Path) -> None:
         fragment = json.loads(CLAUDE_FRAGMENT.read_text(encoding="utf-8"))
         ours = fragment.pop("hooks")
         # Claude Code lists a synced claude.ai skill next to a local one of the same
@@ -577,10 +887,14 @@ class Installer:
         # copy is the only one. A value already set by hand wins (merge_values).
         fragment["skillOverrides"] = {SYNCED_PREFIX + name: "off" for name in self.uploaded_skills()}
         denied = fragment.get("permissions", {}).get("deny", [])
+        personal = {}
+        if self.personal and (self.personal / PERSONAL_CLAUDE).is_file():
+            personal = json.loads((self.personal / PERSONAL_CLAUDE).read_text(encoding="utf-8"))
 
-        def mutate(settings: dict) -> dict:
-            settings = merge_values(settings, fragment)
-            settings["hooks"] = merge_event_hooks(settings.get("hooks"), ours)
+        def mutate(settings: dict, added: list) -> dict:
+            settings = merge_values(settings, fragment, added)
+            settings = merge_values(settings, personal, added)
+            settings = self.with_hooks(settings, ours, added)
             # A rule this repository now denies leaves ask, where an older install put it.
             permissions = settings.get("permissions")
             if isinstance(permissions, dict) and isinstance(permissions.get("ask"), list):
@@ -591,12 +905,10 @@ class Installer:
                 "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
                 "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
 
-    def path_rule_files(self) -> dict:
-        return {f"{RULE_PREFIX}{skill}.md": path_rule(skill, globs) for skill, globs in path_rules().items()}
-
-    def install_path_rules(self, rules: Path) -> None:
+    def step_path_rules(self, base: Path) -> None:
         """Write a rule per path rule; back up and remove our own (dotagents-*.md) rules that
         the repository no longer has. Every other file in the folder is the user's."""
+        rules = base / "rules"
         wanted = self.path_rule_files()
         for name, text in sorted(wanted.items()):
             self.write(rules / name, text)
@@ -605,79 +917,140 @@ class Installer:
                 if stale.name not in wanted and (stale.is_file() or stale.is_symlink()):
                     self.backup(stale)
 
-    def install_codex(self) -> None:
-        base = self.home / ".codex"
-        self.link(base / "AGENTS.md", self.agents_home / "AGENTS.md")
-        for path, meta, body in self.subagents():
-            self.write(base / "agents" / f"{meta['name']}.toml", codex_agent(meta, body))
-        self.merge_json(base / "hooks.json", lambda s: {**s, "hooks": merge_event_hooks(s.get("hooks"), CODEX_HOOKS)})
+    def path_rule_files(self) -> dict:
+        return {f"{RULE_PREFIX}{skill}.md": path_rule(skill, globs) for skill, globs in path_rules().items()}
+
+    def step_claude_leftovers(self, base: Path) -> None:
+        for name, marker in OLD_PACK_SKILLS.items():
+            old = base / "skills" / name / "SKILL.md"
+            if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
+                self.backup(old.parent)
+        for old_hook in OLD_HOOK_SCRIPTS:
+            if (base / "hooks" / old_hook).is_file():
+                self.backup(base / "hooks" / old_hook)
+
+    def step_codex_rules(self, base: Path) -> None:
         # Codex writes default.rules itself (its allow list), so this file has its own name.
         self.write(base / "rules" / "dotagents.rules", codex_rules())
-        self.notes.append("Codex: review and trust ~/.codex/hooks.json when Codex asks; user hooks run only after review.")
 
-    def install_gemini(self) -> None:
-        base = self.home / ".gemini"
-        self.link(base / "GEMINI.md", self.agents_home / "AGENTS.md")
-        for path, meta, body in self.subagents():
-            self.write(base / "agents" / f"{meta['name']}.md", gemini_agent(meta, body))
+    @staticmethod
+    def gemini_context(settings: dict, added: list) -> dict:
+        """Gemini CLI reads AGENTS.md as well as GEMINI.md (context.fileName)."""
+        if "context" not in settings:
+            added.append(["container", ["context"]])
+        context = settings.setdefault("context", {})
+        if not isinstance(context, dict):
+            raise CannotMerge("its context value is not an object")
+        names = context.get("fileName", ["GEMINI.md"])
+        names = [names] if isinstance(names, str) else names
+        if not isinstance(names, list):
+            raise CannotMerge("its context.fileName is neither a name nor a list")
+        names, absent = list(names), "fileName" not in context
+        for name in ("AGENTS.md", "GEMINI.md"):
+            if name not in names:
+                names.insert(0 if name == "AGENTS.md" else len(names), name)
+                if not absent:
+                    added.append(["item", ["context", "fileName"], name])
+        context["fileName"] = names
+        if absent:  # the whole list is ours, default entry included
+            added.append(["key", ["context", "fileName"], names])
+        return settings
 
-        def mutate(settings: dict) -> dict:
-            settings["hooks"] = merge_event_hooks(settings.get("hooks"), GEMINI_HOOKS)
-            context = settings.setdefault("context", {})
-            if not isinstance(context, dict):
-                raise CannotMerge("its context value is not an object")
-            names = context.get("fileName", ["GEMINI.md"])
-            names = [names] if isinstance(names, str) else names
-            if not isinstance(names, list):
-                raise CannotMerge("its context.fileName is neither a name nor a list")
-            names = list(names)
-            for name in ("AGENTS.md", "GEMINI.md"):
-                if name not in names:
-                    names.insert(0 if name == "AGENTS.md" else len(names), name)
-            context["fileName"] = names
-            return settings
-        self.merge_json(base / "settings.json", mutate)
+    def step_cursor_note(self, base: Path) -> None:
+        if "claude" in self.tools:
+            reads = ("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself "
+                     "(Settings > Agents > Third-Party Imports, on by default).")
+        else:
+            reads = ("Cursor: this run gave it no subagents and no hooks, because Cursor reads them "
+                     "from Claude Code's ~/.claude/agents and ~/.claude/settings.json, which only "
+                     "--tools claude writes (run install.py --tools claude,cursor to add them). "
+                     "It reads ~/.agents/skills by itself.")
+        self.notes.append(reads + " It has no global instructions file: paste ~/.agents/AGENTS.md into "
+                          "Settings > Rules > User Rules.")
 
-    def install_antigravity(self) -> None:
-        base = self.home / ".gemini"
-        self.link(base / "GEMINI.md", self.agents_home / "AGENTS.md")
+    def install_target(self, target: str) -> None:
+        """A generic target: link every skill into <folder>/skills and the global rules into
+        <folder>/<rules file> (AGENTS.md unless the target names another)."""
+        folder, _, rules = target.partition(":")
+        self.scope = f"target:{target}"
+        base = Path(folder).expanduser()
+        self.link(base / (rules or "AGENTS.md"), self.agents_home / "AGENTS.md")
+        self.link_skills(base / "skills", base.as_posix())
 
-        def hooks(config: dict) -> dict:
-            for name, events in ANTIGRAVITY_HOOKS.items():
-                old = config.get(name)
-                config[name] = json.loads(json.dumps(events))
-                if isinstance(old, dict) and isinstance(old.get("enabled"), bool):
-                    config[name]["enabled"] = old["enabled"]  # a hook turned off by hand stays off
-            return config
-        self.merge_json(base / "config" / "hooks.json", hooks)
+    # Retirement and uninstall -----------------------------------------------
 
-        # A personal skills manifest adds a folder to the skills Antigravity loads; it does
-        # not expand ~, so the path is absolute.
-        skills = str(self.agents_home / "skills")
+    def remove_dropped(self) -> None:
+        """Remove what the last install owned, this run's scopes no longer install, and
+        nobody changed since; keep and name what was changed by hand."""
+        installed = {"shared", *self.tools, *(f"target:{t}" for t in self.targets)}
+        for name, entry in sorted(self.old.get("files", {}).items()):
+            path = Path(name)
+            if name in self.owned or entry.get("scope") not in installed:
+                continue
+            if not (path.exists() or path.is_symlink()):
+                continue
+            if self.changed_by_hand(path):
+                self.notes.append(f"Kept {path}: this version no longer installs it, and it was changed by hand.")
+                self.owned[name] = entry
+                continue
+            self.backup(path)
+            self.prune(path.parent)
 
-        def manifest(config: dict) -> dict:
-            entries = config.setdefault("entries", [])
-            if not isinstance(entries, list):
-                raise CannotMerge("its entries value is not a list")
-            if not any(isinstance(entry, dict) and entry.get("path") == skills for entry in entries):
-                entries.append({"path": skills})
-            return config
-        self.merge_json(base / "config" / "skills.json", manifest)
-        self.notes.append(
-            "Antigravity CLI: check the hooks with /hooks. It documents no reply that reaches the agent "
-            "after an edit, so dash reports stay in the hook's stderr there; it gets no session refresh "
-            "and no subagents.")
+    def prune(self, folder: Path) -> None:
+        """Remove empty folders from folder upward, as long as an install made them."""
+        while not self.dry and str(folder) in self.made:
+            try:
+                folder.rmdir()
+            except OSError:
+                return
+            self.made.discard(str(folder))
+            folder = folder.parent
 
-    def install_copilot(self) -> None:
-        base = self.copilot_home
-        if not base.is_absolute():
-            self.notes.append(f"Copilot CLI: skipped, because COPILOT_HOME ({base}) is a relative path; "
-                              "set it to an absolute one and run install.py again.")
-            return
-        self.link(base / "copilot-instructions.md", self.agents_home / "AGENTS.md")
-        for path, meta, body in self.subagents():
-            self.write(base / "agents" / f"{meta['name']}.agent.md", copilot_agent(meta, body))
-        self.write(base / "hooks" / "agents-global.json", json.dumps(COPILOT_HOOKS, indent=2) + "\n")
+    def uninstall(self) -> int:
+        if not self.old:
+            print(f"No manifest at {self.manifest_path}: nothing recorded to remove.", file=sys.stderr)
+            return 1
+        kept = []
+        for name, entry in sorted(self.old.get("files", {}).items()):
+            path = Path(name)
+            if not (path.exists() or path.is_symlink()):
+                continue
+            if self.changed_by_hand(path):
+                kept.append(path)
+                continue
+            if not self.dry:
+                path.unlink()
+            self.say("removed", str(path))
+            self.prune(path.parent)
+        for name, entry in sorted(self.old.get("merged", {}).items()):
+            path = Path(name)
+            try:
+                data = json.loads(path.read_text(encoding="utf-8"))
+            except (OSError, ValueError):
+                continue
+            if not isinstance(data, dict):
+                continue
+            before = json.loads(json.dumps(data))
+            if isinstance(data.get("hooks"), dict):
+                data["hooks"] = merge_event_hooks(data["hooks"], {})
+            # List items first, so a key holds only what was added with it; empty containers last.
+            for record in sorted(entry.get("added", []), key=lambda r: {"item": 0, "container": 2}.get(r[0], 1)):
+                take_back(data, record)
+            if entry.get("created") and empty(data):
+                self.backup(path)
+                self.prune(path.parent)
+            elif data != before:
+                self.write_merged(path, data)
+        if not self.dry:
+            self.manifest_path.unlink()
+            self.prune(self.manifest_path.parent)
+        backups = f" Replaced files are in {self.backup_root}." if self.backups else ""
+        print(f"\n{self.changes} change(s).{backups}")
+        for path in kept:
+            print(f"- Kept {path}: changed by hand since the install.")
+        print(f"- Files the install replaced are in {self.home / '.agents-backup'}; "
+              "an older version's installer puts its own back.")
+        return 0
 
     def audit(self) -> int:
         """Print what the skill and agent folders hold that this repository does not manage."""
@@ -688,13 +1061,15 @@ class Installer:
             self.agents_home / "skills": skills,
             self.agents_home / "agents": {f"{a}.md" for a in agents},
             self.agents_home / "hooks": hooks | {"__pycache__"},
-            self.home / ".claude" / "skills": skills | {"synced", ".trash"},
-            self.home / ".claude" / "agents": {f"{a}.md" for a in agents},
-            self.home / ".claude" / "rules": set(self.path_rule_files()),
-            self.home / ".codex" / "agents": {f"{a}.toml" for a in agents},
-            self.home / ".gemini" / "agents": {f"{a}.md" for a in agents},
-            self.copilot_home / "agents": {f"{a}.agent.md" for a in agents},
         }
+        for tool, spec in TOOL_DESCRIPTIONS.items():
+            base = self.base(tool)
+            if spec.get("skills", {}).get("how") == "link":
+                folders[base / spec["skills"]["folder"]] = skills | {"synced", ".trash"}
+            if spec.get("agents"):
+                folders[base / spec["agents"]["folder"]] = {spec["agents"]["file"].format(name=a) for a in agents}
+            if "path_rules" in spec.get("steps", []):
+                folders[base / "rules"] = set(self.path_rule_files())
         foreign, broken = [], []
         for folder, managed in folders.items():
             if not folder.is_dir():
@@ -710,32 +1085,12 @@ class Installer:
         print("\n".join(f"  {p}" for p in broken) or "  none")
         return 0
 
-    def install_cursor(self) -> None:
-        if "claude" in self.tools:
-            reads = ("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself "
-                     "(Settings > Agents > Third-Party Imports, on by default).")
-        else:
-            reads = ("Cursor: this run gave it no subagents and no hooks, because Cursor reads them "
-                     "from Claude Code's ~/.claude/agents and ~/.claude/settings.json, which only "
-                     "--tools claude writes (run install.py --tools claude,cursor to add them). "
-                     "It reads ~/.agents/skills by itself.")
-        self.notes.append(
-            reads + " It has no global instructions file: paste ~/.agents/AGENTS.md into "
-            "Settings > Rules > User Rules.")
-
 
 def detect(home: Path) -> list[str]:
-    probes = {
-        "claude": (home / ".claude", ["claude"]),
-        "codex": (home / ".codex", ["codex"]),
-        "gemini": (home / ".gemini", ["gemini"]),
-        "antigravity": (home / ".gemini" / "antigravity-cli", ["agy"]),
-        "copilot": (copilot_folder(home), ["copilot"]),
-        "cursor": (home / ".cursor", ["cursor-agent", "cursor"]),
-    }
     found = []
-    for tool, (folder, binaries) in probes.items():
-        if folder.is_dir() or any(shutil.which(b) for b in binaries):
+    for tool, spec in TOOL_DESCRIPTIONS.items():
+        folders = [copilot_folder(home) if f == "$COPILOT_HOME" else home / f for f in spec["detect"]]
+        if any(f.is_dir() for f in folders) or any(shutil.which(b) for b in spec["programs"]):
             found.append(tool)
     return found
 
@@ -746,6 +1101,15 @@ def main() -> int:
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--audit", action="store_true",
                         help="list unmanaged entries and broken links in the agents' folders; change nothing")
+    parser.add_argument("--uninstall", action="store_true",
+                        help="remove what the manifest records and nobody changed since; change nothing else")
+    parser.add_argument("--force", action="store_true",
+                        help="back up and replace installed files changed by hand")
+    parser.add_argument("--personal", metavar="DIR", help="apply this personal layer now and on later runs")
+    parser.add_argument("--no-personal", action="store_true", help="stop applying the recorded personal layer")
+    parser.add_argument("--target", metavar="DIR[:RULES]", action="append", default=[],
+                        help="also link the skills into DIR/skills and the global rules into DIR/RULES "
+                             "(default AGENTS.md), now and on later runs")
     args = parser.parse_args()
 
     home = Path(os.environ.get("HOME", "~")).expanduser()
@@ -759,20 +1123,36 @@ def main() -> int:
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
 
-    problems = check_source()
+    probe = Installer(home, True, tools)
+    if args.uninstall:
+        return Installer(home, args.dry_run, tools).uninstall()
+    personal = None if args.no_personal else (
+        Path(args.personal).expanduser().resolve() if args.personal else
+        Path(probe.old["personal"]) if probe.old.get("personal") else None)
+    targets = list(dict.fromkeys([*probe.old.get("targets", []),
+                                  *(str(Path(t.partition(":")[0]).expanduser().resolve())
+                                    + (":" + t.partition(":")[2] if t.partition(":")[2] else "")
+                                    for t in args.target)]))
+    problems = check_source() + (check_personal(personal) if personal else [])
     if problems:
         print("Nothing installed: fix the repository first (python3 tools/validate.py checks it).",
               file=sys.stderr)
         print("\n".join(f"  {problem}" for problem in problems), file=sys.stderr)
         return 1
 
-    installer = Installer(home, args.dry_run, tools)
+    installer = Installer(home, args.dry_run, tools, force=args.force, personal=personal, targets=targets)
     if args.audit:
         return installer.audit()
-    print(f"Agents: {', '.join(tools) or 'none detected (installing ~/.agents only)'}")
+    print(f"Agents: {', '.join(tools) or 'none detected (installing ~/.agents only)'}"
+          + (f"; personal layer {personal}" if personal else "")
+          + (f"; targets {', '.join(targets)}" if targets else ""))
     installer.install_source()
     for tool in tools:
-        getattr(installer, f"install_{tool}")()
+        installer.install_tool(tool)
+    for target in targets:
+        installer.install_target(target)
+    installer.remove_dropped()
+    installer.write_manifest()
 
     saved = "would be saved" if args.dry_run else "saved"
     backups = f" Replaced files {saved} in {installer.backup_root}" if installer.backups else ""

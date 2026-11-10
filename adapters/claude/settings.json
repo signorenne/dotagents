@@ -13,17 +13,7 @@
       "Bash(git show *)",
       "Bash(git merge-base *)",
       "Bash(git rev-parse *)",
-      "Bash(git branch --show-current)",
-      "Bash(cmake --preset *)",
-      "Bash(cmake --build *)",
-      "Bash(cmake -B *)",
-      "Bash(ctest *)",
-      "Bash(clang-format *)",
-      "Bash(clang-format-20 *)",
-      "Bash(clang-tidy *)",
-      "Bash(clang-tidy-20 *)",
-      "Bash(./build/*)",
-      "Read(~/memex/**)"
+      "Bash(git branch --show-current)"
     ],
     "ask": [
       "Bash(git reset --hard *)",
@@ -67,9 +57,6 @@
       "Read(~/.ssh/**)",
       "Read(~/.gnupg/**)"
     ]
-  },
-  "enabledPlugins": {
-    "engineering@synced": false
   },
   "hooks": {
     "PreToolUse": [

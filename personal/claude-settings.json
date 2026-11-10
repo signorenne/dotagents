@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cmake --preset *)",
+      "Bash(cmake --build *)",
+      "Bash(cmake -B *)",
+      "Bash(ctest *)",
+      "Bash(clang-format *)",
+      "Bash(clang-format-20 *)",
+      "Bash(clang-tidy *)",
+      "Bash(clang-tidy-20 *)",
+      "Bash(./build/*)",
+      "Read(~/memex/**)"
+    ]
+  },
+  "enabledPlugins": {
+    "engineering@synced": false
+  }
+}
