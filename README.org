@@ -159,20 +159,20 @@ when asked in words.
 
 ** Repository workflow
 
-[[file:docs/pipeline.org][docs/pipeline.org]] shows how these skills chain from idea to merge.
+[[file:METHOD.org][METHOD.org]] states the method these skills apply.
 
 - [[file:home/.agents/skills/decide/SKILL.md][decide]] : settles a choice that belongs to you, one Socratic question at
   a time, then records it.
-- [[file:home/.agents/skills/spec/SKILL.md][spec]] : turns a feature idea into a self-contained implementation spec
-  through scouting and a maieutic interview, without writing code.
-- [[file:home/.agents/skills/implement/SKILL.md][implement]] : carries out a spec or a scoped task in small verified
-  commits, with a progress log, the full gates and an independent review.
+- [[file:home/.agents/skills/build/SKILL.md][build]] : builds one change in its lane (direct, quick or full), from the
+  plan file to the triaged review, resumable from that file in any session.
+- [[file:home/.agents/skills/design/SKILL.md][design]] : turns a feature too large for one plan into a design and its
+  ordered plans, checked by an independent agent, without writing code.
 - [[file:home/.agents/skills/branch-review/SKILL.md][branch-review]] : reviews the current branch through the =reviewer= subagent and
   returns findings ranked by severity.
 - [[file:home/.agents/skills/gates/SKILL.md][gates]] : runs the project's documented gates through =gate-runner= and
   reports only verdicts and the first errors.
-- [[file:home/.agents/skills/session-close/SKILL.md][session-close]] : records the real state of the work in a handoff the next
-  fresh session resumes from.
+- [[file:home/.agents/skills/close/SKILL.md][close]] : brings the plan files up to date, settles decisions and rulings,
+  drafts lessons, and names the next action for a fresh session.
 - [[file:home/.agents/skills/project-setup/SKILL.md][project-setup]] : sets up or audits a repository's =AGENTS.md=, bridges
   and project docs, from vision to agent workflows.
 

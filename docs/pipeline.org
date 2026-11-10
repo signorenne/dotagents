@@ -64,7 +64,7 @@ maintainer.
 
 ** 3. Specify
 
-- /Skill/ : [[file:../home/.agents/skills/spec/SKILL.md][spec]]. It maps the area with scout, settles each design choice
+- /Skill/ : [[file:../home/.agents/skills/design/SKILL.md][spec]]. It maps the area with scout, settles each design choice
   with decide, writes the spec, has a subagent that did not write it check
   every claim and give a second reading of each acceptance criterion where
   one exists (in Claude Code the general-purpose subagent, elsewhere
@@ -83,7 +83,7 @@ maintainer.
 
 ** 4. Implement
 
-- /Skill/ : [[file:../home/.agents/skills/implement/SKILL.md][implement]], in a fresh session. It grounds the plan with scout and
+- /Skill/ : [[file:../home/.agents/skills/build/SKILL.md][implement]], in a fresh session. It grounds the plan with scout and
   its own reading of the code (without scout when the spec's affected paths
   have not changed since the commit the spec was checked on), and shows the
   plan: one commit per step, each with its files and its check. It waits for
@@ -149,7 +149,7 @@ maintainer.
 
 ** 7. Close the session
 
-- /Skill/ : [[file:../home/.agents/skills/session-close/SKILL.md][session-close]], at the end of every working session and before
+- /Skill/ : [[file:../home/.agents/skills/close/SKILL.md][session-close]], at the end of every working session and before
   clearing the context. It reads every progress log of the task (the
   per-agent logs of parallel work too) and brings this session's up to date
   from git and the commands that ran.
