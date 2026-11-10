@@ -5,7 +5,9 @@
 import contextlib
 import importlib.util
 import io
+import os
 import shutil
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -282,6 +284,172 @@ class AnnotateDraw(unittest.TestCase):
         self.assertEqual(self.run_main("--mark", "500,5"), 2)
         self.assertEqual(self.run_main("--mark", "5,5", "--radius", "2"), 2)
         self.assertFalse(self.target.exists())
+
+
+BUILD = ROOT / "home/.agents/skills/build/scripts"
+# git without the user's configuration (signing, hooks, default branch).
+GIT_ENV = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull, "GIT_CONFIG_NOSYSTEM": "1",
+           "GIT_AUTHOR_NAME": "t", "GIT_AUTHOR_EMAIL": "t@t", "GIT_COMMITTER_NAME": "t",
+           "GIT_COMMITTER_EMAIL": "t@t"}
+PLAN = """#+TITLE: Plan: widget
+
+- Status: in progress
+- Lane: {lane}
+- Risk: low
+- Base: {base}
+- Branch: feat/widget
+- Review: quick
+- Next: S2 add the widget's test
+
+* Intent
+Make the widget.
+
+* Steps
+| Nr | Step        | Files    | Check | Status      | Commit |
+|----+-------------+----------+-------+-------------+--------|
+| S1 | scaffold    | a.py     | unit  | done        | {base} |
+| S2 | widget test | test_a.py | unit | in progress |        |
+
+* Rulings
+| Nr | Ruling              | Why | Alternative | Cost if wrong | Review  |
+|----+---------------------+-----+-------------+---------------+---------|
+| R1 | name it widget      | x   | gadget      | a rename      | pending |
+| R2 | keep the old helper | y   | drop it     | none          | kept    |
+"""
+
+
+class PlanScripts(unittest.TestCase):
+    """plan_state, check_step and floor_check on a temporary repository whose working
+    notes hold a plan, as METHOD.org (The plan file, Checks) defines them."""
+
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        self.repo = self.root / "repo"
+        self.repo.mkdir()
+        self.git("init", "-q", "-b", "main")
+        (self.repo / ".gitignore").write_text(".private/\n")
+        (self.repo / "test_a.py").write_text("def test_one():\n    pass\n\n\ndef test_two():\n    pass\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "base")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.git("switch", "-q", "-c", "feat/widget")
+        self.plan = self.repo / ".private" / "plans" / "widget.org"
+        self.plan.parent.mkdir(parents=True)
+        self.write_plan("full")
+
+    def write_plan(self, lane):
+        self.plan.write_text(PLAN.format(base=self.base, lane=lane))
+
+    def git(self, *args, cwd=None) -> str:
+        return subprocess.run(["git", *args], cwd=cwd or self.repo, env=GIT_ENV, capture_output=True,
+                              text=True, check=True).stdout.strip()
+
+    def run_script(self, name, *args, cwd=None):
+        return subprocess.run([sys.executable, "-B", str(BUILD / name), *args], cwd=cwd or self.repo,
+                              env=GIT_ENV, capture_output=True, text=True, check=False)
+
+    def log(self) -> list:
+        path = self.plan.with_suffix(".log")
+        return [line.split("\t") for line in path.read_text().splitlines()] if path.exists() else []
+
+    def test_plan_state_prints_the_header_the_step_in_progress_and_open_rulings(self):
+        result = self.run_script("plan_state.py")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("Status in progress, Lane full, Risk low", result.stdout)
+        self.assertIn("Next: S2 add the widget's test", result.stdout)
+        self.assertIn("In progress: S2 widget test (files: test_a.py)", result.stdout)
+        self.assertIn("no commit for it yet", result.stdout)
+        self.assertIn("Open rulings: 1: R1 name it widget", result.stdout)
+        self.assertNotIn("R2", result.stdout)
+
+    def test_the_excerpt_is_marked_as_a_map_and_bounded(self):
+        result = self.run_script("plan_state.py", "--excerpt", "--max-chars", "200")
+        self.assertTrue(result.stdout.startswith("Plan file excerpt: a map"), result.stdout)
+        self.assertLessEqual(len(result.stdout.rstrip("\n")), 200)
+        self.assertTrue(result.stdout.rstrip().endswith("(cut)"))
+
+    def test_a_linked_worktree_reads_the_main_checkouts_plan(self):
+        worktree = self.root / "wt"
+        self.git("switch", "-q", "main")
+        self.git("worktree", "add", "-q", str(worktree), "feat/widget")
+        result = self.run_script("plan_state.py", cwd=worktree)
+        self.assertIn(f"Plan: {self.plan}", result.stdout)
+
+    def test_off_a_task_branch_it_lists_the_open_plans_only(self):
+        landed = self.plan.parent / "old.md"
+        landed.write_text("# Plan: old\n\n- Status: landed\n- Branch: feat/old\n")
+        self.git("switch", "-q", "main")
+        result = self.run_script("plan_state.py")
+        self.assertIn("No plan file for this branch. Open plans:", result.stdout)
+        self.assertIn("widget.org (in progress, branch feat/widget)", result.stdout)
+        self.assertNotIn("old.md", result.stdout)
+        self.assertEqual(self.run_script("plan_state.py", "--excerpt").stdout, "")
+
+    def test_outside_a_repository_plan_state_exits_2(self):
+        outside = self.root / "plain"
+        outside.mkdir()
+        self.assertEqual(self.run_script("plan_state.py", cwd=outside).returncode, 2)
+
+    def test_check_step_logs_a_pass_with_the_commit_and_the_test_count(self):
+        result = self.run_script("check_step.py", "--step", "S2", "--",
+                                 sys.executable, "-c", "print('Ran 3 tests in 0.1s')")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.log()[-1][1:6], ["S2", "check", self.base, "pass", "3"])
+        saved = list(self.plan.with_suffix(".runs").iterdir())
+        self.assertEqual(len(saved), 1)
+        self.assertIn("Ran 3 tests", saved[0].read_text())
+
+    def test_check_step_logs_a_dirty_tree_as_uncommitted_and_passes_the_exit_code_on(self):
+        (self.repo / "test_a.py").write_text("changed\n")
+        result = self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "raise SystemExit(3)")
+        self.assertEqual(result.returncode, 3)
+        self.assertEqual(self.log()[-1][2:5], ["check", "uncommitted(1)", "fail"])
+
+    def test_expect_fail_succeeds_only_when_the_command_fails(self):
+        failing = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--",
+                                  sys.executable, "-c", "raise SystemExit(1)")
+        self.assertEqual(failing.returncode, 0, failing.stdout)
+        self.assertEqual(self.log()[-1][2:5:2], ["fail-first", "fail"])
+        passing = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--",
+                                  sys.executable, "-c", "pass")
+        self.assertEqual(passing.returncode, 1)
+        self.assertIn("does not show the test can fail", passing.stdout)
+        self.assertEqual(self.log()[-1][2:5:2], ["fail-first", "pass"])
+
+    def test_check_step_runs_without_a_plan_and_logs_nothing(self):
+        self.git("switch", "-q", "main")
+        result = self.run_script("check_step.py", "--step", "x", "--", sys.executable, "-c", "pass")
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("not logged: no plan file", result.stdout)
+        self.assertEqual(self.log(), [])
+
+    def test_floor_check_reports_removed_tests_skips_suppressions_and_surfaces(self):
+        (self.repo / "test_a.py").write_text(
+            "import unittest\n\n\n@unittest.skip('later')\ndef test_one():\n    x = 1  # noqa: F841\n")
+        (self.repo / "CMakeLists.txt").write_text("project(x)\n")
+        self.git("add", "CMakeLists.txt")
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("removed test: test_a.py: test_two", result.stdout)
+        self.assertNotIn("removed test: test_a.py: test_one", result.stdout)  # kept, only decorated
+        self.assertIn("added skip: test_a.py: @unittest.skip('later')", result.stdout)
+        self.assertIn("added suppression: test_a.py: x = 1  # noqa: F841", result.stdout)
+        self.assertIn("risk surface: build: CMakeLists.txt", result.stdout)
+
+    def test_floor_check_raises_a_quick_change_that_outgrew_its_lane(self):
+        self.write_plan("quick")
+        (self.repo / "test_a.py").write_text((self.repo / "test_a.py").read_text() + "x = 1\n" * 101)
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("raise to the full lane: 101 changed lines", result.stdout)
+        (self.repo / "test_a.py").write_text((self.repo / "test_a.py").read_text().replace("x = 1\n" * 101, "x = 1\n"))
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("nothing removed, skipped or suppressed", result.stdout)
+
+    def test_floor_check_that_cannot_run_exits_2(self):
+        self.assertEqual(self.run_script("floor_check.py", "--base", "no-such-ref").returncode, 2)
 
 
 if __name__ == "__main__":
