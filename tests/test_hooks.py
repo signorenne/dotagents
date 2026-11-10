@@ -1175,6 +1175,30 @@ class AfterEdit(unittest.TestCase):
                 self.assertEqual(module.main(), code, stderr.getvalue())
 
 
+PLAN_TEXT = """#+TITLE: Plan: {slug}
+
+- Status: in progress
+- Lane: full
+- Risk: low
+- Branch: feat/{slug}
+- Next: S2 the next step
+
+* Steps
+| Nr | Step | Files | Check | Status | Commit |
+|----+------+-------+-------+--------+--------|
+| S1 | one  | a.py  | unit  | done   |        |
+"""
+
+
+def write_plan(repo: Path, slug: str) -> Path:
+    """A git-ignored plan file .private/plans/<slug>.org, as the build skill writes it."""
+    write_notes(repo, {})
+    plan = repo / ".private" / "plans" / f"{slug}.org"
+    plan.parent.mkdir(parents=True, exist_ok=True)
+    plan.write_text(PLAN_TEXT.format(slug=slug))
+    return plan
+
+
 class SessionRefresh(unittest.TestCase):
     def refresh_with(self, payload, env: dict = None) -> subprocess.CompletedProcess:
         data = payload if isinstance(payload, str) else json.dumps(payload)
@@ -1251,7 +1275,7 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Current branch: work", result.stdout)
         self.assertIn("Uncommitted changes not shown: git status failed", result.stdout)
 
-    REREAD = "Re-read the task's progress log before the next step."
+    REREAD = "Re-read the task's plan file before the next step."
 
     def write_notes(self, repo: Path, notes: dict) -> None:
         write_notes(repo, notes)
@@ -1259,8 +1283,10 @@ class SessionRefresh(unittest.TestCase):
     def test_points_to_the_most_recent_task_notes(self):
         repo, env = self.committed_repo()
         day = 1_790_000_000
-        self.write_notes(repo, {"progress/old.org": day, "progress/a.org": day + 60,
-                                "progress/task/b.org": day + 120, "progress/c.org": day + 180,
+        self.write_notes(repo, {"plans/old.org": day, "plans/a.org": day + 60,
+                                "plans/b.md": day + 120, "plans/c.org": day + 180,
+                                "plans/c.log": day + 400, "plans/c.runs/x.txt": day + 500,
+                                "plans/archive/z.org": day + 600,
                                 "handoff/h.org": day + 30, "specs/s.org": day + 300})
         (repo / "src").mkdir()
         for cwd in (repo, repo / "src"):
@@ -1268,22 +1294,23 @@ class SessionRefresh(unittest.TestCase):
                 result = self.refresh_with({"cwd": str(cwd), "source": "compact"}, env)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))
                 listed = [f".private/{name} ({time.strftime('%Y-%m-%d %H:%M', time.localtime(mtime))})"
-                          for name, mtime in (("progress/c.org", day + 180), ("progress/task/b.org", day + 120),
-                                              ("progress/a.org", day + 60), ("handoff/h.org", day + 30))]
+                          for name, mtime in (("plans/c.org", day + 180), ("plans/b.md", day + 120),
+                                              ("plans/a.org", day + 60), ("handoff/h.org", day + 30))]
                 positions = [result.stdout.find(line) for line in listed]
                 self.assertNotIn(-1, positions, result.stdout)
-                self.assertEqual(positions, sorted(positions), "most recent first, progress before handoff")
+                self.assertEqual(positions, sorted(positions), "most recent first, plans before handoff")
                 self.assertNotIn("old.org", result.stdout)
+                self.assertNotIn("c.log", result.stdout)  # a plan's log and run outputs are not plans
+                self.assertNotIn("x.txt", result.stdout)
+                self.assertNotIn("z.org", result.stdout)  # plans sit at the top of plans/
                 self.assertNotIn("s.org", result.stdout)
                 self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
 
-    def test_linked_worktree_lists_the_main_checkouts_notes(self):
-        # A worktree has no .private/: its notes are in the main checkout's, the parent
-        # of git rev-parse --git-common-dir. They are listed with absolute paths, since
-        # the agent's folder is the worktree, not the checkout that holds them.
+    def test_linked_worktree_prints_the_main_checkouts_plan(self):
+        # A worktree has no .private/: its plan is in the main checkout's, the parent of
+        # git rev-parse --git-common-dir, named after the task branch's slug.
         repo, env = self.committed_repo()
-        day = 1_790_000_000
-        self.write_notes(repo, {"progress/task.org": day, "handoff/2026-11-12-task.org": day + 60})
+        write_plan(repo, "task")
         worktree = linked_worktree(self, repo, env)
         (worktree / "src").mkdir()
         for cwd in (worktree, worktree / "src"):
@@ -1291,10 +1318,42 @@ class SessionRefresh(unittest.TestCase):
                 result = self.refresh_with({"cwd": str(cwd), "source": "compact"}, env)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))
                 self.assertIn("Current branch: feat/task", result.stdout)
-                for name, mtime in (("progress/task.org", day), ("handoff/2026-11-12-task.org", day + 60)):
-                    when = time.strftime('%Y-%m-%d %H:%M', time.localtime(mtime))
-                    self.assertIn(f"{(repo / '.private' / name).as_posix()} ({when})", result.stdout)
+                self.assertIn(f"Plan: {(repo / '.private/plans/task.org').as_posix()}", result.stdout)
+                self.assertIn("Next: S2 the next step", result.stdout)
+                self.assertNotIn("Task notes", result.stdout)
                 self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
+
+    def test_a_new_or_cleared_session_gets_only_the_plan_excerpt(self):
+        repo, env = self.committed_repo()
+        write_plan(repo, "task")
+        worktree = linked_worktree(self, repo, env)
+        for source in ("startup", "clear"):
+            with self.subTest(source=source):
+                result = self.refresh_with({"cwd": str(worktree), "source": source}, env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertTrue(result.stdout.startswith("Plan file excerpt: a map"), result.stdout)
+                self.assertIn("Status in progress", result.stdout)
+                self.assertNotIn("Session restarted", result.stdout)
+                self.assertLess(len(result.stdout), 4100)
+        # Off a task branch with a plan, a new session costs nothing.
+        result = self.refresh_with({"cwd": str(repo), "source": "startup"}, env)
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def test_without_the_build_skill_the_refresh_still_reports_git(self):
+        repo, env = self.committed_repo()
+        write_plan(repo, "task")
+        worktree = linked_worktree(self, repo, env)
+        hooks = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, hooks)
+        shutil.copy(HOOKS / "session_refresh.py", hooks)
+        script = hooks / "session_refresh.py"
+        run_it = lambda source: subprocess.run([sys.executable, str(script)], capture_output=True, text=True,
+                                               input=json.dumps({"cwd": str(worktree), "source": source}),
+                                               check=False, env=env)
+        self.assertEqual((run_it("startup").returncode, run_it("startup").stdout), (0, ""))
+        compact = run_it("compact")
+        self.assertEqual((compact.returncode, compact.stderr), (0, ""))
+        self.assertIn("Current branch: feat/task", compact.stdout)
 
     def test_lists_the_other_worktrees(self):
         # Work in parallel or in isolation runs in sibling worktrees; after a compaction
@@ -1328,7 +1387,7 @@ class SessionRefresh(unittest.TestCase):
     def test_unreadable_task_notes_never_fail(self):
         repo, env = self.committed_repo()
         (repo / ".private").mkdir()
-        (repo / ".private/progress").write_text("a file, not a folder\n")
+        (repo / ".private/plans").write_text("a file, not a folder\n")
         self.write_notes(repo, {"handoff/h.org": 1_790_000_000})
         (repo / ".private/handoff/gone.org").symlink_to(repo / "missing")
         result = self.refresh(repo, env)
@@ -1349,7 +1408,7 @@ class SessionRefresh(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp)
         fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
         (tmp / ".git").mkdir()
-        self.write_notes(tmp, {"progress/p.org": 1_790_000_000})
+        self.write_notes(tmp, {"plans/p.org": 1_790_000_000})
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
         start = time.monotonic()
         result = self.refresh_with({"cwd": str(tmp), "source": "resume"}, env)
@@ -1361,15 +1420,15 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Last commits not shown", result.stdout)
         self.assertIn("Other worktrees not shown", result.stdout)
         # The notes are files, not git output: a slow git does not hide them.
-        self.assertIn(".private/progress/p.org", result.stdout)
+        self.assertIn(".private/plans/p.org", result.stdout)
         self.assertIn(self.REREAD, result.stdout)
 
 
 class CompactBrief(unittest.TestCase):
     # Claude Code's PreCompact: stdout of an exit 0 becomes instructions for the summary,
     # cut at 10,000 characters; exit 2 blocks the compaction (code.claude.com/docs/en/hooks).
-    ITEMS = ["The task:", "its slug", "progress log and handoff", "The current plan step",
-             "Review: pending", "The files changed", "commands still needed",
+    ITEMS = ["The task:", "its slug", "The plan file's path", "The current plan step",
+             "ruling still pending", "The files changed", "commands still needed",
              "last result of each"]
 
     def brief(self, payload, env: dict = None, script: Path = HOOKS / "compact_brief.py",
@@ -1386,32 +1445,33 @@ class CompactBrief(unittest.TestCase):
 
     def test_keeps_what_resuming_needs_with_the_real_state(self):
         repo, env = committed_repo(self)
-        write_notes(repo, {"progress/task.org": 1_790_000_000,
+        write_notes(repo, {"plans/task.org": 1_790_000_000,
                                    "handoff/2026-11-12-task.org": 1_790_000_060})
         (repo / "tracked.txt").write_text("two\n")
         result = self.brief({"cwd": str(repo), "hook_event_name": "PreCompact", "trigger": "auto",
                              "custom_instructions": None}, env)
         self.assert_brief(result)
         self.assertIn("The branch: work.", result.stdout)
-        self.assertIn(".private/progress/task.org", result.stdout)
+        self.assertIn(".private/plans/task.org", result.stdout)
         self.assertIn(".private/handoff/2026-11-12-task.org", result.stdout)
         self.assertIn("Uncommitted now:\n   M tracked.txt", result.stdout)
 
-    def test_linked_worktree_points_to_the_main_checkouts_notes(self):
+    def test_linked_worktree_points_to_the_main_checkouts_plan(self):
         repo, env = committed_repo(self)
-        write_notes(repo, {"progress/task.org": 1_790_000_000})
+        write_plan(repo, "task")
         worktree = linked_worktree(self, repo, env)
         result = self.brief({"cwd": str(worktree)}, env)
         self.assert_brief(result)
         self.assertIn("The branch: feat/task.", result.stdout)
-        self.assertIn(f"{(repo / '.private/progress/task.org').as_posix()} (", result.stdout)
+        self.assertIn(f"{(repo / '.private/plans/task.org').as_posix()} (the plan file of this branch)",
+                      result.stdout)
 
     def test_keeps_the_running_workflow_skill_and_its_step(self):
         # After a compaction the session refresh asks the agent to invoke its workflow
         # skill again; the summary must say which one and where in it the work stood.
         result = self.brief({"cwd": "/no/such/folder"})
         self.assert_brief(result)
-        self.assertIn("- The workflow skill in use (such as implement or spec) and the section or step "
+        self.assertIn("- The workflow skill in use (such as build or design) and the section or step "
                       "of it that was running, so it is invoked again there.", result.stdout)
 
     def test_keeps_the_users_unrecorded_constraints_and_what_is_blocked(self):
@@ -1478,14 +1538,14 @@ class CompactBrief(unittest.TestCase):
         self.addCleanup(shutil.rmtree, tmp)
         fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
         (tmp / ".git").mkdir()
-        write_notes(tmp, {"progress/p.org": 1_790_000_000})
+        write_notes(tmp, {"plans/p.org": 1_790_000_000})
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
         start = time.monotonic()
         result = self.brief({"cwd": str(tmp)}, env)
         self.assertLess(time.monotonic() - start, 9.5)
         self.assert_brief(result)
         self.assertIn("The branch: work.", result.stdout)
-        self.assertIn(".private/progress/p.org", result.stdout)
+        self.assertIn(".private/plans/p.org", result.stdout)
 
 
 def commit(folder: Path, env: dict, message: str) -> tuple:
@@ -1498,12 +1558,10 @@ def commit(folder: Path, env: dict, message: str) -> tuple:
     return out[0], int(out[1])
 
 
-class ProgressCheck(unittest.TestCase):
-    # Claude Code's Stop hook (code.claude.com/docs/en/hooks): input stop_hook_active
-    # (true when Claude Code already continues because of a stop hook), cwd; output
-    # {"decision": "block", "reason": ...} keeps Claude going with the reason. Codex's Stop
-    # (learn.chatgpt.com/docs/hooks) reads the same fields and the same JSON on exit 0.
-    def check(self, payload, env: dict = None, script: Path = HOOKS / "progress_check.py"):
+class StepLog(unittest.TestCase):
+    # Claude Code's and Codex's Stop hook: input cwd and stop_hook_active; no output lets
+    # the agent stop. step_log.py only writes the plan's log and never keeps it going.
+    def run_log(self, payload, env: dict = None, script: Path = HOOKS / "step_log.py"):
         data = payload if isinstance(payload, str) else json.dumps(payload)
         return subprocess.run([sys.executable, str(script)], input=data, capture_output=True,
                               text=True, check=False, env=env)
@@ -1513,141 +1571,151 @@ class ProgressCheck(unittest.TestCase):
                 "last_assistant_message": "Done.", **fields}
 
     def task(self, worktree: bool = True) -> tuple:
-        """(repository, folder of branch feat/task, env, progress log of the task)."""
+        """(repository, folder of branch feat/task, env, the plan's log path)."""
         repo, env = committed_repo(self)
         if worktree:
             folder = linked_worktree(self, repo, env)
         else:
             folder = repo
             subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feat/task"], check=True, env=env)
-        write_notes(repo, {"progress/task.org": time.time()})
-        return repo, folder, env, repo / ".private/progress/task.org"
+        return repo, folder, env, write_plan(repo, "task").with_suffix(".log")
 
-    def assert_lets_stop(self, result):
+    def commit_lines(self, log: Path) -> list:
+        """(commit, subject) of each commit line of the log."""
+        if not log.exists():
+            return []
+        rows = [line.split("\t") for line in log.read_text().splitlines()]
+        return [(row[3], row[6]) for row in rows if row[2] == "commit"]
+
+    def assert_silent(self, result):
         self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
-    def assert_blocks(self, result, log: Path, short: str):
-        self.assertEqual((result.returncode, result.stderr), (0, ""))
-        reply = json.loads(result.stdout)
-        self.assertEqual(sorted(reply), ["decision", "reason"])
-        self.assertEqual(reply["decision"], "block")
-        lines = reply["reason"].splitlines()
-        self.assertEqual(len(lines), 3, reply["reason"])
-        self.assertIn(log.as_posix(), lines[0])
-        self.assertIn(short, lines[0])
-        self.assertIn("feat/task", lines[0])
-        self.assertIn("commit hash", lines[1])
-        self.assertIn("check", lines[1])
-        # After a rebase every hash changes: mapping old to new is the whole fix.
-        self.assertIn("if a rebase only changed their hashes", lines[1])
-        self.assertIn("each old hash with its new one is enough", lines[1])
-        self.assertEqual(lines[2], "Then end the turn.")
-
-    def test_blocks_when_a_commit_is_missing_from_the_log(self):
+    def test_records_each_branch_commit_once_oldest_first(self):
         for worktree in (True, False):
             with self.subTest(worktree=worktree):
                 repo, folder, env, log = self.task(worktree)
-                full, when = commit(folder, env, "feat(x): step one")
-                log.write_text("* Steps\n** step one\n")
-                os.utime(log, (when + 60, when + 60))
-                self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
-                log.write_text(f"* Steps\n** step one {full[:7]}: check passed\n")
-                os.utime(log, (when + 60, when + 60))
-                self.assert_lets_stop(self.check(self.stop(folder), env))
+                one, _ = commit(folder, env, "feat(x): step one")
+                two, _ = commit(folder, env, "feat(x): step two")
+                self.assert_silent(self.run_log(self.stop(folder), env))
+                expected = [(one[:12], "feat(x): step one"), (two[:12], "feat(x): step two")]
+                self.assertEqual(self.commit_lines(log), expected)
+                self.assert_silent(self.run_log(self.stop(folder, stop_hook_active=True), env))
+                self.assertEqual(self.commit_lines(log), expected)  # once, even when continued
 
-    def test_blocks_when_a_commit_is_newer_than_the_log(self):
+    def test_a_hash_prefix_of_seven_characters_names_a_commit_and_six_do_not(self):
         repo, folder, env, log = self.task()
-        full, when = commit(folder, env, "feat(x): step one")
-        log.write_text(f"** step one {full}\n")
-        os.utime(log, (when - 120, when - 120))
-        self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
+        one, _ = commit(folder, env, "feat(x): one")
+        two, _ = commit(folder, env, "feat(x): two")
+        log.write_text(f"t\t-\tcommit\t{one[:7]}\t-\t-\tone\nt\t-\tcommit\t{two[:6]}\t-\t-\ttwo\n")
+        self.run_log(self.stop(folder), env)
+        self.assertEqual([c for c, _ in self.commit_lines(log)], [one[:7], two[:6], two[:12]])
 
-    def test_a_longer_or_shorter_hash_prefix_counts(self):
+    def test_commits_another_branch_or_a_remote_holds_are_not_recorded(self):
         repo, folder, env, log = self.task()
-        first, when = commit(folder, env, "one")
-        second, _ = commit(folder, env, "two")
-        log.write_text(f"one: {first[:12]}\ntwo: commit {second[:7].upper()}\n")
-        os.utime(log, (when + 60, when + 60))
-        self.assert_lets_stop(self.check(self.stop(folder), env))
-        log.write_text(f"one: {first[:6]}\ntwo: {second[:7]}\n")  # 6 characters are not a hash
-        os.utime(log, (when + 60, when + 60))
-        self.assert_blocks(self.check(self.stop(folder), env), log, first[:7])
-
-    def test_only_the_branchs_own_commits_count(self):
-        # The base branch's commits (here init on work) are not the task's steps.
-        repo, folder, env, log = self.task()
-        log.write_text("* Steps\n")
-        self.assert_lets_stop(self.check(self.stop(folder), env))
-
-    def test_commits_a_remote_branch_holds_are_not_asked_for(self):
-        # A commit the maintainer already pushed (a remote-tracking branch holds it) is
-        # not a step of the open task, whether or not the log names it.
-        repo, folder, env, log = self.task()
-        full, _ = commit(folder, env, "feat(x): step one")
-        log.write_text("* Steps\n")
-        os.utime(log, (1, 1))
-        self.assert_blocks(self.check(self.stop(folder), env), log, full[:7])
-        subprocess.run(["git", "-C", str(folder), "update-ref", "refs/remotes/origin/feat/task", "HEAD"],
+        one, _ = commit(folder, env, "feat(x): one")
+        two, _ = commit(folder, env, "feat(x): two")
+        subprocess.run(["git", "-C", str(repo), "update-ref", "refs/remotes/origin/feat/task", one],
                        check=True, env=env)
-        self.assert_lets_stop(self.check(self.stop(folder), env))
+        self.run_log(self.stop(folder), env)
+        self.assertEqual([c for c, _ in self.commit_lines(log)], [two[:12]])  # not init, not one
 
-    def test_lets_the_stop_through_once_continued_or_without_the_flag(self):
-        repo, folder, env, log = self.task()
-        commit(folder, env, "feat(x): step one")
-        log.write_text("* Steps\n")
-        os.utime(log, (1, 1))
-        # Cursor runs Claude Code's Stop hooks with its own input (status, loop_count) and
-        # no cap on follow-ups (cursor.com/docs/reference/third-party-hooks), so a missing
-        # flag lets the stop through too.
-        for payload in (self.stop(folder, stop_hook_active=True), self.stop(folder, stop_hook_active="false"),
-                        {"cwd": str(folder), "status": "completed", "loop_count": 0},
-                        {k: v for k, v in self.stop(folder).items() if k != "stop_hook_active"}):
-            with self.subTest(payload=payload):
-                self.assert_lets_stop(self.check(payload, env))
-
-    def test_lets_the_stop_through_outside_a_task_branch_with_a_log(self):
+    def test_nothing_is_written_off_a_task_branch_or_without_a_plan(self):
         repo, env = committed_repo(self)
-        commit(repo, env, "two")
-        write_notes(repo, {"progress/work.org": 1, "progress/other.org": 1})
-        self.assert_lets_stop(self.check(self.stop(repo), env))  # work: not <type>/<slug>
-        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feat/task"], check=True, env=env)
-        commit(repo, env, "three")
-        self.assert_lets_stop(self.check(self.stop(repo), env))  # no .private/progress/task.*
-        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--detach"], check=True, env=env)
-        write_notes(repo, {"progress/task.org": 1})
-        self.assert_lets_stop(self.check(self.stop(repo), env))  # detached HEAD
-        outside = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, outside)
-        self.assert_lets_stop(self.check(self.stop(outside), env))  # not a repository
+        write_notes(repo, {"plans/work.org": 1})
+        commit(repo, env, "chore: on work")
+        self.assert_silent(self.run_log(self.stop(repo), env))
+        self.assertFalse((repo / ".private/plans/work.log").exists())  # work is not <type>/<slug>
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "feat/other"], check=True, env=env)
+        commit(repo, env, "feat: other")
+        self.assert_silent(self.run_log(self.stop(repo), env))
+        self.assertEqual(sorted(p.name for p in (repo / ".private/plans").iterdir()), ["work.org"])
 
-    def test_bad_input_lets_the_stop_through(self):
-        for payload in ("not json", "", DEEP_JSON, [1], {"stop_hook_active": False},
-                        {"stop_hook_active": False, "cwd": 5}, {"stop_hook_active": False, "cwd": "bad\u0000path"},
-                        {"stop_hook_active": False, "cwd": "/no/such/folder"}):
+    def test_bad_input_never_fails_or_speaks(self):
+        repo, folder, env, log = self.task()
+        commit(folder, env, "feat(x): one")
+        for payload in ("not json", "", DEEP_JSON, [1], {"cwd": 5}, {"cwd": "bad\u0000path"},
+                        {"cwd": "/no/such/folder"}):
             with self.subTest(payload=str(payload)[:40]):
-                self.assert_lets_stop(self.check(payload))
+                self.assert_silent(self.run_log(payload, env))
+        self.assertEqual(self.commit_lines(log), [])
 
-    def test_without_session_refresh_the_stop_goes_through(self):
+    def test_without_the_build_skill_nothing_happens_and_no_cache_is_left(self):
+        repo, folder, env, log = self.task()
+        commit(folder, env, "feat(x): one")
         hooks = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, hooks)
-        shutil.copy(HOOKS / "progress_check.py", hooks)
-        repo, folder, env, log = self.task()
-        commit(folder, env, "feat(x): step one")
-        os.utime(log, (1, 1))
-        self.assert_lets_stop(self.check(self.stop(folder), env, script=hooks / "progress_check.py"))
-        self.assertEqual([p.name for p in hooks.iterdir()], ["progress_check.py"])
+        shutil.copy(HOOKS / "step_log.py", hooks)
+        self.assert_silent(self.run_log(self.stop(folder), env, script=hooks / "step_log.py"))
+        self.assertEqual([p.name for p in hooks.iterdir()], ["step_log.py"])
+        self.assertEqual(self.commit_lines(log), [])
 
     def test_slow_git_stays_within_hook_timeout(self):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
-        fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo feat/p\nexit 0\n')
+        fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo feat/task\nexit 0\n')
         (tmp / ".git").mkdir()
-        write_notes(tmp, {"progress/p.org": 1})
+        write_plan(tmp, "task")
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
         start = time.monotonic()
-        result = self.check(self.stop(tmp), env)
+        self.assert_silent(self.run_log(self.stop(tmp), env))
         self.assertLess(time.monotonic() - start, 9.5)
-        self.assert_lets_stop(result)
+
+
+class ContextNudge(unittest.TestCase):
+    # Claude Code's PostToolUse: input tool_name, tool_input, transcript_path, cwd; a JSON
+    # systemMessage on stdout is shown to the user (code.claude.com/docs/en/hooks).
+    def setUp(self):
+        self.repo, self.env = committed_repo(self)
+        self.folder = linked_worktree(self, self.repo, self.env)
+        write_plan(self.repo, "task")
+        self.transcript = self.repo.parent / f"{self.repo.name}-session.jsonl"
+        self.addCleanup(lambda: self.transcript.unlink(missing_ok=True))
+
+    def session(self, *contexts, sidechain: int = 0):
+        """A transcript whose main requests had these contexts, the last one last."""
+        rows = [{"type": "user", "message": {"content": "go"}}]
+        for tokens in contexts:
+            rows.append({"type": "assistant", "message": {"id": f"m{tokens}", "usage": {
+                "input_tokens": 10, "cache_creation_input_tokens": 0, "cache_read_input_tokens": tokens - 10,
+                "output_tokens": 5}}})
+        if sidechain:
+            rows.append({"type": "assistant", "isSidechain": True, "message": {"id": "side", "usage": {
+                "input_tokens": sidechain, "output_tokens": 1}}})
+        self.transcript.write_text("".join(json.dumps(r) + "\n" for r in rows) + "{broken\n")
+
+    def nudge(self, command="git commit -m 'feat(x): step'", cwd=None, transcript=None):
+        payload = {"session_id": "s", "hook_event_name": "PostToolUse", "tool_name": "Bash",
+                   "tool_input": {"command": command}, "tool_response": {},
+                   "transcript_path": str(transcript or self.transcript), "cwd": str(cwd or self.folder)}
+        return run("context_nudge.py", payload, env=self.env)
+
+    def test_a_commit_with_a_large_context_tells_the_user_to_clear(self):
+        self.session(120_000, 250_000)
+        for command in ("git commit -m x", "cd /r && git -C /r commit -q -m x", "make && (git commit -am x)"):
+            with self.subTest(command=command):
+                result = self.nudge(command)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                message = json.loads(result.stdout)["systemMessage"]
+                self.assertIn("250k tokens", message)
+                self.assertIn("/clear", message)
+                self.assertIn("task.org", message)
+
+    def test_no_hint_for_a_small_context_another_command_or_no_plan(self):
+        self.session(250_000, 150_000, sidechain=900_000)
+        self.assertEqual(self.nudge().stdout, "")  # the last main request is small
+        self.session(250_000)
+        for command in ("git status", "git commit-tree HEAD^{tree}", "echo git commit"):
+            with self.subTest(command=command):
+                self.assertEqual(self.nudge(command).stdout, "")
+        self.assertEqual(self.nudge(cwd=self.repo).stdout, "")  # branch work has no plan
+
+    def test_bad_input_and_a_missing_transcript_never_fail(self):
+        self.session(250_000)
+        self.assertEqual(self.nudge(transcript=self.repo / "missing.jsonl").stdout, "")
+        for payload in ("not json", "", DEEP_JSON, [1], {"tool_input": 5}, {"tool_input": {"command": 5}}):
+            with self.subTest(payload=str(payload)[:40]):
+                result = run("context_nudge.py", payload, env=self.env)
+                self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
 
 class ClaimCheck(unittest.TestCase):

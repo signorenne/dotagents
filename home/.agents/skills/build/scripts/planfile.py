@@ -26,13 +26,15 @@ SECTION = re.compile(r"^(?:\* +|## +)(.+?)\s*$")
 SEPARATOR_ROW = re.compile(r"^\|[-+:| ]+\|?$")
 LOG_FIELDS = ("time", "step", "kind", "commit", "result", "tests", "command")
 PLAN_SUFFIXES = (".org", ".md")
+# Seconds per git call; a hook with a time limit lowers it before calling in.
+GIT_TIMEOUT = 5.0
 
 
-def git(args, cwd, timeout: float = 5.0) -> tuple[str, bool]:
-    """(stdout without trailing newlines, ok)."""
+def git(args, cwd, timeout: float | None = None) -> tuple[str, bool]:
+    """(stdout without trailing newlines, ok); a call slower than the timeout is not ok."""
     try:
         result = subprocess.run(["git", *args], cwd=str(cwd), capture_output=True, text=True,
-                                timeout=timeout, check=False)
+                                timeout=timeout or GIT_TIMEOUT, check=False)
     except (OSError, ValueError, subprocess.TimeoutExpired):
         return "", False
     return result.stdout.rstrip("\n"), result.returncode == 0

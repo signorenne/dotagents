@@ -42,8 +42,10 @@ TOOLS = ("claude", "codex", "gemini", "antigravity", "copilot", "cursor")
 # Hook scripts this repository installs, and those an older version kept in ~/.claude/hooks.
 OUR_HOOK_SCRIPTS = sorted(p.name for p in (SRC / "hooks").glob("*.py"))
 OLD_HOOK_SCRIPTS = ("guard_bash.py", "after_edit.py")
+# Hook scripts this repository installed in ~/.agents/hooks and has since renamed or dropped.
+RETIRED_HOOK_SCRIPTS = ("progress_check.py",)
 OUR_HOOK = re.compile(r"(?:{})(?![\w.-])".format("|".join(
-    [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS]
+    [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS + list(RETIRED_HOOK_SCRIPTS)]
     + [re.escape(f"/.claude/hooks/{name}") for name in OLD_HOOK_SCRIPTS])))
 OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
 # Skills this repository renamed or dropped (review became branch-review): an old copy
@@ -87,16 +89,17 @@ def script(name: str, tool: str) -> str:
 
 
 # Codex runs SessionStart with matcher on the source (startup, resume, clear, compact,
-# fork) and adds plain stdout as developer context, as Claude Code does.
+# fork) and adds plain stdout as developer context, as Claude Code does (capped at about
+# 2,500 tokens per message, so the plan excerpt stays under 4,000 characters).
 CODEX_HOOKS = {
     "PreToolUse": [{"matcher": "Bash", "hooks": [hook(script("guard_bash.py", "codex"), timeout=10)]}],
     "PostToolUse": [{"matcher": "apply_patch|Edit|Write",
                      "hooks": [hook(script("after_edit.py", "codex"), timeout=60)]}],
-    "SessionStart": [{"matcher": "compact|resume",
+    "SessionStart": [{"matcher": "startup|resume|clear|compact",
                       "hooks": [hook('python3 "$HOME/.agents/hooks/session_refresh.py"', timeout=10)]}],
     # Stop reads stop_hook_active and takes {"decision": "block", "reason"} on exit 0, as in
     # Claude Code; exit 2 also continues, so a missing script must not pass python3's 2 on.
-    "Stop": [{"hooks": [hook('python3 "$HOME/.agents/hooks/progress_check.py" || true', timeout=10)]}],
+    "Stop": [{"hooks": [hook('python3 "$HOME/.agents/hooks/step_log.py" || true', timeout=10)]}],
 }
 GEMINI_HOOKS = {
     "BeforeTool": [{"matcher": "run_shell_command",
@@ -502,6 +505,10 @@ class Installer:
                 if stale.is_file() and "__pycache__" not in stale.parts \
                         and not (skill / stale.relative_to(installed)).exists():
                     self.backup(stale)
+        for name in RETIRED_HOOK_SCRIPTS:
+            stale = self.agents_home / "hooks" / name
+            if stale.is_file() and not stale.is_symlink() and OUR_LICENSE in stale.read_text(errors="replace"):
+                self.backup(stale)
         for name in RETIRED_SKILLS:
             installed = self.agents_home / "skills" / name
             skill_md = installed / "SKILL.md"

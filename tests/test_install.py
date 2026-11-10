@@ -410,7 +410,7 @@ class Install(unittest.TestCase):
                    "cwd": str(self.home)}
         installed = self.run_hook(handler["command"], payload)
         self.assertEqual(installed.returncode, 0, installed)
-        self.assertIn("Review: pending", installed.stdout)
+        self.assertIn("Each ruling still pending", installed.stdout)
         (self.home / ".agents/hooks/compact_brief.py").unlink()
         missing = self.run_hook(handler["command"], payload)
         self.assertEqual(missing.returncode, 0, missing)
@@ -470,7 +470,7 @@ class Install(unittest.TestCase):
         self.assert_hook_group(post, "after_edit.py", "codex", ["apply_patch", "Edit", "Write"], ["Bash"],
                                range(1, 601))
 
-    def assert_stop_check(self, groups: list, payload: dict, scripts=("progress_check.py",)):
+    def assert_stop_check(self, groups: list, payload: dict, scripts=("step_log.py",)):
         """One Stop group without a matcher whose commands, one per script, never keep the
         agent going on their own failure: exit 2 from a Stop hook continues the turn, and
         python3 exits 2 when the script is missing, so each command ends in || true."""
@@ -489,7 +489,7 @@ class Install(unittest.TestCase):
                 missing = self.run_hook(handler["command"], payload)
                 self.assertEqual((missing.returncode, missing.stdout), (0, ""))
 
-    def test_claude_checks_the_progress_log_and_a_test_claim_before_a_stop(self):
+    def test_claude_logs_the_branch_commits_and_checks_a_test_claim_before_a_stop(self):
         # Claude Code's Stop: no matcher; input transcript_path, stop_hook_active,
         # last_assistant_message. The claim check reads the transcript, whose shape only
         # Claude Code's is known; Codex calls its own format not a stable interface.
@@ -498,7 +498,7 @@ class Install(unittest.TestCase):
         self.assert_stop_check(hooks["Stop"], {"session_id": "s", "transcript_path": str(self.home / "t.jsonl"),
                                                "cwd": str(self.home), "hook_event_name": "Stop",
                                                "stop_hook_active": False, "last_assistant_message": "Tests pass."},
-                               scripts=("progress_check.py", "claim_check.py"))
+                               scripts=("step_log.py", "claim_check.py"))
 
     def test_claude_points_repeated_bash_failures_to_a_change_of_approach(self):
         # Claude Code's PostToolUseFailure: matcher on the tool name; input session_id,
@@ -526,7 +526,7 @@ class Install(unittest.TestCase):
         missing = self.run_hook(handler["command"], payload)
         self.assertEqual((missing.returncode, missing.stdout), (0, ""))
 
-    def test_codex_checks_the_progress_log_before_a_stop(self):
+    def test_codex_logs_the_branch_commits_before_a_stop(self):
         # Codex hooks docs: Stop ignores matcher; input turn_id, stop_hook_active,
         # last_assistant_message; JSON on stdout with exit 0, and no output lets it stop.
         self.install("--tools", "codex")
@@ -535,17 +535,16 @@ class Install(unittest.TestCase):
                                                "hook_event_name": "Stop", "model": "m", "permission_mode": "default",
                                                "stop_hook_active": False, "last_assistant_message": None})
 
-    def test_codex_refreshes_the_session_after_a_compaction_or_a_resume(self):
+    def test_codex_refreshes_the_session_on_start_clear_compaction_and_resume(self):
         # Codex hooks docs: the SessionStart matcher filters the source (startup, resume, clear,
         # compact, fork); after a compaction the hook runs before the next model request, and
         # plain text on stdout is added as developer context. Input: session_id,
         # transcript_path, cwd, hook_event_name, model, source.
         self.install("--tools", "codex")
         (start,) = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]["SessionStart"]
-        for source in ("compact", "resume"):
-            self.assertTrue(re.search(start["matcher"], source), source)
-        for source in ("startup", "clear", "fork"):
-            self.assertFalse(re.search(start["matcher"], source), source)
+        for source in ("compact", "resume", "startup", "clear"):
+            self.assertTrue(re.fullmatch(start["matcher"], source), source)
+        self.assertFalse(re.fullmatch(start["matcher"], "fork"))
         (handler,) = start["hooks"]
         self.assertEqual(handler["type"], "command")
         self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/session_refresh.py"')

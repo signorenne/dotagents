@@ -1,15 +1,19 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
-"""SessionStart hook (Claude Code and Codex, matcher "compact|resume"): after a
-compaction or a resume, remind the agent that its picture of the code is a summary and
-print the real repository state (branch, changes, last commits and the other
-worktrees), so stale function names are caught before they cause edits. After a
-compaction it also asks the agent to invoke its workflow skill again.
-When the project keeps git-ignored task notes, it also lists the three most recent
-files under .private/progress/ and under .private/handoff/ (found in the working folder
-or a parent, up to the repository root, or in a linked worktree in the main checkout),
-with absolute paths, and asks the agent to re-read the progress log.
+"""SessionStart hook (Claude Code and Codex, matcher "startup|resume|clear|compact").
+
+On a task branch whose plan file exists, it prints the plan excerpt of the build skill's
+plan_state.py --excerpt (status, next step, step in progress, open rulings), marked as a
+map to check against git. On a new session or after a clear that is all it prints, and
+nothing at all without a plan file. After a compaction or a resume it first reminds the
+agent that its picture of the code is a summary and prints the real repository state
+(branch, changes, last commits and the other worktrees), so stale function names are
+caught before they cause edits; after a compaction it also asks the agent to invoke its
+workflow skill again. Without a plan excerpt it lists instead the three most recent plan
+files of .private/plans/ and files of .private/handoff/ (found in the working folder or
+a parent, up to the repository root, or in a linked worktree in the main checkout), with
+absolute paths.
 
 Usage: python3 "$HOME/.agents/hooks/session_refresh.py"
 Plain stdout on exit 0 is added to the agent's context. Never fails the session.
@@ -33,13 +37,18 @@ CALL_TIMEOUT_SECONDS = 5
 MIN_CALL_SECONDS = 0.5
 TIMED_OUT = "did not finish in time"
 FAILED = "failed"
-NOTE_FOLDERS = ("progress", "handoff")
+NOTE_FOLDERS = ("plans", "handoff")
+PLAN_SUFFIXES = (".org", ".md")
+# The plan excerpt: the build skill's script, beside this folder once installed.
+PLAN_STATE = Path(__file__).resolve().parent.parent / "skills" / "build" / "scripts" / "plan_state.py"
+EXCERPT_SECONDS = 3
+EXCERPT_CHARACTERS = 4000  # under Codex's cap of about 2,500 tokens per hook message
 NOTES_PER_FOLDER = 3
 # The notes listing runs first, so it gets a small share of the budget and a cap on the
 # files it looks at; git gets the rest.
 NOTES_SECONDS = 1
 MAX_SCANNED_FILES = 2000
-REREAD = "Re-read the task's progress log before the next step."
+REREAD = "Re-read the task's plan file before the next step."
 # After a compaction Claude Code re-attaches only the start (5,000 tokens) of each skill
 # invoked before it, and may drop older ones; Codex documents nothing on it, so the line
 # gives no tool's reason.
@@ -128,9 +137,12 @@ def task_notes(cwd: str, deadline: float) -> list[str]:
         lines, scanned = [], 0
         for name in NOTE_FOLDERS:
             found = []
-            for folder, _, files in os.walk(private / name):
+            for folder, folders, files in os.walk(private / name):
                 if scanned >= MAX_SCANNED_FILES or time.monotonic() > deadline:
                     break
+                if name == "plans":  # the plans themselves, not their logs and run outputs
+                    folders[:] = []
+                    files = [f for f in files if f.endswith(PLAN_SUFFIXES)]
                 for file in files[:MAX_SCANNED_FILES - scanned]:
                     scanned += 1
                     path = Path(folder) / file
@@ -147,6 +159,20 @@ def task_notes(cwd: str, deadline: float) -> list[str]:
         return []
 
 
+def plan_excerpt(cwd: str, deadline: float) -> str:
+    """plan_state.py --excerpt for cwd, or "" when there is no plan, no script or no time."""
+    left = min(EXCERPT_SECONDS, deadline - time.monotonic())
+    if left < MIN_CALL_SECONDS or not PLAN_STATE.is_file():
+        return ""
+    try:
+        result = subprocess.run([sys.executable, "-B", str(PLAN_STATE), "--excerpt", "--cwd", cwd,
+                                 "--max-chars", str(EXCERPT_CHARACTERS)],
+                                capture_output=True, text=True, timeout=left, check=False)
+    except (subprocess.TimeoutExpired, OSError, ValueError):
+        return ""
+    return result.stdout.strip() if result.returncode == 0 else ""
+
+
 def main() -> int:
     deadline = time.monotonic() + DEADLINE_SECONDS
     try:
@@ -157,8 +183,13 @@ def main() -> int:
         payload = {}
     cwd = text_field(payload, "cwd", ".")
     source = text_field(payload, "source", "resume or compaction")
+    excerpt = plan_excerpt(cwd, deadline)
+    if source in ("startup", "clear"):
+        if excerpt:
+            print(excerpt)
+        return 0
     # Before git, so a slow git cannot leave the notes out.
-    notes = task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))
+    notes = [] if excerpt else task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))
 
     lines = [
         f"Session restarted from {source}. Everything you remember about the code is a "
@@ -208,7 +239,10 @@ def main() -> int:
             if shown:
                 lines.append("Other worktrees of this repository:\n" + "\n".join(shown)
                              + (f"\n... and {more} more" if more > 0 else ""))
-    if notes:
+    if excerpt:
+        lines.append(excerpt)
+        lines.append(REREAD)
+    elif notes:
         lines.append("Task notes (git-ignored), most recent first:\n" + "\n".join(notes))
         lines.append(REREAD)
     print("\n".join(lines))

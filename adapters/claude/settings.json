@@ -95,6 +95,16 @@
             "timeout": 60
           }
         ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.agents/hooks/context_nudge.py\" || true",
+            "timeout": 10
+          }
+        ]
       }
     ],
     "PostToolUseFailure": [
@@ -122,7 +132,7 @@
     ],
     "SessionStart": [
       {
-        "matcher": "compact|resume",
+        "matcher": "startup|resume|clear|compact",
         "hooks": [
           {
             "type": "command",
@@ -137,7 +147,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.agents/hooks/progress_check.py\" || true",
+            "command": "python3 \"$HOME/.agents/hooks/step_log.py\" || true",
             "timeout": 10
           },
           {

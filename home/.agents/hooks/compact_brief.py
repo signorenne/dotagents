@@ -4,13 +4,14 @@
 """PreCompact hook (Claude Code): tell the compaction summary what resuming the work
 needs. When a PreCompact hook exits 0, Claude Code uses its stdout as instructions for
 the summary, cut at 10,000 characters. The brief asks the summary to keep the task and
-its slug, the branch, the paths of the task's progress log and handoff, the workflow
-skill and its running section or step, the current plan step, the decisions marked
-Review: pending, the user's constraints that no file records (word for word) and
-what is blocked on what, the files changed, and the commands still needed with their
-last results. It fills in what it can read itself: the branch, the uncommitted
-changes, and the newest files of .private/progress/ and .private/handoff/
-(session_refresh.py's finder).
+its slug, the branch, the plan file's path (it holds the state: status, next step,
+steps, rulings), the workflow skill and its running section or step, the current plan
+step, the rulings still pending and the user's choices of this session, the user's
+constraints that no file records (word for word) and what is blocked on what, the files
+changed, and the commands still needed with their last results. It fills in what it can
+read itself: the branch, the uncommitted changes, the plan file of a task branch (the
+build skill's planfile.py) or else the newest files of .private/plans/ and
+.private/handoff/ (session_refresh.py's finder).
 
 Usage: python3 "$HOME/.agents/hooks/compact_brief.py" || true
 Always exits 0: exit 2 blocks the compaction, and when the compaction recovers from a
@@ -23,12 +24,19 @@ covers what the script cannot: python3 exits 2 when the script file is missing.
 import json
 import sys
 import time
+from pathlib import Path
 
 sys.dont_write_bytecode = True  # importing session_refresh leaves no cache in ~/.agents/hooks
 try:
     import session_refresh
 except Exception:  # a missing or broken copy only drops the facts read from disk
     session_refresh = None
+try:
+    sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "skills" / "build" / "scripts"))
+    import planfile
+    planfile.GIT_TIMEOUT = 1.0  # five calls leave time for the git state under the 10 s timeout
+except Exception:  # without the build skill the brief names the newest notes instead
+    planfile = None
 
 # Claude Code cuts PreCompact stdout at 10,000 characters; stay well under it.
 MAX_CHARACTERS = 9000
@@ -52,7 +60,15 @@ def facts(cwd: str) -> tuple:
     if session_refresh is None:
         return "", "", ""
     deadline = time.monotonic() + DEADLINE_SECONDS
-    notes = session_refresh.task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))
+    plan = None
+    if planfile is not None:
+        try:
+            plan = planfile.locate(cwd)[2]
+        except Exception:  # an unreadable plan only drops its path
+            plan = None
+    notes = (f"{plan} (the plan file of this branch)" if plan else
+             "\n".join(session_refresh.task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))))
+    notes = notes.splitlines()
     branch, problem = session_refresh.git("branch", "--show-current", cwd=cwd, deadline=deadline)
     if problem:
         return "", "", "\n".join(notes)
@@ -79,12 +95,12 @@ def brief(branch: str, changes: str, notes: str) -> str:
         "without asking the user again:",
         "- The task: what the user asked, its slug, and the check that says it is done.",
         f"- The branch: {branch}." if branch else "- The branch the work is on.",
-        "- The paths of the task's progress log and handoff, verbatim"
-        + (f". The newest task notes:\n{indented(notes)}" if notes else "."),
-        "- The workflow skill in use (such as implement or spec) and the section or step of it "
+        "- The plan file's path, verbatim: it holds the state (status, next step, steps, rulings)"
+        + (f". Task notes:\n{indented(notes)}" if notes else "."),
+        "- The workflow skill in use (such as build or design) and the section or step of it "
         "that was running, so it is invoked again there.",
         "- The current plan step: the step in progress, the steps done and the steps left.",
-        "- Each decision marked Review: pending, with who took it and why.",
+        "- Each ruling still pending and each choice the user made in this session, with why.",
         "- Each constraint the user stated in this session that no file records, word for word, "
         "and what is blocked and on what.",
         "- The files changed, each with what changed"
