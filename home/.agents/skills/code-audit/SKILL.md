@@ -17,7 +17,7 @@ Goal: a short list of problems the owner can act on and trust. A wrong finding c
 
 ## 2. Find candidates
 
-- Map the area with scout (for a large repository, one read-only subagent per area), then read yourself the code each candidate depends on.
+- Map the area with scout; for a large repository, at most about four read-only subagents, one per area (in Claude Code the general-purpose subagent with model sonnet and effort medium, told not to edit; return: candidates with file:line and a one-line reason, at most 40 lines). Then read yourself the code each candidate depends on.
 - Look in this order:
   - security: input reaching a dangerous call, secrets in code, missing authorization, unsafe parsing or deserialization, each named with its CWE;
   - likely bugs: wrong results, races, resource leaks, unchecked errors, boundary mistakes, undefined behavior, mismatches with a contract or spec;
@@ -27,7 +27,7 @@ Goal: a short list of problems the owner can act on and trust. A wrong finding c
 
 ## 3. Confirm each candidate
 
-Give each candidate a check that could fail: a failing test, a command and its output, a reproduction, or a subagent that did not find it, given only the claim and the code, told that its target is the claim at file:line, not the branch diff, and asked to refute it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer with that instruction). What survives becomes a finding. Anything you cannot confirm, that depends on intent, environment or a threat model, or that you do not fully understand, goes to Questions instead. Drop issues that cannot happen in this code and style preferences the project's rules do not back.
+Give each candidate a check that could fail: a failing test, a command and its output, a reproduction, or a subagent that did not find it, given only the claims and the code, told that its target is each claim at file:line, not the branch diff, and asked to refute it (in Claude Code the general-purpose subagent on the session's model at effort high, told not to edit; elsewhere the reviewer with that instruction; return: per claim holds or refuted with evidence, at most 40 lines). Give one such subagent all the candidates of an area rather than one subagent per candidate. What survives becomes a finding. Anything you cannot confirm, that depends on intent, environment or a threat model, or that you do not fully understand, goes to Questions instead. Drop issues that cannot happen in this code and style preferences the project's rules do not back.
 
 ## 4. Report
 

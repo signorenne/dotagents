@@ -38,7 +38,8 @@ An agent knows this conversation only through its brief (it does load the projec
 - where to start (files and lines), as a starting point: it reports where it had to go beyond it;
 - the build and test commands for its worktree, the commit style and the gates;
 - the rules: follow the build skill from section 5 with the steps of its plan file, when available; commit each verified step; never merge, push, or touch the target branch or the main checkout, except its plan file and log in the main checkout's .private/plans/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
-- what to return: its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
+- the model and effort it runs on: writers on the session's model and effort, since they make the code's choices;
+- what to return, in at most 30 lines: its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
 
 ## 4. Watch
 
