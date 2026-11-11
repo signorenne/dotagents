@@ -207,3 +207,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The maintainer wants one structure in every project, as Martin, Evans, Fowler and Cockburn describe it. No source makes every layer mandatory (Android adds use cases "only when required", Gossman calls MVVM overkill for simple UIs, Ardalis keeps a single-project template for small apps); the recorded exception keeps the structure without use cases that only forward calls. It makes small apps heavier than they would otherwise be.
 - Rejected: every layer with no exception (use cases that only forward calls); layers added only when needed, as in Android's guide (against the maintainer's structure); a domain that depends on the data layer, as in Android (against Martin, Cockburn, Vernon and the reference templates).
 - Revisit if: the layers cost more than they give in a project, or projects stop following them.
+
+## D-0018: UI threads never block; work moves through events
+
+- Status: Accepted
+- Proposed by: maintainer (an event-based architecture where the UI or graphics thread is never interrupted, file writes and heavy computation elsewhere), agent (one skill, the rules from the sources, the Qt lines in qt-quick)
+- Decided by: maintainer
+- Date: 2026-11-11
+- Rule in: home/.agents/skills/event-driven-ui/SKILL.md, qt-quick (Threads), clean-architecture (one pointer)
+- Decision: A language-neutral skill for event-based concurrency inside an application with a UI or render loop: one owning thread per piece of state, a UI thread that never waits, long-lived worker threads per role with results back as events, bounded queues with an overflow policy per stream, coalesced bursts and budgeted handling, superseded work dropped, crash-safe writes from a writer thread, injected clocks, owner checks and ThreadSanitizer. One loop with asynchronous APIs stays the answer when every handler fits the frame budget.
+- Why: The maintainer's rule and fdc-next's design, which match Chromium's threading guide, Android's and Apple's main-thread rules, Qt's threading documentation, the single writer principle and the LMAX Disruptor. A separate skill loads when a UI freezes, not only for architecture questions. It brings more threads to reason about and event flows that are harder to follow in the code, hence the rule on when one loop is enough.
+- Rejected: a section in clean-architecture (would not load for a frozen UI); a thread per task (switching and memory costs); locks shared between threads as the default (deadlocks and contention).
+- Revisit if: in a project whose handlers all fit the frame budget the threads add only complexity, or the skill misfires in real sessions.
