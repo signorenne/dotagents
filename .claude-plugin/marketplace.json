@@ -1,0 +1,135 @@
+{
+  "name": "dotagents",
+  "owner": {
+    "name": "Nicolò Plebani"
+  },
+  "description": "A cross-agent method and skill set: plan files, lanes, reviews that can fail, and craft, docs and chat skills.",
+  "plugins": [
+    {
+      "name": "dotagents-method",
+      "source": "./packs/method",
+      "description": "The dotagents method: build in lanes from one plan file, design, close, decide, review and gates, with the scout, reviewer and gate-runner subagents, the guard and session hooks, and the global rules.",
+      "version": "1.0.0",
+      "license": "MIT",
+      "hooks": {
+        "PreToolUse": [
+          {
+            "matcher": "Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/guard_bash.py\" --tool claude",
+                "timeout": 10,
+                "onFailure": "block"
+              }
+            ]
+          }
+        ],
+        "PostToolUse": [
+          {
+            "matcher": "Edit|Write",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/after_edit.py\" --tool claude",
+                "timeout": 60
+              }
+            ]
+          },
+          {
+            "matcher": "Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/context_nudge.py\" || true",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PostToolUseFailure": [
+          {
+            "matcher": "Bash",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/repeated_failure.py\" || true",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "PreCompact": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/compact_brief.py\" || true",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "SessionStart": [
+          {
+            "matcher": "startup|clear|compact",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "cat \"${CLAUDE_PLUGIN_ROOT}/AGENTS.md\"",
+                "timeout": 10
+              }
+            ]
+          },
+          {
+            "matcher": "startup|resume|clear|compact",
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/session_refresh.py\"",
+                "timeout": 10
+              }
+            ]
+          }
+        ],
+        "Stop": [
+          {
+            "hooks": [
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/step_log.py\" || true",
+                "timeout": 10
+              },
+              {
+                "type": "command",
+                "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/hooks/claim_check.py\" || true",
+                "timeout": 10
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "name": "dotagents-craft",
+      "source": "./packs/craft",
+      "description": "Craft skills: clean architecture, event-driven UIs, Qt Quick, precise UI changes, code audits and notes from work.",
+      "version": "1.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "dotagents-docs",
+      "source": "./packs/docs",
+      "description": "Documentation skills: as-built docs, requirements and architecture, project setup for agents, and PlantUML diagrams.",
+      "version": "1.0.0",
+      "license": "MIT"
+    },
+    {
+      "name": "dotagents-chat",
+      "source": "./packs/chat",
+      "description": "The skills that also run in chat: debugging, tests that can fail, verification, research, decisions, prompts, notes, tutoring and handoffs.",
+      "version": "1.0.0",
+      "license": "MIT"
+    }
+  ]
+}

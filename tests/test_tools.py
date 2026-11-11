@@ -34,7 +34,7 @@ class Tools(unittest.TestCase):
     def setUp(self):
         self.repo = Path(tempfile.mkdtemp()) / "repo"
         # Local state stays out: .private notes and .claude (settings, agent worktrees).
-        shutil.copytree(ROOT, self.repo, ignore=shutil.ignore_patterns(
+        shutil.copytree(ROOT, self.repo, symlinks=True, ignore=shutil.ignore_patterns(
             ".git", "dist", "__pycache__", ".private", ".claude"))
         self.addCleanup(shutil.rmtree, self.repo.parent)
 
@@ -55,6 +55,33 @@ class Tools(unittest.TestCase):
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
         self.assertIn("FAIL home/.agents/AGENTS.md: 9001 characters (limit 9000", result.stdout)
+
+    def test_validate_keeps_the_packs_in_step_with_their_sources(self):
+        marketplace = self.repo / ".claude-plugin/marketplace.json"
+        marketplace.write_text(marketplace.read_text().replace('"1.0.0"', '"0.9.0"', 1))
+        (self.repo / "packs/method/skills/build").unlink()
+        (self.repo / "packs/craft/skills/stray").symlink_to("../../../home/.agents/skills/gates")
+        skill = self.repo / "home/.agents/skills/new-one"
+        skill.mkdir()
+        (skill / "SKILL.md").write_text('---\nname: new-one\ndescription: "Does a new thing. Use when asked."\n'
+                                        'license: "MIT"\n---\n\nBody.\n')
+        (skill / "LICENSE.txt").write_text("MIT\n")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        lines = result.stdout.splitlines()
+        self.assertIn("FAIL .claude-plugin/marketplace.json: missing or out of date; run python3 tools/build.py "
+                      "--marketplace", lines)
+        self.assertIn("FAIL packs/method/skills/build: not a link to ../../../home/.agents/skills/build; "
+                      "run python3 tools/build.py --marketplace", lines)
+        self.assertIn("FAIL packs/craft/skills/stray: a link no pack names; run python3 tools/build.py "
+                      "--marketplace", lines)
+        self.assertIn("FAIL home/.agents/skills/new-one: in 0 packs of tools/build.py (PACKS), not one", lines)
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
+        result = self.run_tool("validate.py")
+        self.assertEqual([line for line in result.stdout.splitlines() if line.startswith("FAIL ")],
+                         ["FAIL home/.agents/skills/new-one: in 0 packs of tools/build.py (PACKS), not one"])
+        self.assertFalse((self.repo / "packs/craft/skills/stray").is_symlink())
+        self.assertTrue((self.repo / "packs/method/skills/build").is_symlink())
 
     def test_validate_rejects_a_toml_end_marker_in_a_subagent(self):
         scout = self.repo / "home/.agents/agents/scout.md"
@@ -104,7 +131,11 @@ class Tools(unittest.TestCase):
         folder.mkdir()
         (folder / "SKILL.md").write_text(f"---\nname: {name}\ndescription: {description}\nlicense: MIT\n---\n{body}",
                                          encoding="utf-8")
-        shutil.copy(self.repo / "home/.agents/skills/spec/LICENSE.txt", folder / "LICENSE.txt")
+        shutil.copy(self.repo / "home/.agents/skills/design/LICENSE.txt", folder / "LICENSE.txt")
+        # As an author does: the new skill joins a pack (tools/build.py PACKS), whose links follow.
+        build = self.repo / "tools/build.py"
+        build.write_text(build.read_text().replace('"notes-from-work"]', f'"notes-from-work", "{name}"]', 1))
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
 
     def test_validate_rejects_a_skill_body_over_20000_bytes(self):
         # After compaction Claude Code keeps about 5,000 tokens of a skill, about 20,000 bytes.
@@ -220,10 +251,10 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         scout.write_text(kept + "\n\nhidden\u2069\n", encoding="utf-8")
         self.add_skill("hidden-text", body="Plain line.\nA soft\u00adhyphen and <!-- note -->.\n```html\n"
                                            "<!-- shown as code -->\n```\n")
-        write("home/.agents/skills/spec/reference.txt", "tag\U000e0041s\n"
+        write("home/.agents/skills/design/reference.txt", "tag\U000e0041s\n"
               "\u200c|\u202a|\u202e|\u2066|\U000e0000|\U000e007f\n"
               "\u00a0|\u200a|\u202f|\u2065|\u206a|\U000e0080|\u2028\n")
-        write("home/.agents/skills/spec/extra.md", "<!-- a -->\n")
+        write("home/.agents/skills/design/extra.md", "<!-- a -->\n")
         write("claude-ai/skills/tutor/notes.org", "x\u202by\n<!-- not markdown -->\n")
         write("docs/notes.md", "not loaded as instructions: <!-- c -->\n")
         result = self.run_tool("validate.py")
@@ -243,14 +274,14 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             f"FAIL home/.agents/agents/scout.md:{kept.count(chr(10)) + 3}:7: {hidden} U+2069",
             f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:7: {hidden} U+00AD",
             f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:19: {comment}",
-            f"FAIL home/.agents/skills/spec/reference.txt:1:4: {hidden} U+E0041",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:1: {hidden} U+200C",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:3: {hidden} U+202A",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:5: {hidden} U+202E",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:7: {hidden} U+2066",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:9: {hidden} U+E0000",
-            f"FAIL home/.agents/skills/spec/reference.txt:2:11: {hidden} U+E007F",
-            f"FAIL home/.agents/skills/spec/extra.md:1:1: {comment}",
+            f"FAIL home/.agents/skills/design/reference.txt:1:4: {hidden} U+E0041",
+            f"FAIL home/.agents/skills/design/reference.txt:2:1: {hidden} U+200C",
+            f"FAIL home/.agents/skills/design/reference.txt:2:3: {hidden} U+202A",
+            f"FAIL home/.agents/skills/design/reference.txt:2:5: {hidden} U+202E",
+            f"FAIL home/.agents/skills/design/reference.txt:2:7: {hidden} U+2066",
+            f"FAIL home/.agents/skills/design/reference.txt:2:9: {hidden} U+E0000",
+            f"FAIL home/.agents/skills/design/reference.txt:2:11: {hidden} U+E007F",
+            f"FAIL home/.agents/skills/design/extra.md:1:1: {comment}",
             f"FAIL claude-ai/skills/tutor/notes.org:1:2: {hidden} U+202B",
         ]))
 
@@ -261,7 +292,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         # claude-ai/overrides.json too (its descriptions reach claude.ai). An emoji's own
         # parts pass: U+FE0E or U+FE0F right after a pictographic character, and U+200D
         # joining two (after a presentation selector or a skin tone too).
-        (self.repo / "home/.agents/skills/spec/more.txt").write_text(
+        (self.repo / "home/.agents/skills/design/more.txt").write_text(
             "\ufe00|\ufe0f|\U000e0100|\U000e01ef|\u061c|\u2061|\u2064|\u3164\n"
             "\U0001F468\u200d\U0001F469\u200d\U0001F467 \u26a0\ufe0f \U0001F3F3\ufe0f\u200d\U0001F308 "
             "\U0001F469\U0001F3FD\u200d\U0001F4BB \u2764\ufe0e\n"
@@ -272,7 +303,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         self.assertEqual(result.returncode, 1, result.stdout)
         hidden = "invisible or bidirectional character"
         reported = sorted(line for line in result.stdout.splitlines() if hidden in line)
-        more = "FAIL home/.agents/skills/spec/more.txt"
+        more = "FAIL home/.agents/skills/design/more.txt"
         self.assertEqual(reported, sorted([
             f"{more}:1:1: {hidden} U+FE00", f"{more}:1:3: {hidden} U+FE0F", f"{more}:1:5: {hidden} U+E0100",
             f"{more}:1:7: {hidden} U+E01EF", f"{more}:1:9: {hidden} U+061C", f"{more}:1:11: {hidden} U+2061",
@@ -306,7 +337,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         # its marker) or in a blockquote, and closes only with its own character, at least as
         # many times, and nothing after it; a code span shows its text. A <!-- there is
         # shown as code, not hidden: only the two bare comments are reported.
-        (self.repo / "home/.agents/skills/spec/fenced.md").write_text(
+        (self.repo / "home/.agents/skills/design/fenced.md").write_text(
             "- item\n"
             "    - nested\n"
             "      ```html\n"
@@ -335,8 +366,8 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         result = self.run_tool("validate.py")
         comment = "HTML comment in a Markdown instruction file"
         self.assertEqual(sorted(line for line in result.stdout.splitlines() if comment in line), [
-            f"FAIL home/.agents/skills/spec/fenced.md:13:5: {comment}",
-            f"FAIL home/.agents/skills/spec/fenced.md:25:19: {comment}",
+            f"FAIL home/.agents/skills/design/fenced.md:13:5: {comment}",
+            f"FAIL home/.agents/skills/design/fenced.md:25:19: {comment}",
         ])
 
     def test_validate_does_not_let_a_false_fence_hide_an_html_comment(self):
@@ -345,7 +376,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         # fence in a blockquote or a list item ends with the container, when a line has no
         # ">" or less indentation than the item; a backslash before a backtick escapes it, so
         # no code span starts there. In each, a comment a reader would not see is reported.
-        (self.repo / "home/.agents/skills/spec/false-fences.md").write_text(
+        (self.repo / "home/.agents/skills/design/false-fences.md").write_text(
             "    ```\n"
             "<!-- a: after indented code, not inside a fence -->\n"
             "    ```\n"
@@ -374,11 +405,11 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         result = self.run_tool("validate.py")
         comment = "HTML comment in a Markdown instruction file"
         self.assertEqual(sorted(line for line in result.stdout.splitlines() if comment in line), sorted([
-            f"FAIL home/.agents/skills/spec/false-fences.md:2:1: {comment}",
-            f"FAIL home/.agents/skills/spec/false-fences.md:6:16: {comment}",
-            f"FAIL home/.agents/skills/spec/false-fences.md:10:20: {comment}",
-            f"FAIL home/.agents/skills/spec/false-fences.md:11:3: {comment}",
-            f"FAIL home/.agents/skills/spec/false-fences.md:23:3: {comment}",
+            f"FAIL home/.agents/skills/design/false-fences.md:2:1: {comment}",
+            f"FAIL home/.agents/skills/design/false-fences.md:6:16: {comment}",
+            f"FAIL home/.agents/skills/design/false-fences.md:10:20: {comment}",
+            f"FAIL home/.agents/skills/design/false-fences.md:11:3: {comment}",
+            f"FAIL home/.agents/skills/design/false-fences.md:23:3: {comment}",
         ]))
 
     def test_validate_checks_subagent_effort_and_turn_limit(self):
@@ -419,12 +450,12 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"
         text = skill.read_text()
         skill.write_text(text.replace("name: tutor", "name: Tutor", 1) + "\nA long pause \u2014 here.\n")
-        (self.repo / "home/.agents/skills/spec/LICENSE.txt").unlink()
+        (self.repo / "home/.agents/skills/design/LICENSE.txt").unlink()
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1)
         self.assertIn("invalid name 'Tutor'", result.stdout)
         self.assertIn("em or en dash", result.stdout)
-        self.assertIn("spec/SKILL.md: LICENSE.txt missing", result.stdout)
+        self.assertIn("design/SKILL.md: LICENSE.txt missing", result.stdout)
 
     def test_build_produces_uploadable_zips(self):
         result = self.run_tool("build.py")

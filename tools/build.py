@@ -4,6 +4,7 @@
 """Build the upload and share artifacts into dist/.
 
 Usage: python3 tools/build.py
+       python3 tools/build.py --marketplace   write .claude-plugin/marketplace.json and packs/
 
 Produces:
 - dist/claude-ai/<skill>.zip   one zip per skill, ready for claude.ai (Customize >
@@ -13,11 +14,17 @@ Produces:
 - dist/project-kit.zip         the project templates, for setting up a repository by hand.
 
 Zip entries get a fixed timestamp so rebuilding unchanged sources gives identical files.
+
+--marketplace writes the committed Claude Code marketplace and the packs/ folders, the
+packs other people install as plugins (claude plugin marketplace add <this repository>,
+then /plugin install dotagents-<pack>@dotagents). tools/validate.py fails when either
+differs from what this script writes.
 """
 
 from __future__ import annotations
 
 import json
+import os
 import shutil
 import sys
 import zipfile
@@ -30,6 +37,40 @@ OVERRIDES = ROOT / "claude-ai" / "overrides.json"
 TEMPLATES = HOME / "skills" / "project-setup" / "templates"
 DIST = ROOT / "dist"
 FIXED_TIME = (2026, 1, 1, 0, 0, 0)
+MARKETPLACE = ROOT / ".claude-plugin" / "marketplace.json"
+PACKS_DIR = ROOT / "packs"
+CLAUDE_FRAGMENT = ROOT / "adapters" / "claude" / "settings.json"
+PACK_VERSION = "1.0.0"
+# Each pack is a Claude Code plugin rooted at packs/<pack>/, whose skills/, agents/, hooks
+# and AGENTS.md are relative links into home/.agents and claude-ai/skills: one source, no
+# copies. An install from the marketplace copies each link's target in (Claude Code's
+# plugin docs); Claude Code loads a plugin's subagents only from its own agents/ folder.
+# Every local skill belongs to exactly one pack and every claude.ai skill to the chat pack
+# (tools/validate.py checks it). The method pack also carries the subagents, the hooks and
+# the global rules, which a session-start hook prints (Claude Code loads no CLAUDE.md from
+# a plugin and caps that output at 10,000 characters).
+PACKS = {
+    "method": {
+        "description": "The dotagents method: build in lanes from one plan file, design, close, decide, "
+                       "review and gates, with the scout, reviewer and gate-runner subagents, the guard "
+                       "and session hooks, and the global rules.",
+        "skills": ["build", "design", "close", "decide", "branch-review", "gates", "isolated-work",
+                   "parallel-agents", "mechanical-changes"],
+        "agents": True, "hooks": True},
+    "craft": {
+        "description": "Craft skills: clean architecture, event-driven UIs, Qt Quick, precise UI changes, "
+                       "code audits and notes from work.",
+        "skills": ["clean-architecture", "event-driven-ui", "qt-quick", "precise-ui-changes", "code-audit",
+                   "notes-from-work"]},
+    "docs": {
+        "description": "Documentation skills: as-built docs, requirements and architecture, project setup "
+                       "for agents, and PlantUML diagrams.",
+        "skills": ["as-built-docs", "architecture-doc", "project-setup", "plantuml-diagrams"]},
+    "chat": {
+        "description": "The skills that also run in chat: debugging, tests that can fail, verification, "
+                       "research, decisions, prompts, notes, tutoring and handoffs.",
+        "skills": "claude-ai"},
+}
 
 
 def add(archive: zipfile.ZipFile, name: str, data: bytes) -> None:
@@ -62,7 +103,79 @@ def build_skill_zip(folder: Path, out: Path, description: str | None = None) -> 
             add(archive, f"{folder.name}/{path.relative_to(folder)}", data)
 
 
-def main() -> int:
+def pack_links() -> dict:
+    """{link path relative to the repository: its relative target} for every pack."""
+    links = {}
+    for name, pack in PACKS.items():
+        folder = f"packs/{name}"
+        if pack["skills"] == "claude-ai":
+            for skill in sorted(p.name for p in ONLINE.iterdir() if (p / "SKILL.md").is_file()):
+                links[f"{folder}/skills/{skill}"] = f"../../../claude-ai/skills/{skill}"
+        else:
+            for skill in pack["skills"]:
+                links[f"{folder}/skills/{skill}"] = f"../../../home/.agents/skills/{skill}"
+        if pack.get("agents"):
+            for agent in sorted(p.name for p in (HOME / "agents").glob("*.md")):
+                links[f"{folder}/agents/{agent}"] = f"../../../home/.agents/agents/{agent}"
+        if pack.get("hooks"):
+            links[f"{folder}/hooks"] = "../../home/.agents/hooks"
+            links[f"{folder}/AGENTS.md"] = "../../home/.agents/AGENTS.md"
+    return links
+
+
+def pack_hooks() -> dict:
+    """Claude Code's hooks from the shared fragment, pointed at the pack's hooks link, after a
+    session-start hook that prints the global rules."""
+    events = json.loads(CLAUDE_FRAGMENT.read_text(encoding="utf-8"))["hooks"]
+    events = json.loads(json.dumps(events).replace("$HOME/.agents/hooks/", "${CLAUDE_PLUGIN_ROOT}/hooks/"))
+    rules = {"matcher": "startup|clear|compact", "hooks": [
+        {"type": "command", "command": 'cat "${CLAUDE_PLUGIN_ROOT}/AGENTS.md"', "timeout": 10}]}
+    events["SessionStart"] = [rules] + events.get("SessionStart", [])
+    return events
+
+
+def marketplace() -> dict:
+    plugins = []
+    for name, pack in PACKS.items():
+        entry = {"name": f"dotagents-{name}", "source": f"./packs/{name}", "description": pack["description"],
+                 "version": PACK_VERSION, "license": "MIT"}
+        if pack.get("hooks"):
+            entry["hooks"] = pack_hooks()
+        plugins.append(entry)
+    return {"name": "dotagents", "owner": {"name": "Nicolò Plebani"},
+            "description": "A cross-agent method and skill set: plan files, lanes, reviews that can fail, "
+                           "and craft, docs and chat skills.",
+            "plugins": plugins}
+
+
+def marketplace_text() -> str:
+    return json.dumps(marketplace(), indent=2, ensure_ascii=False) + "\n"
+
+
+def write_packs() -> None:
+    """Write the marketplace and make packs/ hold exactly the links pack_links() names."""
+    MARKETPLACE.parent.mkdir(exist_ok=True)
+    MARKETPLACE.write_text(marketplace_text(), encoding="utf-8")
+    wanted = pack_links()
+    if PACKS_DIR.is_dir():
+        for path in sorted(PACKS_DIR.rglob("*"), reverse=True):
+            rel = path.relative_to(ROOT).as_posix()
+            if path.is_symlink() and wanted.get(rel) != os.readlink(path):
+                path.unlink()
+            elif path.is_dir() and not path.is_symlink() and not any(path.iterdir()):
+                path.rmdir()
+    for rel, target in sorted(wanted.items()):
+        link = ROOT / rel
+        if not link.is_symlink():
+            link.parent.mkdir(parents=True, exist_ok=True)
+            link.symlink_to(target)
+
+
+def main(argv=None) -> int:
+    if "--marketplace" in (sys.argv[1:] if argv is None else argv):
+        write_packs()
+        print(f"wrote {MARKETPLACE.relative_to(ROOT)} and the links in {PACKS_DIR.relative_to(ROOT)}/")
+        return 0
     overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))["skills"]
     for name, override in sorted(overrides.items()):
         description = override.get("description") if isinstance(override, dict) else None

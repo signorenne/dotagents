@@ -49,6 +49,7 @@ Checks:
   =verbatim= and ~code~ spans, web links and other searches are not checked.
 """
 
+import importlib.util
 import json
 import os
 import re
@@ -436,6 +437,32 @@ def check_html_comments(rel: Path, text: str, errors: list) -> None:
             errors.append(f"{rel}:{number}:{match.start() + 1}: HTML comment in a Markdown instruction file")
 
 
+def check_marketplace(errors: list) -> None:
+    """The committed Claude Code marketplace is what tools/build.py writes, every path in it
+    exists, and every skill sits in exactly one pack."""
+    spec = importlib.util.spec_from_file_location("dotagents_build", ROOT / "tools" / "build.py")
+    build = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(build)
+    rel = build.MARKETPLACE.relative_to(ROOT)
+    if not build.MARKETPLACE.is_file() or build.MARKETPLACE.read_text(encoding="utf-8") != build.marketplace_text():
+        errors.append(f"{rel}: missing or out of date; run python3 tools/build.py --marketplace")
+    wanted = build.pack_links()
+    for link, target in sorted(wanted.items()):
+        path = ROOT / link
+        if not (path.is_symlink() and os.readlink(path) == target and path.exists()):
+            errors.append(f"{link}: not a link to {target}; run python3 tools/build.py --marketplace")
+    if build.PACKS_DIR.is_dir():
+        for path in sorted(build.PACKS_DIR.rglob("*")):
+            if path.is_symlink() and path.relative_to(ROOT).as_posix() not in wanted:
+                errors.append(f"{path.relative_to(ROOT)}: a link no pack names; run python3 tools/build.py "
+                              "--marketplace")
+    packed = [Path(link).name for link in wanted if "/skills/" in link]
+    for folder in skill_folders(HOME / "skills") + skill_folders(ONLINE):
+        count = packed.count(folder.name)
+        if count != 1:
+            errors.append(f"{folder.relative_to(ROOT)}: in {count} packs of tools/build.py (PACKS), not one")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -448,6 +475,7 @@ def main() -> int:
         errors.append(f"{name}: skill in both home/.agents/skills and claude-ai/skills")
     check_overrides(errors)
     check_path_rules(errors)
+    check_marketplace(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)

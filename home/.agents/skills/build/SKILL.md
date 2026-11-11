@@ -6,7 +6,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LIC
 
 # Build
 
-The method is in METHOD.org of the dotagents repository; this skill applies it. Scripts: S=~/.agents/skills/build/scripts (in this repository's checkout, home/.agents/skills/build/scripts). Each runs with python3 and prints a short result.
+The method is in METHOD.org of the dotagents repository; this skill applies it. Scripts: S is this skill's scripts folder, in Claude Code ${CLAUDE_SKILL_DIR}/scripts, elsewhere ~/.agents/skills/build/scripts. Each runs with python3 and prints a short result.
 
 ## 0. Resume
 
