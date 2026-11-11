@@ -70,25 +70,28 @@ LINE_SURFACES = (
 
 
 def parse_diff(text: str) -> dict:
-    """{path: {"added": [lines], "removed": [lines]}} from a unified diff."""
-    files, current = {}, None
+    """{path: {"added": [lines], "removed": [lines]}} from a unified diff. The --- and +++
+    lines name the file only in its header, before its first @@, since a hunk line can
+    start with them too (a removed "-- comment"); a deleted file keeps its old path."""
+    files, current, old, header = {}, None, None, False
     for line in text.splitlines():
         if line.startswith("diff --git "):
-            current = None
-        elif line.startswith("+++ "):
+            current, old, header = None, None, True
+        elif header and line.startswith("--- "):
             name = line[4:].strip()
-            current = None if name == "/dev/null" else name[2:] if name.startswith("b/") else name
+            old = None if name == "/dev/null" else name[2:] if name.startswith("a/") else name
+        elif header and line.startswith("+++ "):
+            name = line[4:].strip()
+            current = old if name == "/dev/null" else name[2:] if name.startswith("b/") else name
             if current is not None:
                 files.setdefault(current, {"added": [], "removed": []})
-        elif line.startswith("--- "):
-            name = line[4:].strip()
-            if name != "/dev/null":
-                old = name[2:] if name.startswith("a/") else name
-                files.setdefault(old, {"added": [], "removed": []})
-                current = old
-        elif current is not None and line.startswith("+") and not line.startswith("+++"):
+        elif line.startswith("@@"):
+            header = False
+        elif header or current is None:
+            continue
+        elif line.startswith("+"):
             files[current]["added"].append(line[1:])
-        elif current is not None and line.startswith("-") and not line.startswith("---"):
+        elif line.startswith("-"):
             files[current]["removed"].append(line[1:])
     return files
 
@@ -159,7 +162,11 @@ def main(argv=None) -> int:
     if not base:
         print("floor_check: no base (give --base, or a Base in the plan); nothing was checked")
         return 2
-    diff, ok = planfile.git(["diff", "--no-color", "--no-ext-diff", "-M", base], args.cwd, timeout=60)
+    commit = planfile.commit_of(base, args.cwd)
+    if commit is None:
+        print(f"floor_check: base {base!r} is not a commit; nothing was checked")
+        return 2
+    diff, ok = planfile.git(["diff", "--no-color", "--no-ext-diff", "-M", commit, "--"], args.cwd, timeout=60)
     if not ok:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2

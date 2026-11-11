@@ -73,10 +73,12 @@ def describe(cwd, excerpt: bool) -> tuple[int, list]:
     base = header.get("Base", "")
     commits = set()
     if base:
-        listed, ok = planfile.git(["log", "--format=%h", f"{base}..HEAD"], cwd)
+        commit = planfile.commit_of(base, cwd)
+        listed, ok = planfile.git(["log", "--format=%h", f"{commit}..HEAD", "--"], cwd) if commit else ("", False)
         commits = set(listed.split()) if ok else set()
         if not excerpt:
-            lines.append(f"Base: {base} ({len(commits) if ok else 'unknown'} commits since)")
+            lines.append(f"Base: {base} ({len(commits)} commits since)" if ok
+                         else f"Base: unknown ({base!r} is not a commit)")
     lines.append(f"Plan: {plan}")
     lines.append("  " + ", ".join(f"{key} {header[key]}" for key in planfile.HEADER_KEYS[:-1] if key in header))
     if header.get("Next"):

@@ -9,18 +9,24 @@ result to the plan's log, so no model turn is spent writing it.
   python3 check_step.py --step base --baseline -- <the narrow check>
   python3 check_step.py --step final --gate -- <a documented gate>
 
-A single command argument that holds spaces runs through the shell. --expect-fail
-records a failing-first run: the call succeeds when the command fails and fails when it
-passes, because a pass does not show that the test can fail. A run with modified tracked
-files is logged as "uncommitted(<n>)", never as the commit's. Without a plan file for the
-branch the check still runs and the result is not logged. Exit: the command's code; with
---expect-fail 0 when it failed and 1 when it passed; 2 when the command could not start.
+A single command argument that holds spaces runs through the shell. The command goes
+first to the guard hook beside the skills (../../hooks/guard_bash.py), and one it would
+block is not run. --expect-fail records a failing-first run: the call succeeds when the
+command fails and fails when it passes, because a pass does not show that the test can
+fail. A run with modified or untracked files is logged as "uncommitted(<n>)", never as
+the commit's. --tail 0 prints the whole output (for gate-runner, which searches it).
+Without a plan file for the branch the check still runs and the result is not logged.
+Exit: the command's code; with --expect-fail 0 when it failed and 1 when it passed; 2
+when the command could not start (also exit 126 or 127 from the shell) or the guard
+blocked it, and then nothing is logged.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -39,6 +45,23 @@ COUNTS = (
 )
 
 
+GUARD = Path(__file__).resolve().parents[3] / "hooks" / "guard_bash.py"
+
+
+def guard_refusal(command: str) -> str | None:
+    """The guard's reason when it blocks command, or None (also when the guard is not
+    installed beside the skills)."""
+    if not GUARD.is_file():
+        return None
+    try:
+        result = subprocess.run([sys.executable, str(GUARD), "--tool", "claude"], capture_output=True, text=True,
+                                input=json.dumps({"tool_name": "Bash", "tool_input": {"command": command}}),
+                                timeout=10, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return (result.stderr.strip() or "blocked") if result.returncode == 2 else None
+
+
 def test_count(output: str) -> str:
     for pattern in COUNTS:
         found = pattern.findall(output)
@@ -55,14 +78,18 @@ def main(argv=None) -> int:
     kind.add_argument("--baseline", action="store_true", help="the baseline on the base commit")
     kind.add_argument("--gate", action="store_true", help="a full gate")
     parser.add_argument("--cwd", default=".")
-    parser.add_argument("--tail", type=int, default=30)
+    parser.add_argument("--tail", type=int, default=30, help="lines of output to print; 0 prints all")
     parser.add_argument("command", nargs=argparse.REMAINDER)
     args = parser.parse_args(argv)
     command = args.command[1:] if args.command[:1] == ["--"] else args.command
     if not command:
         parser.error("give the command after --")
     shell = len(command) == 1 and " " in command[0]
-    shown = command[0] if shell else " ".join(command)
+    shown = command[0] if shell else shlex.join(command)
+    refusal = guard_refusal(shown)
+    if refusal:
+        print(f"check_step: blocked by the guard, not run: {refusal}")
+        return 2
 
     state, private, plan = planfile.locate(args.cwd)
     # The whole output stays in the working notes: beside the plan, else in .private/runs.
@@ -75,17 +102,21 @@ def main(argv=None) -> int:
         print(f"check_step: could not start {shown}: {error}", file=sys.stderr)
         return 2
     output = result.stdout + result.stderr
+    if shell and result.returncode in (126, 127):
+        print(output.strip())
+        print(f"check_step: could not start {shown} (exit {result.returncode}); not logged")
+        return 2
     saved = None
     if folder is not None:
         folder.mkdir(parents=True, exist_ok=True)
         saved = folder / f"{started}-{args.step}.txt"
         saved.write_text(f"$ {shown}\n{output}\nexit {result.returncode}\n", encoding="utf-8")
     lines = output.splitlines()
-    print("\n".join(lines[-args.tail:]))
+    print("\n".join(lines[-args.tail:] if args.tail > 0 else lines))
     passed = result.returncode == 0
     count = test_count(output)
     label = "fail-first" if args.expect_fail else "baseline" if args.baseline else "gate" if args.gate else "check"
-    dirty = state.get("dirty", []) if state else []
+    dirty = (state.get("dirty", []) + state.get("untracked", [])) if state else []
     commit = f"uncommitted({len(dirty)})" if dirty else (state.get("head") or "-") if state else "-"
     print(f"exit {result.returncode}, {'pass' if passed else 'fail'}, tests {count}, {commit}"
           + (f", output {saved}" if saved else ""))

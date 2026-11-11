@@ -39,7 +39,7 @@ def named(full: str, recorded: set) -> bool:
 
 def record(cwd: str) -> list:
     """Append the missing commit lines; return them."""
-    state, _, plan = planfile.locate(cwd)
+    state, _, plan = planfile.locate(cwd, full=False)
     if plan is None:
         return []
     recorded = {row["commit"].lower() for row in planfile.log_lines(plan) if row["kind"] == "commit"}

@@ -65,7 +65,7 @@ def hint(payload: dict):
     tokens = context_tokens(Path(transcript))
     if tokens is None or tokens < THRESHOLD:
         return None
-    _, _, plan = planfile.locate(cwd)
+    _, _, plan = planfile.locate(cwd, full=False)
     if plan is None:
         return None
     return (f"Context at {tokens // 1000}k tokens after a step's commit: a good point to clear the "

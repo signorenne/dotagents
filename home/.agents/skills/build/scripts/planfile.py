@@ -150,11 +150,23 @@ def log_lines(plan: Path) -> list:
     return rows
 
 
-def head_state(cwd) -> dict:
-    """Branch, short HEAD and the modified tracked files of the repository at cwd; {} outside one."""
+def commit_of(revision: str, cwd) -> str | None:
+    """The full hash of a revision that names a commit, or None; the revision never
+    reaches git as an option (a plan's Base such as --output=<file> would)."""
+    if not revision or revision.startswith("-"):
+        return None
+    found, ok = git(["rev-parse", "--verify", "--quiet", "--end-of-options", f"{revision}^{{commit}}"], cwd)
+    return found if ok and found else None
+
+
+def head_state(cwd, full: bool = True) -> dict:
+    """Branch, short HEAD, modified tracked files and untracked files of the repository at
+    cwd; {} outside one. Without full, only the branch, for hooks that run on every turn."""
     branch, ok = git(["branch", "--show-current"], cwd)
     if not ok:
         return {}
+    if not full:
+        return {"branch": branch, "head": "", "dirty": [], "untracked": []}
     head, _ = git(["rev-parse", "--short", "HEAD"], cwd)
     status, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd)
     untracked, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal"], cwd)
@@ -162,12 +174,15 @@ def head_state(cwd) -> dict:
             "untracked": [line[3:] for line in untracked.splitlines() if line.startswith("??")]}
 
 
-def locate(cwd) -> tuple[dict, Path | None, Path | None]:
-    """(head state, working-notes folder, plan file of the current task branch)."""
-    state = head_state(cwd)
+def locate(cwd, full: bool = True) -> tuple[dict, Path | None, Path | None]:
+    """(head state, working-notes folder, plan file of the current task branch). Off a
+    task branch nothing but the branch is read, and without full nothing more ever."""
+    state = head_state(cwd, full=False)
     if not state:
         return {}, None, None
-    private = private_folder(cwd)
     slug = slug_of(state["branch"])
+    private = private_folder(cwd) if (slug or full) else None
     plan = plan_for(private, slug) if private and slug else None
+    if full:
+        state = head_state(cwd) or state
     return state, private, plan

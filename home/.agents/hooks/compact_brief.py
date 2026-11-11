@@ -63,7 +63,7 @@ def facts(cwd: str) -> tuple:
     plan = None
     if planfile is not None:
         try:
-            plan = planfile.locate(cwd)[2]
+            plan = planfile.locate(cwd, full=False)[2]
         except Exception:  # an unreadable plan only drops its path
             plan = None
     notes = (f"{plan} (the plan file of this branch)" if plan else

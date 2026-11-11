@@ -448,6 +448,58 @@ class PlanScripts(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout)
         self.assertIn("nothing removed, skipped or suppressed", result.stdout)
 
+    def test_floor_check_sees_a_deleted_test_file_and_hunk_lines_that_look_like_headers(self):
+        (self.repo / "q.sql").write_text("-- old comment\nselect 1;\n")
+        (self.repo / "tests").mkdir()
+        (self.repo / "tests/test_x.py").write_text("def test_one():\n    pass\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "more")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.write_plan("full")
+        self.git("rm", "-q", "tests/test_x.py")
+        (self.repo / "q.sql").write_text("select 1;\n")
+        (self.repo / "test_a.py").write_text("def test_one():\n    pass\n")
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("removed test: tests/test_x.py: test_one", result.stdout)
+        self.assertIn("removed test: test_a.py: test_two", result.stdout)
+        self.assertNotIn("old comment", result.stdout)
+        # 2 lines of the deleted file, 1 in q.sql, 4 in test_a.py (two blank lines and test_two)
+        self.assertIn(f"base {self.base}, 7 changed lines", result.stdout)
+
+    def test_a_base_that_is_not_a_commit_never_reaches_git_as_an_option(self):
+        target = self.root / "written-by-git"
+        self.plan.write_text(PLAN.format(base=f"--output={target}", lane="full"))
+        self.assertEqual(self.run_script("floor_check.py").returncode, 2)
+        self.assertIn("Base: unknown", self.run_script("plan_state.py").stdout)
+        self.assertFalse(target.exists())
+        self.assertFalse(any(p.name.endswith("..HEAD") for p in self.repo.iterdir()))
+
+    def test_check_step_counts_an_untracked_file_as_uncommitted(self):
+        (self.repo / "test_new.py").write_text("def test_new():\n    pass\n")
+        self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
+        self.assertEqual(self.log()[-1][3], "uncommitted(1)")
+
+    def test_a_command_that_never_started_is_no_failing_run(self):
+        result = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--", "no-such-program-xyz --flag")
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertEqual(self.log(), [])
+
+    def test_check_step_refuses_what_the_guard_blocks(self):
+        for command in (["git push origin main"], ["git", "commit", "--no-verify", "-m", "x"]):
+            with self.subTest(command=command):
+                result = self.run_script("check_step.py", "--step", "S2", "--", *command)
+                self.assertEqual(result.returncode, 2, result.stdout)
+                self.assertIn("blocked by the guard", result.stdout)
+        self.assertEqual(self.log(), [])
+        self.assertEqual(self.git("log", "--oneline").count("\n"), 0)  # nothing was committed
+
+    def test_tail_0_prints_the_whole_output_for_gate_runner(self):
+        result = self.run_script("check_step.py", "--step", "final", "--gate", "--tail", "0", "--",
+                                 sys.executable, "-c", "print('\\n'.join(map(str, range(50))))")
+        self.assertEqual(result.returncode, 0)
+        self.assertTrue(result.stdout.startswith("0\n1\n2\n"), result.stdout[:40])
+
     def test_floor_check_that_cannot_run_exits_2(self):
         self.assertEqual(self.run_script("floor_check.py", "--base", "no-such-ref").returncode, 2)
 
