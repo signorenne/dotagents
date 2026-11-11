@@ -561,7 +561,8 @@ class Installer:
         self.linked = set()  # (link, target) pairs done in this run, which a dry run cannot see on disk
         self.old = self.read_manifest()
         self.owned = {}  # path -> {"scope", "sha256" | "link"}: what this run installs
-        self.merged = {}  # JSON path -> {"scope", "created", "added": [records]}
+        self.merged = {}  # JSON path -> {"scope", "created", "added": [records], "personal": [records]}
+        self.personal_set = set()  # settings files whose personal records this run rewrote
         self.made = set(self.old.get("dirs", []))  # folders an install created, the only ones it removes
         self.scope = "shared"
 
@@ -591,12 +592,11 @@ class Installer:
             if path not in files and entry.get("scope") not in installed:
                 files[path] = entry
         for path, entry in self.old.get("merged", {}).items():
-            # Without a personal layer now, its records were taken back: drop them.
-            entry = {**entry, "added": [r for r in entry.get("added", [])
-                                        if self.personal or r[-1:] != ["personal"]]}
             if path in merged:
                 kept = [r for r in entry.get("added", []) if r not in merged[path]["added"]]
-                merged[path] = {**merged[path], "added": kept + merged[path]["added"],
+                # The personal records change only where the settings step ran this time.
+                personal = merged[path]["personal"] if path in self.personal_set else entry.get("personal", [])
+                merged[path] = {**merged[path], "added": kept + merged[path]["added"], "personal": personal,
                                 "created": entry.get("created", False) or merged[path]["created"]}
             else:
                 merged[path] = entry
@@ -663,7 +663,13 @@ class Installer:
     def write(self, path: Path, data, executable: bool = False):
         """Write path, backing up what it replaces; return the backup path, if any."""
         data = data.encode("utf-8") if isinstance(data, str) else data
-        if path.exists() and not path.is_symlink() and path.read_bytes() == data:
+        same = False
+        if path.is_file() and not path.is_symlink():  # a folder or an unreadable file is not ours
+            try:
+                same = path.read_bytes() == data
+            except OSError:
+                same = False
+        if same:
             if executable and not self.dry:
                 path.chmod(0o755)
             self.owned[str(path)] = {"scope": self.scope, "sha256": digest(data)}
@@ -718,7 +724,8 @@ class Installer:
         except CannotMerge as error:
             self.notes.append(f"Could not merge {path}: {error}; merge it by hand.")
             return False
-        entry = self.merged.setdefault(str(path), {"scope": self.scope, "created": created, "added": []})
+        entry = self.merged.setdefault(str(path), {"scope": self.scope, "created": created, "added": [],
+                                                   "personal": []})
         entry["added"] += [record for record in added if record not in entry["added"]]
         if new != old:
             self.write_merged(path, new)
@@ -918,23 +925,27 @@ class Installer:
         if self.personal and (self.personal / PERSONAL_CLAUDE).is_file():
             personal = json.loads((self.personal / PERSONAL_CLAUDE).read_text(encoding="utf-8"))
 
-        old_personal = [r[:-1] for r in self.old.get("merged", {}).get(str(base / "settings.json"), {})
-                        .get("added", []) if r[-1:] == ["personal"]]
+        path = base / "settings.json"
+        old_personal = self.old.get("merged", {}).get(str(path), {}).get("personal", [])
+        recorded = self.old.get("personal")
+        changed = recorded != (str(self.personal) if self.personal else None)
+        from_personal = []
 
         def mutate(settings: dict, added: list) -> dict:
-            if not self.personal:  # --no-personal: what the layer added comes out
+            if changed:  # --no-personal or another layer: what the old layer added comes out
                 take_back_all(settings, old_personal)
             settings = merge_values(settings, fragment, added)
-            from_personal = []
             settings = merge_values(settings, personal, from_personal)
-            added += [r + ["personal"] for r in from_personal]
             settings = self.with_hooks(settings, ours, added)
             # A rule this repository now denies leaves ask, where an older install put it.
             permissions = settings.get("permissions")
             if isinstance(permissions, dict) and isinstance(permissions.get("ask"), list):
                 permissions["ask"] = [rule for rule in permissions["ask"] if rule not in denied]
             return settings
-        if self.merge_json(base / "settings.json", mutate):
+        if self.merge_json(path, mutate):
+            kept = [] if changed else [r for r in old_personal if r not in from_personal]
+            self.merged[str(path)]["personal"] = kept + from_personal
+            self.personal_set.add(str(path))
             self.notes.append(
                 "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
                 "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
@@ -1067,7 +1078,7 @@ class Installer:
             before = json.loads(json.dumps(data))
             if isinstance(data.get("hooks"), dict):
                 data["hooks"] = merge_event_hooks(data["hooks"], {})
-            take_back_all(data, [r[:-1] if r[-1:] == ["personal"] else r for r in entry.get("added", [])])
+            take_back_all(data, entry.get("added", []) + entry.get("personal", []))
             if entry.get("created") and empty(data):
                 self.backup(path)
                 self.prune(path.parent)

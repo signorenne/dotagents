@@ -1136,11 +1136,31 @@ class Manifest(unittest.TestCase):
         self.run_install("--uninstall")
         self.assertFalse(settings.exists())
 
+    def test_personal_values_are_taken_back_only_where_the_settings_step_ran(self):
+        layer, other = self.home / "layer", self.home / "other"
+        for folder, rule in ((layer, "Bash(make *)"), (other, "Bash(ninja *)")):
+            folder.mkdir()
+            (folder / "claude-settings.json").write_text(json.dumps({"permissions": {"allow": [rule]}}))
+        settings = self.home / ".claude/settings.json"
+        (self.home / ".codex").mkdir()
+        self.run_install("--tools", "claude,codex", "--personal", str(layer))
+        self.run_install("--tools", "codex", "--no-personal")  # Claude Code's settings are not touched
+        self.assertIn("Bash(make *)", json.loads(settings.read_text())["permissions"]["allow"])
+        self.run_install("--personal", str(other))  # a new layer: the old one's values come out
+        allow = json.loads(settings.read_text())["permissions"]["allow"]
+        self.assertNotIn("Bash(make *)", allow)
+        self.assertIn("Bash(ninja *)", allow)
+        self.run_install("--uninstall")
+        self.assertFalse(settings.exists())
+
     def test_uninstall_keeps_what_it_cannot_read_or_is_now_a_folder(self):
         self.run_install()
         scout = self.home / ".claude/agents/scout.md"
         scout.unlink()
         scout.mkdir()
+        out = self.run_install()  # an install over it keeps it too, and finishes
+        self.assertIn(f"- Kept {scout}: it was changed by hand since the last install. Run install.py "
+                      "--force to back it up and replace it.", out.splitlines())
         out = self.run_install("--uninstall")
         self.assertTrue(scout.is_dir())
         self.assertIn(f"- Kept {scout}: changed by hand since the install.", out.splitlines())
