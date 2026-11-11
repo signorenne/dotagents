@@ -18,7 +18,7 @@ instructions.
 |---|---|
 | Small fix | Ask directly. Hooks block gate bypasses, flag em and en dashes, format C and C++ |
 | Feature or design work | spec (raise the effort), then a fresh session, then implement on the spec file, then session-close |
-| Large or parallel work (Claude Code) | Add "use a workflow" to the request (or ultracode); /deep-research for a question about the web; ask for parallel subagents for a question across several code areas. In auto mode only the first launch asks. Save a run you want again from /workflows |
+| Large or parallel work (Claude Code) | Add "use a workflow" to the request (or ultracode); /deep-research for a question about the web; ask for parallel subagents for a question across several code areas; for several agents writing code at once, parallel-agents. In auto mode only the first launch asks. Save a run you want again from /workflows |
 | A choice that is yours | decide |
 | Before commit or PR | review |
 | Build and tests | gates, or gates narrow <module or test filter> |
@@ -27,6 +27,7 @@ instructions.
 | Documenting a repository, or updating its docs after a change | as-built-docs |
 | Planning a new system or major component: requirements and architecture | architecture-doc, then spec per increment |
 | Drawing or fixing a PlantUML diagram | plantuml-diagrams |
+| Several agents writing in parallel in one repository, and merging their branches | parallel-agents |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 
