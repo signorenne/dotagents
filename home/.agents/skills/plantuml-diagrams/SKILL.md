@@ -1,6 +1,6 @@
 ---
 name: plantuml-diagrams
-description: "Draws and fixes PlantUML diagrams that read at a glance: one question per diagram, the right diagram type, a bundled palette with day and night colours, a layered compact layout without crossing lines or overlapping labels, and a render-and-look check on every change. Use when creating, fixing, reviewing or cleaning up PlantUML diagrams (.puml files), or when a document needs a diagram."
+description: "Draws and fixes PlantUML diagrams that read at a glance: one question per diagram, the right diagram type, a bundled palette with day and night colours, a layered compact layout without crossing lines or overlapping labels, and a render-and-look check on every change. Use when creating, fixing, reviewing or cleaning up PlantUML or UML diagrams (sequence, class, component, state, activity; .puml files), or when a document needs a diagram."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -28,7 +28,7 @@ Goal: a diagram the reader understands in one look: it answers one question, has
 
 ## Colours: the bundled palette only
 
-Copy palette.iuml into the diagrams folder when it is not there, with the shell (in Claude Code cp ${CLAUDE_SKILL_DIR}/palette.iuml; elsewhere cp ~/.agents/skills/plantuml-diagrams/palette.iuml), because the skill folder may be outside the files you may read, and put !include palette.iuml on the line after @startuml. It sets day colours, and night colours when the diagram is drawn in dark mode (an editor preview on a dark theme renders with -darkmode, and PlantUML then applies the palette's dark block); a rendered SVG for a document carries the day colours. Add no other style, skinparam, theme or inline colour: a fill set without its matching text colour turns unreadable in a dark preview.
+Copy palette.iuml into the diagrams folder when it is missing or differs from the bundled one, with the shell (in Claude Code cp ${CLAUDE_SKILL_DIR}/palette.iuml; elsewhere cp ~/.agents/skills/plantuml-diagrams/palette.iuml), because the skill folder may be outside the files you may read, and put !include palette.iuml on the line after @startuml. It sets day colours, and night colours when the diagram is drawn in dark mode (an editor preview on a dark theme renders with -darkmode, and PlantUML then applies the palette's dark block); a rendered SVG for a document carries the day colours. Add no other style, skinparam, theme or inline colour: a fill set without its matching text colour turns unreadable in a dark preview.
 
 ## Layout
 

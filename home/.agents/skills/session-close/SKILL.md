@@ -6,7 +6,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 
 # Session close
 
-1. Collect facts with commands, not from memory: current branch, git status --short, git log --oneline from the merge base with main (or master when there is no main) to HEAD, git diff --stat HEAD. Commands run in this session and their results come from the session itself; list only commands that actually ran.
+1. Collect facts with commands, not from memory: current branch, git status --short, git log --oneline from the merge base with main (falling back to origin/main, then master) to HEAD, git diff --stat HEAD. Commands run in this session and their results come from the session itself; list only commands that actually ran.
    If the task has a progress log (for example .private/progress/<slug>.<ext>), bring it up to date from these facts: steps and commits since its last entry, decisions taken in this session with who took them, and assumptions refuted in this session.
 2. Fill the project's handoff template when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions). Commands still needed must include every documented gate not run since the last code change. Refuted assumptions lists each assumption of this session that a check broke: what was assumed, the check that broke it, what changed.
 3. Name the code-level facts the next session will depend on (files, symbols, signatures) and mark them "verify before use": they may change before the next session reads the handoff.

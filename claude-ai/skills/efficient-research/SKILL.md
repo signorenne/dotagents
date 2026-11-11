@@ -1,6 +1,6 @@
 ---
 name: efficient-research
-description: "Decides when to search and how much, prefers primary sources, and labels what is sourced, inferred or unknown. Use when an answer depends on current, changeable or contested facts."
+description: "Decides when to search and how much, prefers primary sources, and labels what is sourced, inferred or unknown. Use to research or look up current, changeable or contested facts."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -19,9 +19,9 @@ Without a search or fetch tool, answer from knowledge, mark each changeable or l
 - Timeless or structural (how TCP works, what a P/E ratio means, historical dates): answer from knowledge.
 - Changeable (versions, prices, availability, who holds a role, current law, what exists now): verify when being wrong would matter.
 - Consequential and specific (a number going into a deck, a dosage, a legal deadline, a config flag headed for production): verify even when fairly sure.
-- Load-bearing (the recommendation collapses if this one fact is wrong): it needs a source.
+- Load-bearing (the recommendation collapses if this one fact is wrong): it needs a source unless it is timeless.
 
-These get searched when the test above says so. This applies even when the user never says search or sources, and even when the question feels like settled knowledge ("is X still true", "what's the best Y right now").
+This applies even when the user never says search or sources, and even when the question feels like settled knowledge ("is X still true", "what's the best Y right now").
 
 ## Budget
 
@@ -58,24 +58,11 @@ Time is where research quietly goes wrong. Distinguish the publication date, the
 
 When credible sources disagree, do not average them or silently pick one. Say what each claims, prefer the one closer to the fact's origin, and note whether the disagreement changes the answer; if it does not, one clause is enough.
 
-## Red flags
-
-- Rewording a query you already ran, hoping for different results.
-- Opening a fifth source when three agreed.
-- Reaching for a number you remember instead of one you retrieved.
-- Citing a listicle or content farm because it was the top result.
-- Answering "what's the current X" without checking anything.
-- Padding the answer with sources that did not change it.
-
 ## Rationalizations
 
 | Excuse | Reality |
 |---|---|
-| "I know this one" | You knew it as of training. Prices, versions and roles move. |
-| "One more search to be thorough" | Thoroughness is coverage of the claims, not query count. |
-| "The user didn't ask for sources" | They asked for a correct answer. |
 | "Close enough for a rough figure" | Rough figures get pasted into decks as exact ones. |
-| "No time to verify" | A wrong current fact costs more time than the search. |
 | "Lots of sources say it" | Aggregators copy each other. Find the origin. |
 
 ## Output

@@ -30,31 +30,15 @@ Make the smallest change that fully satisfies the request. Minimal does not mean
 
 If you notice a real problem outside the scope (a bug, a security issue, a factual error), mention it in one line and let the user decide. Noticing helps; fixing it unasked does not. This one line is what makes strict scope safe, and it is the right move every time the urge to fix something extra appears.
 
-## Red flags
-
-- "While I'm in here, I'll also..."
-- "This would be cleaner if..."
-- "They probably want this fixed too."
-- "It's easier to rewrite the whole thing than to patch it."
-- "I'll modernize this since I'm touching it anyway."
-- "They won't mind."
-
-Each means: make the requested change only, and mention the rest in one line.
-
 ## Rationalizations
 
 | Excuse | Reality |
 |---|---|
-| "The extra changes are clear improvements" | The user now has to diff everything to find the one requested change. |
 | "It's easier to regenerate the file" | Easier for you, costlier for them, and it silently drops things you did not notice. |
-| "Their version had a bug" | Say so. Do not fix it silently inside an unrelated edit. |
-| "Their phrasing was awkward" | It is their voice. You were asked to change one thing. |
-| "The style was inconsistent" | Inconsistency they can live with beats a diff they cannot review. |
-| "I improved it while preserving meaning" | Unreviewable changes are unreviewed changes. |
 
 ## Output
 
-Show what changed, not what did not. When you edited a file directly, report what changed and where (path:line) and reprint it only if asked; in chat:
+In chat, fit the shape to the change:
 
 - Localized code change: a diff or the changed function, with enough context to place it.
 - Prose edit: the revised paragraph or section.
