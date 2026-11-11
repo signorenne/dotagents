@@ -34,10 +34,10 @@ Keep the machine awake during long runs: a session caught by sleep mid-response 
 An agent knows this conversation only through its brief (it does load the project's instruction files). Each brief holds:
 
 - the goal and why it matters, the acceptance criteria this agent owns, the user's binding decisions quoted, and what was ruled out;
-- its worktree path, branch, base commit, scratch folder and plan file path (the absolute path of .private/plans/<slug>-<agent>.<ext> in the main checkout, so the agents of one task do not collide); the files it owns and the folders it must not touch; the other agents running and what they own;
+- its worktree path, branch, base commit, scratch folder and plan file path (the absolute path of .private/plans/<slug>-<agent>.<ext> in the main checkout, so the agents of one task do not collide; its branch is <type>/<slug>-<agent>, the plan's slug, so the scripts and hooks find it); the files it owns and the folders it must not touch; the other agents running and what they own;
 - where to start (files and lines), as a starting point: it reports where it had to go beyond it;
 - the build and test commands for its worktree, the commit style and the gates;
-- the rules: follow the build skill from section 5 with the steps of its plan file, when available; commit each verified step; never merge, push, or touch the target branch or the main checkout, except its plan file and log in the main checkout's .private/plans/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
+- the rules: follow the build skill's sections 5 and 6 with the steps of its plan file, when available (no review of its own: the coordinator reviews the merged result); commit each verified step; never merge, push, or touch the target branch or the main checkout, except its plan file and log in the main checkout's .private/plans/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
 - the model and effort it runs on: writers on the session's model and effort, since they make the code's choices;
 - what to return, in at most 30 lines: its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
 

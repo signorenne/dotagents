@@ -145,8 +145,9 @@ a new plan; they are not converted.
 - During the work it stops only for:
   1. a change to the frozen intent (something the maintainer would notice in
      the result);
-  2. a public API, architecture, dependency or data migration the plan does
-     not hold;
+  2. a public API, architecture, dependency, data migration or other choice
+     that is the maintainer's (scope, rules, a trade-off between their
+     priorities) that the plan does not hold;
   3. an irreversible, destructive or security-sensitive action;
   4. a test or gate that could pass only by being deleted or loosened;
   5. a conflict with an accepted decision;
@@ -165,16 +166,20 @@ a new plan; they are not converted.
 - A finding states its practical consequence; a change with nothing wrong
   gets no findings.
 - The main agent checks each finding at its location and gives one verdict:
-  real (high, medium, low), false with a disproof the reviewer could read,
-  or undecided with what would settle it. It never lowers a reviewer's
-  severity.
+  real, keeping the reviewer's severity (blocker, major, minor; never
+  lowered), false with a disproof the reviewer could read (that a choice was
+  intentional is not one), or undecided with what would settle it.
 - It fixes in one pass what this change caused when the fix is simple; each
   fix that changes behavior is proven by a test seen failing first; then the
   plan's verification runs again. A fix that involves the maintainer's
   choice stops the work; any other fix that is not simple is made and
   recorded as a ruling. Minor findings are listed, not fixed.
+- The baseline's test count on the last commit is compared with the base's,
+  and the tests that pin the unchanged behavior pass there; built means every
+  gate passed on the last commit, and a SKIP or INCOMPLETE gate keeps the
+  change in progress.
 - A second reviewer pass, limited to the fixes, happens only when the risk is
-  high or a fix added a public surface.
+  high or a fix added a public surface; its findings are triaged the same way.
 - What is not this change's problem goes to =.private/deferred.<ext>=, one
   line each, only when the base commit has it too.
 - A finding that shows the plan was wrong sends the work back to the plan,

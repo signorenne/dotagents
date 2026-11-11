@@ -21,12 +21,14 @@ settle, then names the lane, which the maintainer can override in one word:
   plan file, one approval that holds every question, the full review.
 
 A lane goes up when the work proves larger, never down. Each step is one
-commit with its check. During the work the agent stops only for a change to
-the approved intent, an unplanned public API, architecture, dependency or
-migration, an irreversible or security-sensitive action, a test that would
-pass only by being weakened, a conflict with an accepted decision, or two
-failed approaches; other choices are rulings recorded in the plan for the
-maintainer's review.
+commit with its check. During the work the agent stops only for: a change
+to the approved intent; a public API, architecture, dependency, data
+migration or other choice of the maintainer's that the plan does not hold;
+an irreversible, destructive or security-sensitive action; a test or gate
+that could pass only by being deleted or loosened; a conflict with an
+accepted decision; two changed approaches that both failed; a plan so
+broken that every path is a guess. Other choices are rulings recorded in
+the plan for the maintainer's review.
 
 ## Design workflow
 

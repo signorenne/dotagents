@@ -81,7 +81,7 @@ coin a synonym in a local doc when this file already names the concept.
 | risk surface           | What forces the full lane: a public API, a data migration, security, a new dependency, threading, the build, an irreversible step.                            |
 | stop list              | The closed list of reasons the agent stops during a build (=METHOD.org=, Questions and stops); everything else is a ruling.                                   |
 | deferred list          | =.private/deferred.<ext>=, one line per issue that is not the current change's problem and that its base commit has too.                                      |
-| verdict                | The main agent's answer to a review finding: real (high, medium, low), false with a disproof, or undecided with what would settle it.                         |
+| verdict                | The main agent's answer to a review finding: real with the reviewer's severity, false with a disproof, or undecided with what would settle it.                         |
 | handoff                | The brief close writes to =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>= for a session whose state no plan file holds.                                          |
 | working notes          | The git-ignored =.private/= folder of each repository, holding plan files, designs, the deferred list, handoffs, audit reports and as-built notes.            |
 | fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between tasks and between the plans of a design; it resumes from the plan file. |
