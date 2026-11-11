@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: "Diagnoses failures from evidence before any fix: reads the error, reproduces, compares with a working case, tests one hypothesis. Use for errors, failing tests or CI, crashes, hangs or wrong output."
+description: "Diagnoses failures from evidence before any fix: reproduces, compares with a working case, tests one hypothesis. Use for errors, failing tests or CI, crashes, hangs, slowness or wrong output."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -33,6 +33,15 @@ Name a single cause and the evidence for it in one sentence ("the cache returns 
 - In a project with tests, first add a test that reproduces the failure and watch it fail for this reason (trustworthy-tests).
 - Change as little as the cause needs. Show that the original failure is gone by the same means that showed it, then look for the same pattern elsewhere.
 - A fix that does not work sends you back to step 1 with what it taught you; do not stack a second fix on it. After two failed fixes, stop and restate the evidence and your assumptions. When each fix moves the problem somewhere else, the design is wrong rather than a line: say so.
+
+## Slowness
+
+Slowness is a failure like any other: a plausible cause is a hypothesis until a measurement names it.
+
+- Measure where the time goes before changing any structure: a timeline or frame trace (an on-CPU profiler misses time spent waiting on I/O or locks), and the longest single call or frame, on a release build.
+- Time on an otherwise idle machine, over several runs, and compare medians: a parallel build or another job can slow a measurement several times.
+- Pin the fix with a test of the cause (no image decode on the UI thread, a count of calls or allocations). A wall-clock limit belongs in a separate performance job with repeated runs: in the normal test suite it fails whenever the machine is busy.
+- When the cause is work blocking the UI or render thread, move it with the event-driven-ui skill where available.
 
 ## Signs you are guessing
 

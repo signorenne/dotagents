@@ -12,11 +12,12 @@ Claims of completion are claims about evidence. Say what you observed, not what 
 
 ## Before saying done, answer these
 
-1. What did I actually observe? Ran it and saw output, versus reasoned that it should work. These differ and must be reported differently. A check counts only if it could have failed: a test never seen failing, or output you did not read, is not an observation.
+1. What did I actually observe? Ran it and saw output, versus reasoned that it should work. These differ and must be reported differently. A check counts only if it could have failed: a test never seen failing, or output you did not read, is not an observation. A script you wrote to count or check something counts once it has caught a planted case and ignored a planted look-alike.
 2. Did I check the thing the user asked for, or an adjacent thing that was easier to check?
 3. Did every part get done? Multi-part requests lose parts. Re-read the original request, not your summary of it, and tick off each piece.
 4. What did I not verify? There is always something. Name it.
-5. Would this survive the user trying it right now?
+5. Did I test the current build? A program, server or app started before the last change or merge still runs the old code: compare its build time or embedded commit with the latest commit, and restart it rather than trusting a hot reload. When a fix seems not to work, check this first.
+6. Would this survive the user trying it right now?
 
 ## The honest vocabulary
 
