@@ -27,7 +27,7 @@ Running an agent there:
 - Gemini CLI: subagents have no worktree of their own; run a separate gemini session inside the worktree (gemini --worktree needs the experimental.worktrees setting).
 - Elsewhere (Copilot CLI, Cursor): a separate session inside the worktree.
 
-When the work is done (gates and review passed on its last commit), report the branch for review and keep the worktree until it lands or the user drops it.
+When the work is done (gates passed on its last commit, and review passed unless a coordinator reviews the merged result), report the branch for review and keep the worktree until it lands or the user drops it.
 
 ## 3. Land on the user's go
 
