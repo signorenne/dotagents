@@ -24,7 +24,7 @@ Goal: a diagram the reader understands in one look: it answers one question, has
 - Siblings that belong on one row go in a together { } block.
 - Boxes on the same level carry names of similar length; a long name in one box makes the whole level wide.
 - Group with packages, not stereotypes: a stereotype label such as <<library>> adds a line to every box and, in class diagrams, stays black at night, so put those elements in a package named after the group. A note that matters goes in the name ("Cache\n(singleton)").
-- Class diagrams start with hide empty members, so a box shows only what it holds.
+- Class diagrams start with hide empty members and state diagrams with hide empty description, so a box shows only what it holds. A state's detail goes in its description (KeyOff : alarms held), below the state's name, not in a second line of the name.
 
 ## Colours: the bundled palette only
 
