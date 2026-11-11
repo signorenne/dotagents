@@ -516,7 +516,10 @@ again.
 The method rework proposes replacing or narrowing five of these rules
 (=stop-on-plan-change=, =grouped-questions=, =progress-log=,
 =tests-attacked=, =as-built-session-model=) and adds others. Until the maintainer
-accepts them, the rules below bind.
+accepts them, the rules below bind. The table's guide and sensor cells already
+name the files that carry each rule on this branch (close, build, the plan
+file); the rule bodies keep their accepted wording until the proposed
+vocabulary is accepted.
 
 Each rule has a stable anchor, its =CUSTOM_ID=, for skills and docs to cite
 (for example =DESIGN.org#no-agent-push=; an Org link adds =::= before the

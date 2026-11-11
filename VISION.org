@@ -44,8 +44,8 @@ once before it reaches any tool.
   =home/.agents/agents/= and generated for every other tool.
 - /Hook/ : a script the tool runs around the agent's work, outside the
   model: the guard before a shell command, the after-edit check after a file
-  edit, and, in Claude Code and Codex, the session refresh after a
-  compaction or a resume and the progress check when the agent ends its turn;
+  edit, and, in Claude Code and Codex, the session refresh at session start
+  and the step log when the agent ends its turn;
   in Claude Code also the compaction brief before a compaction, the
   repeated failure reminder after a failed command and the claim check when
   the agent ends its turn.
@@ -68,9 +68,8 @@ once before it reaches any tool.
    change to this repository goes, [[file:DESIGN.org][DESIGN.org]] for the rules that bind. A
    second copy goes stale.
 4. The user owns decisions. Scope, public API, architecture, rules and
-   trade-offs are settled with the user, through an assumptions table and
-   only the questions that change them; every other choice during the work
-   is the agent's ruling, recorded for the user's review.
+   trade-offs are settled with the user, one question at a time; routine
+   engineering inside an approved plan is the agent's, and it is recorded.
 5. Every agent gets the same rules. One tool's files differ from another's in
    format only, or where a tool lacks a feature, and then the difference is
    stated: only Claude Code and Codex get the session refresh, because only

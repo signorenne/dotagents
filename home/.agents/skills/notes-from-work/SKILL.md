@@ -8,7 +8,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LIC
 
 Goal: what a session found stays findable and true. Each confirmed finding becomes one short note in the user's knowledge vault: the problem in general terms and its fix from start to end. A wrong note costs more than a missing one, so a finding is written only after a check that could have failed and an independent attack, and nothing reaches the vault's main branch before the user approves it.
 
-The vault is the one the user's global instructions name, or the one the user names; when neither names one, or the vault has no AGENTS.md or no documented gates, stop and ask. Its AGENTS.md and the docs it points to own the note rules (kinds, headings, folders, links, evidence, gates); where they say more than this skill, they win. Keep each step, every probe and its output in the working notes its rules name (for example .private/progress/), so they outlive the session.
+The vault is the one the user's global instructions name, or the one the user names; when neither names one, or the vault has no AGENTS.md or no documented gates, stop and ask. Its AGENTS.md and the docs it points to own the note rules (kinds, headings, folders, links, evidence, gates); where they say more than this skill, they win. Keep each step, every probe and its output in the working notes its rules name (for example .private/plans/), so they outlive the session.
 
 ## 1. Collect
 

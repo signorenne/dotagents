@@ -71,5 +71,5 @@ Before each commit, run validate and the test module that covers what the commit
 - Do validate, tests and build pass?
 - Does a changed instruction still agree with home/.agents/AGENTS.md and the rules in DESIGN.org?
 - Does a new or changed skill pass the checklist in docs/skill-authoring.org?
-- If the maintainer asked for a real agent session test of a behavior change, was it run, and do the progress log or the PR say whether it was?
+- If the maintainer asked for a real agent session test of a behavior change, was it run, and do the plan file or the PR say whether it was?
 - Did a guard change run the guard replay, and did the maintainer judge each newly blocked command?

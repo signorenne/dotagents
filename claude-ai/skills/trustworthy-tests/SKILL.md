@@ -77,7 +77,7 @@ For each test written or changed:
 - the evidence that it can fail: the command and the failing line, or the change to the code that made it fail;
 - the final passing run, with the number of tests the runner reported.
 
-Then list the test changes that alter an expectation (with their evidence), anything that needs the user's approval under section 4, and the behaviors left untested with the reason. A review lists the false positives found, each with the wrong implementation or change that passes it. A caller (a workflow skill or an orchestrating agent) copies this evidence into its progress log or report.
+Then list the test changes that alter an expectation (with their evidence), anything that needs the user's approval under section 4, and the behaviors left untested with the reason. A review lists the false positives found, each with the wrong implementation or change that passes it. A caller (a workflow skill or an orchestrating agent) copies this evidence into its plan file or report.
 
 ## Example
 

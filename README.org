@@ -193,8 +193,8 @@ when asked in words.
 
 [[file:METHOD.org][METHOD.org]] states the method these skills apply.
 
-- [[file:home/.agents/skills/decide/SKILL.md][decide]] : settles a choice that belongs to you, one Socratic question at
-  a time, then records it.
+- [[file:home/.agents/skills/decide/SKILL.md][decide]] : settles a choice that belongs to you, from an assumptions table
+  and only the questions that change it, then records it.
 - [[file:home/.agents/skills/build/SKILL.md][build]] : builds one change in its lane (direct, quick or full), from the
   plan file to the triaged review, resumable from that file in any session.
 - [[file:home/.agents/skills/design/SKILL.md][design]] : turns a feature too large for one plan into a design and its

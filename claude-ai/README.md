@@ -9,7 +9,7 @@ repository is the source: edit skills here, never on claude.ai.
 
 | Skill | Use |
 |---|---|
-| decide | Settle a choice that belongs to you, one Socratic question at a time (built from home/.agents/skills/decide with a shorter description) |
+| decide | Settle a choice that belongs to you, from an assumptions table and only the questions that change it (built from home/.agents/skills/decide with a shorter description) |
 | tutor | Learning: diagnosis, graded help, one step per turn (adapted from Anthropic's learn skill, Apache 2.0, see its NOTICE.txt) |
 | scoping-before-building | Ask only the question that changes the result before building |
 | systematic-debugging | Diagnose from evidence before any fix |
