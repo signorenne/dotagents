@@ -31,6 +31,7 @@ instructions.
 | The same change in many files: a rename, a migration, a codemod | mechanical-changes |
 | Fixing how a screen looks, or updating screenshot tests | precise-ui-changes |
 | Qt Quick and QML code, its view models and assets | qt-quick |
+| Where code belongs: layers, MVVM, repositories, use cases, dependency checks | clean-architecture |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 
