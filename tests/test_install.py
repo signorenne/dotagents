@@ -1146,7 +1146,11 @@ class Manifest(unittest.TestCase):
         self.run_install("--tools", "claude,codex", "--personal", str(layer))
         self.run_install("--tools", "codex", "--no-personal")  # Claude Code's settings are not touched
         self.assertIn("Bash(make *)", json.loads(settings.read_text())["permissions"]["allow"])
-        self.run_install("--personal", str(other))  # a new layer: the old one's values come out
+        self.run_install()  # the next run that reaches them takes the dropped layer out
+        self.assertNotIn("Bash(make *)", json.loads(settings.read_text())["permissions"]["allow"])
+        self.run_install("--personal", str(layer))
+        self.run_install("--tools", "codex", "--personal", str(other))
+        self.run_install()  # the layer recorded for the file was layer: its values make way for other's
         allow = json.loads(settings.read_text())["permissions"]["allow"]
         self.assertNotIn("Bash(make *)", allow)
         self.assertIn("Bash(ninja *)", allow)

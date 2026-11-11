@@ -595,8 +595,11 @@ class Installer:
             if path in merged:
                 kept = [r for r in entry.get("added", []) if r not in merged[path]["added"]]
                 # The personal records change only where the settings step ran this time.
-                personal = merged[path]["personal"] if path in self.personal_set else entry.get("personal", [])
-                merged[path] = {**merged[path], "added": kept + merged[path]["added"], "personal": personal,
+                mine = path in self.personal_set
+                merged[path] = {**merged[path], "added": kept + merged[path]["added"],
+                                "personal": merged[path]["personal"] if mine else entry.get("personal", []),
+                                "personal_layer": merged[path].get("personal_layer") if mine
+                                else entry.get("personal_layer"),
                                 "created": entry.get("created", False) or merged[path]["created"]}
             else:
                 merged[path] = entry
@@ -926,9 +929,13 @@ class Installer:
             personal = json.loads((self.personal / PERSONAL_CLAUDE).read_text(encoding="utf-8"))
 
         path = base / "settings.json"
-        old_personal = self.old.get("merged", {}).get(str(path), {}).get("personal", [])
-        recorded = self.old.get("personal")
-        changed = recorded != (str(self.personal) if self.personal else None)
+        old_entry = self.old.get("merged", {}).get(str(path), {})
+        old_personal = old_entry.get("personal", [])
+        # The layer whose values this file holds is recorded with them, since a run that skips
+        # this step changes the run's layer without touching the file.
+        held = old_entry.get("personal_layer", self.old.get("personal"))
+        current = str(self.personal) if self.personal else None
+        changed = held != current
         from_personal = []
 
         def mutate(settings: dict, added: list) -> dict:
@@ -945,6 +952,7 @@ class Installer:
         if self.merge_json(path, mutate):
             kept = [] if changed else [r for r in old_personal if r not in from_personal]
             self.merged[str(path)]["personal"] = kept + from_personal
+            self.merged[str(path)]["personal_layer"] = current
             self.personal_set.add(str(path))
             self.notes.append(
                 "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
