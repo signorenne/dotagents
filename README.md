@@ -7,7 +7,7 @@ GitHub Copilot CLI and Cursor from a single source.
 What it gives every session, in chat or in a repository:
 
 - the same global instructions everywhere (priorities, sufficiency, evidence, output rules, no em dashes), including a Socratic method: you question the agent, the agent settles your decisions with you one question at a time, and it tries to refute its own assumptions with checks that could fail;
-- a repository workflow as skills: spec, implement, review, gates, session-close, decide, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, mechanical-changes, precise-ui-changes;
+- a repository workflow as skills: spec, implement, review, gates, session-close, decide, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, mechanical-changes, precise-ui-changes, qt-quick;
 - three subagents that keep the main context small: scout (read-only mapping), gate-runner (builds and tests, returns only verdicts), reviewer (independent review);
 - hooks that block git gate bypasses and force pushes, flag em and en dashes, run clang-format, and remind the agent after a compaction that its memory of the code may be stale;
 - a claude.ai skill set (decide, tutor, debugging, verification, tests, scoping, editing, research, decisions, handoffs, prompts), installed locally from this repository for every agent too.
