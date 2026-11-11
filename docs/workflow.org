@@ -6,8 +6,8 @@
 This file owns how the pieces work together once installed: the maieutic
 method, the daily loop (which skill to run when), context hygiene, cost and
 cache habits with how to measure them, the per-project layer and the setup
-steps. [[file:pipeline.org][docs/pipeline.org]] owns the stages a change goes through from idea
-to merge; [[file:../DESIGN.org][DESIGN.org]] owns how the pieces compose and install;
+steps. [[file:../METHOD.org][METHOD.org]] owns the method a change follows from request to
+landing; [[file:../DESIGN.org][DESIGN.org]] owns how the pieces compose and install;
 [[file:../README.org][README.org]] owns the quick start. The method is the same in every chat
 and every project because claude.ai and every local agent read the same
 global rules.
@@ -18,16 +18,18 @@ global rules.
   answers that question, changes nothing unless asked, and shows evidence,
   assumptions and what would prove it wrong.
 - The agent guides you on choices that are yours (scope, public API,
-  architecture, rules): the decide skill establishes what is known, isolates
-  the missing information, asks one question at a time with a recommended
-  option and the consequence of each option, and records the decision after
-  your explicit confirmation. Up to four independent, low-stakes questions may
-  share one message.
+  architecture, rules): the decide skill shows what is known as an
+  assumptions table (evidence, what breaks if wrong, how sure), asks only the
+  questions whose answers change the choice (in one batch when independent),
+  each with a recommended option and the consequence of each option, and
+  records the decision after your explicit confirmation. During a build the
+  agent stops only for the closed list in METHOD.org; every other choice is a
+  ruling in the plan, listed for your review at the end.
 - The agent questions its own work the same way: before relying on a claim
   (its own, yours, a document's, a subagent's, a test's) it tries to break the
   ones that matter with a check that could fail; rereading is not a check.
-  Refuted assumptions go into the progress log and the handoff, and
-  session-close turns those a rule should have prevented into proposed
+  Refuted assumptions go into the plan file, and close turns those a rule
+  should have prevented into proposed
   changes.
 - When you ask to learn, the Learning section and the tutor skill give graded
   help and announce every check.
@@ -39,16 +41,16 @@ global rules.
 
 | Situation                                                                        | What to run                                                                                                                                                                                                                                                                                                                                                                                                                    |
 |----------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Small fix                                                                        | Ask directly. Hooks block gate bypasses and pushes, flag em and en dashes, check Python, JSON and TOML syntax, format the C and C++ lines an edit changed                                                                                                                                                                                                                                                                      |
-| Feature or design work                                                           | spec (raise the effort), then a fresh session, then implement on the spec file, then session-close; every stage is in [[file:pipeline.org][docs/pipeline.org]]                                                                                                                                                                                                                                                                                        |
+| Small fix                                                                         | Ask directly: build takes the direct lane (the change, the narrow check, a report). Hooks block gate bypasses and pushes, flag em and en dashes, check Python, JSON and TOML syntax, format the C and C++ lines an edit changed                                                                                                                                                                                                 |
+| Feature or design work                                                            | build: it investigates, names the lane (quick: announced, one quick review; full: one approval holding every question, the full review) and keeps the plan file current; design first for work that needs several plans; close at the end of a session. The method is in [[file:../METHOD.org][METHOD.org]]                                                                                                                     |
 | Large or parallel work (Claude Code)                                             | The agent proposes a workflow with its rough cost only for large work that splits into independent parts; ask for one with "use a workflow" (or ultracode); =/deep-research= for a question about the web; ask for parallel subagents for a question across several code areas; for several agents writing code at once, parallel-agents. In auto mode only the first launch asks. Save a run you want again from =/workflows= |
 | A choice that is yours                                                           | decide                                                                                                                                                                                                                                                                                                                                                                                                                         |
 | Before commit or PR                                                              | branch-review                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Build and tests                                                                  | gates, or =gates narrow <module or test filter>=                                                                                                                                                                                                                                                                                                                                                                               |
-| Writing or reviewing tests                                                       | trustworthy-tests (implement and reviewer apply it on their own)                                                                                                                                                                                                                                                                                                                                                               |
+| Writing or reviewing tests                                                        | trustworthy-tests (build and the reviewer apply it on their own)                                                                                                                                                                                                                                                                                                                                                                |
 | New repository or audit                                                          | project-setup                                                                                                                                                                                                                                                                                                                                                                                                                  |
 | Documenting a repository, or updating its docs after a change                    | as-built-docs                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Planning a new system or major component: requirements and architecture          | architecture-doc, then spec per increment                                                                                                                                                                                                                                                                                                                                                                                      |
+| Planning a new system or major component: requirements and architecture           | architecture-doc, then design per increment                                                                                                                                                                                                                                                                                                                                                                                     |
 | Drawing or fixing a PlantUML diagram                                             | plantuml-diagrams                                                                                                                                                                                                                                                                                                                                                                                                              |
 | Several agents writing in parallel in one repository, and merging their branches | parallel-agents                                                                                                                                                                                                                                                                                                                                                                                                                |
 | A complex or risky change kept apart until it is reviewed                        | isolated-work                                                                                                                                                                                                                                                                                                                                                                                                                  |
@@ -76,9 +78,10 @@ guard that cannot run blocks the command; and the commands that land or
 move a branch (=git rebase=, =git merge=, =git update-ref=, a forced
 =git branch= move, rename, copy or delete, also after =git -C <dir>=) ask
 you first. In Claude Code and Codex, when the agent ends its turn on a task
-branch whose progress log misses one of the branch's commits, the progress
-check sends it back once to record it; after a rebase the new hashes are
-enough. In Claude Code, a final message that says the tests pass sends the
+branch with a plan file, the step log records the branch's new commits in
+the plan's log, with no model turn. In Claude Code, after a step's commit
+with a context over 200,000 tokens, the context nudge tells you it is a good
+point to clear the session. In Claude Code, a final message that says the tests pass sends the
 agent back once when the session's transcript shows that no test run passed
 after its last file edit (the claim check), to run the tests or say they
 were not run.
@@ -87,16 +90,18 @@ were not run.
 
 - One task per session; start a fresh session (Claude Code: =/clear=) between
   unrelated tasks.
-- In Claude Code and Codex, after a compaction or a resume, the session refresh reminds
-  the agent that its memory of the code is a summary, prints the real branch,
-  changes and last commits, lists the newest progress and handoff files, and
-  asks it to re-read the progress log and invoke its workflow skill again. The
-  other tools have no such hook: ask for that re-read yourself.
-- Specs, progress logs and handoffs live in =.private/= inside each repository
-  (git-ignored); decisions live in the project's decision log.
-- implement keeps =.private/progress/<slug>.<ext>= current after every step;
-  how you review the agent decisions it marks =Review: pending= is in
-  [[file:pipeline.org][docs/pipeline.org]].
+- Clear the session between steps when the context is large: the plan file
+  holds the state. In Claude Code and Codex, on a new session, a clear, a
+  compaction or a resume, the session refresh prints the plan's header, the
+  step in progress and the open rulings (after a compaction or a resume also
+  the real branch, changes and last commits, and a reminder that the agent's
+  memory of the code is a summary). The other tools have no such hook: ask
+  the agent to run the build skill, which starts from plan_state.py.
+- Plan files and their logs, designs and handoffs live in =.private/= inside
+  each repository (git-ignored); decisions live in the project's decision log.
+- build keeps =.private/plans/<slug>.<ext>= current as it works; the rulings
+  it marks pending are listed at the end for your review
+  ([[file:../METHOD.org][METHOD.org]], Decisions).
 
 * Cost and cache habits
 

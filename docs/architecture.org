@@ -5,7 +5,7 @@
 
 This file owns how the parts of the repository relate and how they work
 together. [[file:../DESIGN.org][DESIGN.org]] owns the rules they keep;
-[[file:pipeline.org][docs/pipeline.org]] owns the stages a change goes through;
+[[file:../METHOD.org][METHOD.org]] owns the stages a change goes through;
 [[file:glossary.org][docs/glossary.org]] owns the terms.
 
 Each section answers one question with a diagram, then says how it works. The
@@ -112,22 +112,30 @@ each edge carries:
 
 * How an install reaches each tool
 
-What =python3 install.py= does, in order, and what each tool receives.
+What =python3 install.py= does, in order, and what each tool receives. Each
+tool is a description in =TOOL_DESCRIPTIONS= (base folder, rules, skills,
+subagents, hooks with their timeout unit, extra steps, notes); one engine
+runs the steps below for every description.
 
 [[file:diagrams/arch_install.svg]]
 
 1. Check the source. Every subagent file must parse and convert for Codex,
    Gemini CLI and Copilot CLI; the adapter must hold a hooks object and
-   =overrides.json= a skills object. On any problem it prints the list,
-   installs nothing and exits 1.
+   =overrides.json= a skills object, and a personal layer (=--personal=, or
+   the one the manifest recorded) must hold no hooks. On any problem it
+   prints the list, installs nothing and exits 1.
 2. Choose the tools: the =--tools= list, or every tool whose folder
    (=~/.claude=, =~/.codex=, =~/.gemini=, =~/.gemini/antigravity-cli=,
    =~/.copilot= or =$COPILOT_HOME=, =~/.cursor=) or command (=agy= for
    Antigravity CLI) exists.
 3. Shared source: copy every file of =home/.agents= to =~/.agents= (hook
-   scripts made executable) and the claude.ai set into =~/.agents/skills=, so
-   every tool sees both skill sets. A file left in an installed skill folder
-   that the repository no longer has goes to the backup.
+   scripts made executable; the global rules followed by the personal
+   layer's =AGENTS.md= when there is one) and the claude.ai set into
+   =~/.agents/skills=, so every tool sees both skill sets. Over an older
+   version without a manifest, a file left in an installed skill folder that
+   the repository no longer has, the retired skills (=review=, =implement=,
+   =spec=, =session-close=) and the retired hook =progress_check.py= go to
+   the backup.
 4. Claude Code: when =~/.claude/CLAUDE.md= lacks the import
    =@~/.agents/AGENTS.md=, replace it with one that has it (the old file goes
    to the backup); back up the =learn= and =handoff= skill copies and the hook
@@ -140,13 +148,15 @@ What =python3 install.py= does, in order, and what each tool receives.
    =dotagents-*.md= rule the repository no longer has; merge the adapter into
    =~/.claude/settings.json=, adding =skillOverrides= that turn off the synced
    copy (=anthropic-skills:<name>=) of every skill also uploaded to claude.ai,
-   and removing from =ask= every rule the adapter denies.
+   merging the personal layer's =claude-settings.json= after it, and
+   removing from =ask= every rule the adapter denies.
 5. Codex: link =~/.codex/AGENTS.md=; write =agents/<name>.toml= (with
    =sandbox_mode= read-only for scout and =workspace-write= for the others,
    which Codex ignores in an agent file, and the reasoning effort when the
-   source sets one); merge the guard, the after-edit hook and the
-   session refresh (=SessionStart= after =compact= or =resume=) into
-   =~/.codex/hooks.json=, which Codex asks the user to trust; write
+   source sets one); merge the guard, the after-edit hook, the session
+   refresh (=SessionStart= on every source but =fork=) and the step log
+   (=Stop=) into =~/.codex/hooks.json=, which Codex asks the user to trust;
+   write
    =rules/dotagents.rules=, whose =prefix_rule= entries forbid every push and
    publish (Codex rules are experimental).
 6. Gemini CLI: link =~/.gemini/GEMINI.md=; write =agents/<name>.md= with Gemini
@@ -154,7 +164,8 @@ What =python3 install.py= does, in order, and what each tool receives.
    =maxTurns=; =timeout_mins= 120 for gate-runner, 60 for reviewer, 30 for
    scout), above Gemini CLI's defaults of 30 turns and 10 minutes; merge the
    two hooks into =~/.gemini/settings.json= and put =AGENTS.md= first in
-   =context.fileName=, so project =AGENTS.md= files load.
+   =context.fileName=, so project =AGENTS.md= files load (one merge of the
+   file).
 7. Antigravity CLI: link =~/.gemini/GEMINI.md= (the same link as Gemini
    CLI's); merge the guard and the after-edit hook into
    =~/.gemini/config/hooks.json= under the names =dotagents-guard= and
@@ -169,11 +180,20 @@ What =python3 install.py= does, in order, and what each tool receives.
    and the Claude Code hooks by itself, so it gets subagents and hooks only
    when Claude Code is installed too; the installer reminds the user to paste
    the global rules into Cursor's User Rules.
-10. Print the number of changes, the backup folder and the notes.
+10. Generic targets (=--target DIR[:RULES]=, and those the manifest
+    recorded): link every skill into =DIR/skills= and the global rules into
+    =DIR/RULES=.
+11. Remove what the last install recorded, this run's tools and targets no
+    longer install, and nobody changed since (backed up first); write the
+    manifest =~/.agents/.dotagents-manifest.json=.
+12. Print the number of changes, the backup folder and the notes.
 
 How it stays safe to run again:
 
-- An identical file is left alone, so a second run changes nothing.
+- An identical file is left alone, so a second run changes nothing. A file
+  the manifest records but that no longer holds what was installed was
+  changed by hand: it is kept with a note, and =--force= backs it up and
+  replaces it.
 - A file or link that differs is moved first to
   =~/.agents-backup/<YYYYmmdd-HHMMSS>/=, under its path relative to =HOME=.
 - A settings merge adds keys and list items, lets values already set win,
@@ -182,9 +202,10 @@ How it stays safe to run again:
   shape cannot take the entries, is left alone with a note to merge it by hand.
 - =--dry-run= prints every action and changes nothing; =--audit= lists what in
   the agents' folders does not come from the repository, and broken links.
-- A whole skill, subagent, hook script or settings entry the repository
-  dropped stays in the tools' folders: =--audit= shows the first three, and
-  settings entries are removed by hand.
+- =--uninstall= removes every recorded file and link still as installed,
+  this repository's hook entries and the values it recorded merging into
+  each settings file, and the folders it made once empty; a file changed by
+  hand is kept and named.
 
 Only the Claude Code copy of a subagent keeps its =model= field; the Codex,
 Gemini CLI and Copilot CLI copies carry none, so they run on the tool's
@@ -242,9 +263,10 @@ demand.
    the palette) load only when a step reads them.
 4. Compaction brief and session refresh. In Claude Code, before a compaction
    the tool runs the compaction brief, which tells the summary what resuming
-   the task needs. In Claude Code and Codex, after a compaction or a resume the
-   tool runs the session refresh, which adds a stale-memory reminder, the real
-   git state and the newest task notes to the context.
+   the task needs. In Claude Code and Codex, on a new session, a clear, a
+   compaction or a resume the tool runs the session refresh, which adds the
+   plan file's excerpt on a task branch, and after a compaction or a resume
+   also a stale-memory reminder and the real git state.
 5. Path rules (Claude Code). When the agent reads or edits a file that
    matches a rule's globs (QML, PlantUML, tests), the rule loads and points
    it to qt-quick, plantuml-diagrams or trustworthy-tests. The globs are
@@ -281,47 +303,49 @@ gate-runner 154 apart from one run of 280), so only a runaway stops early.
 * The workflow skills
 
 Which skills and subagents serve each stage of a change; the stages
-themselves, with what each leaves and where, are in [[file:pipeline.org][docs/pipeline.org]].
+themselves, with what each leaves and where, are in [[file:../METHOD.org][METHOD.org]].
 
 [[file:diagrams/arch_skills_workflow.svg]]
 
 What each edge carries:
 
-| From          | To                            | What passes                                           |
-|---------------+-------------------------------+-------------------------------------------------------|
-| project-setup | decide                        | the open points the repository does not answer        |
-| spec          | decide                        | each design choice                                    |
-| spec          | implement, in a fresh session | the spec file                                         |
-| implement     | decide                        | the user's choices                                    |
-| implement     | trustworthy-tests             | each test, written first                              |
-| implement     | systematic-debugging          | a problem after two failed fixes                      |
-| session-close | implement, in a fresh session | the handoff                                           |
-| implement     | isolated-work                 | the worktree to create; on the user's go, the landing |
+| From          | To                         | What passes                                                  |
+|---------------+----------------------------+--------------------------------------------------------------|
+| project-setup | decide                     | the open points the repository does not answer               |
+| design        | decide                     | each design choice                                           |
+| design        | build, in a fresh session  | one plan of the design                                       |
+| build         | decide                     | the user's choices, in one batch before approval             |
+| build         | trustworthy-tests          | each test, written first                                     |
+| build         | systematic-debugging       | a problem after two failed fixes                             |
+| close         | build, in a fresh session  | the plan file, brought up to date                            |
+| build         | isolated-work              | the worktree to create; on the user's go, the landing        |
 
 1. Set up: project-setup runs once per repository. scout surveys it, decide
    settles what the repository does not answer, and gate-runner runs each
    validation command once.
-2. Decide and specify: spec maps the area with scout, settles each design
-   choice with decide, and has a subagent that did not write it check the
-   spec (in Claude Code the general-purpose subagent, elsewhere reviewer).
-3. Implement, gates and review: a fresh session runs implement on the spec
-   file. implement grounds the plan with scout (skipped when the spec records
-   the commit its check ran on and none of the spec's affected paths changed
-   since, as =git diff --quiet= shows) and its own reading of the files it
-   will touch, takes the user's choices to decide, writes each test first by
-   trustworthy-tests, turns to systematic-debugging after two failed fixes,
-   runs the full gates through gate-runner and the review through reviewer,
-   and creates the worktree through isolated-work when the plan's isolation
-   was approved.
-4. On request: gates and branch-review are the user's direct way to the same two
-   subagents; implement calls the subagents itself, not these skills.
-5. Close: session-close writes the handoff that the next fresh session reads
-   before resuming implement.
+2. Decide and design: for work that needs several plans, design maps the
+   area with scout, settles each choice with decide, and has a subagent that
+   did not write it check the design (in Claude Code the general-purpose
+   subagent, elsewhere reviewer).
+3. Build, in its lane: build starts from plan_state.py, investigates (scout
+   only when the area is unknown or wide), names the lane, writes the plan
+   file, and in the full lane has it checked by an independent subagent and
+   approved once with every question in one batch. It writes each test first
+   by trustworthy-tests and records the failing run with check_step, turns to
+   systematic-debugging after two failed fixes, runs floor_check and the full
+   gates through gate-runner, the review through reviewer in quick or full
+   mode, triages each finding, and creates the worktree through isolated-work
+   when the plan proposed isolation.
+4. On request: gates and branch-review are the user's direct way to the same
+   two subagents; build calls the subagents itself, not these skills.
+5. Close: close brings the plan files up to date, settles decisions and
+   rulings, and names the next action; a fresh session resumes build from
+   the plan file, which the session hook prints.
 6. Land and clean up: on the user's go, isolated-work rebases the branch,
    gates the rebased commit through gate-runner, fast-forwards the target and
    removes the worktree and the branch. It skips the gate run only when the
-   rebase left the pinned commit unchanged and the progress log records the
-   full gates passing on a clean tree at that hash.
+   rebase left the pinned commit unchanged and the plan's log holds a passing
+   gate line for every full gate at that hash.
 
 decide is where every choice that belongs to the user is settled. Besides the
 callers drawn here, architecture-doc, mechanical-changes, parallel-agents,
@@ -336,44 +360,44 @@ Where the specialist skills hand work on.
 What each edge carries; a plain line names both skills, so its row reads both
 ways:
 
-| From                        | To                   | What passes                                                                                                                         |
-|-----------------------------+----------------------+-------------------------------------------------------------------------------------------------------------------------------------|
-| architecture-doc            | plantuml-diagrams    | its diagrams, to draw and check                                                                                                     |
-| as-built-docs               | plantuml-diagrams    | its diagrams, to draw and check                                                                                                     |
-| as-built-docs               | precise-ui-changes   | its screen pictures, made repeatable                                                                                                |
-| as-built-docs               | code-audit           | a list of suspicious behavior                                                                                                       |
-| architecture-doc            | spec                 | a build order whose every step is ready for spec                                                                                    |
-| architecture-doc            | clean-architecture   | clean-architecture's layers, for an application (plain line)                                                                        |
-| code-audit                  | implement            | a finding the user wants fixed                                                                                                      |
-| precise-ui-changes          | trustworthy-tests    | a behavior test for a visual bug that plays out over time                                                                           |
-| parallel-agents             | mechanical-changes   | shards to spread over several agents (to parallel-agents); a one-rule change across many files (to mechanical-changes) (plain line) |
-| mechanical-changes          | implement            | the change, as a task with its shards as plan steps                                                                                 |
-| parallel-agents (not drawn) | implement            | each agent's approved plan steps, run from section 5 (each writer's worktree goes through isolated-work)                            |
-| parallel-agents             | isolated-work        | each writer's worktree, created and later landed                                                                                    |
-| isolated-work               | implement            | its change, run through implement                                                                                                   |
-| clean-architecture          | qt-quick             | the layers, applied in Qt (plain line)                                                                                              |
-| clean-architecture          | event-driven-ui      | the threads                                                                                                                         |
-| qt-quick                    | event-driven-ui      | the threads, applied in Qt (plain line)                                                                                             |
-| event-driven-ui             | systematic-debugging | a freeze whose cause is not yet measured (to systematic-debugging); a blocked UI thread (to event-driven-ui) (plain line)           |
-| clean-architecture          | spec                 | a feature's steps, as the plan's steps                                                                                              |
-| clean-architecture          | implement            | a feature's steps, as the plan's steps                                                                                              |
+| From                        | To                   | What passes                                                                                                                           |
+|-----------------------------+----------------------+---------------------------------------------------------------------------------------------------------------------------------------|
+| architecture-doc            | plantuml-diagrams    | its diagrams, to draw and check                                                                                                       |
+| as-built-docs               | plantuml-diagrams    | its diagrams, to draw and check                                                                                                       |
+| as-built-docs               | precise-ui-changes   | its screen pictures, made repeatable                                                                                                  |
+| as-built-docs               | code-audit           | a list of suspicious behavior                                                                                                         |
+| architecture-doc            | design               | a build order whose every step is ready for design                                                                                    |
+| architecture-doc            | clean-architecture   | clean-architecture's layers, for an application (plain line)                                                                          |
+| code-audit                  | build                | a finding the user wants fixed                                                                                                        |
+| precise-ui-changes          | trustworthy-tests    | a behavior test for a visual bug that plays out over time                                                                             |
+| parallel-agents             | mechanical-changes   | shards to spread over several agents (to parallel-agents); a one-rule change across many files (to mechanical-changes) (plain line)   |
+| mechanical-changes          | build                | the change, as a task with its shards as plan steps                                                                                   |
+| parallel-agents (not drawn) | build                | each agent's approved plan steps, run from build section 5 with its own plan file (each writer's worktree goes through isolated-work) |
+| parallel-agents             | isolated-work        | each writer's worktree, created and later landed                                                                                      |
+| isolated-work               | build                | its change, run through build                                                                                                         |
+| clean-architecture          | qt-quick             | the layers, applied in Qt (plain line)                                                                                                |
+| clean-architecture          | event-driven-ui      | the threads                                                                                                                           |
+| qt-quick                    | event-driven-ui      | the threads, applied in Qt (plain line)                                                                                               |
+| event-driven-ui             | systematic-debugging | a freeze whose cause is not yet measured (to systematic-debugging); a blocked UI thread (to event-driven-ui) (plain line)             |
+| clean-architecture          | design               | a feature's steps, as the plan's steps                                                                                                |
+| clean-architecture          | build                | a feature's steps, as the plan's steps                                                                                                |
 
 - Documents and audits. architecture-doc and as-built-docs draw their diagrams
   with plantuml-diagrams. architecture-doc ends with a build order whose every
-  step is ready for spec. as-built-docs makes its screen pictures repeatable
+  step is ready for design. as-built-docs makes its screen pictures repeatable
   as precise-ui-changes does, and hands a list of suspicious behavior to
   code-audit. code-audit fixes nothing: a finding the user wants fixed goes to
-  implement, starting with a failing test. In precise-ui-changes, a visual bug
+  build, starting with a failing test. In precise-ui-changes, a visual bug
   that plays out over time also needs a behavior test from trustworthy-tests.
-- Changes across files. mechanical-changes runs as an implement task, with its
+- Changes across files. mechanical-changes runs as a build task, with its
   shards as plan steps; to spread the shards over several agents it uses
   parallel-agents, which sends a one-rule change across many files back to
-  mechanical-changes. Each parallel agent runs implement from section 5 with
-  its approved plan steps, in a worktree that isolated-work creates and later
-  lands. isolated-work runs its change through implement.
+  mechanical-changes. Each parallel agent runs build from section 5 with
+  its own plan file, in a worktree that isolated-work creates and later
+  lands. isolated-work runs its change through build.
 - Application design. clean-architecture gives the layers, event-driven-ui the
   threads, and qt-quick applies both in Qt. architecture-doc uses
-  clean-architecture's layers for an application, and under spec or implement
+  clean-architecture's layers for an application, and under design or build
   clean-architecture's steps for a feature become the plan's steps. A freeze
   whose cause is not yet measured goes to systematic-debugging first, which
   sends a blocked UI thread back to event-driven-ui.
@@ -400,7 +424,7 @@ The subagents these skills use:
 - mechanical-changes sends its review to reviewer. parallel-agents gates each
   branch through isolated-work, which runs gate-runner on the rebased commit
   (unless the rebase left it unchanged and its pass is logged), and reviews
-  the merged result through implement's review.
+  the merged result through build's review.
 
 * The claude.ai skills
 
@@ -427,11 +451,11 @@ which the diagram leaves out so that no line crosses the whole map:
 | atomic-notes            | minimal-editing                | a small fix to an existing text                                                                                                      |
 | atomic-notes            | tutor                          | a request to learn, understand, study or practice                                                                                    |
 | atomic-notes            | verifying-before-claiming-done | the notes, checked before calling them correct                                                                                       |
-| scoping-before-building | Local skills                   | open work in a repository, to spec; a new system, to architecture-doc                                                                |
-| decide                  | Local skills                   | a decision too large, to spec                                                                                                        |
+| scoping-before-building | Local skills                   | open work in a repository, to design; a new system, to architecture-doc                                                              |
+| decide                  | Local skills                   | a decision too large, to design                                                                                                      |
 | prompt-optimizer        | Local skills                   | a repository's =AGENTS.md=, to project-setup                                                                                         |
-| context-handoff         | Local skills                   | a handoff inside a repository, to session-close                                                                                      |
-| systematic-debugging    | Local skills                   | a fix of more than one sentence, to implement; work that blocks a UI thread, to event-driven-ui                                      |
+| context-handoff         | Local skills                   | a handoff inside a repository, to close                                                                                              |
+| systematic-debugging    | Local skills                   | a fix of more than one sentence, to build; work that blocks a UI thread, to event-driven-ui                                          |
 
 The set is the eleven skills of =claude-ai/skills/= plus decide, uploaded through
 its override. The installer puts all of them in every local agent too, so the
@@ -440,8 +464,8 @@ applies where that skill is installed (the texts say "where available").
 
 - Debugging: systematic-debugging diagnoses first, reproduces the failure with
   a test by trustworthy-tests, applies the fix with minimal-editing, or with
-  implement where it is available and the fix is more than a one-sentence
-  change (implement then writes the failing test), and checks with
+  build where it is available and the fix is more than a one-sentence
+  change (build then writes the failing test), and checks with
   verifying-before-claiming-done before saying it is fixed. It sends work
   that blocks a UI thread to event-driven-ui. trustworthy-tests sends a flaky
   or unclear failure back to systematic-debugging, and minimal-editing sends
@@ -449,12 +473,12 @@ applies where that skill is installed (the texts say "where available").
 - Choices: efficient-research gathers the facts, decision-analysis commits to
   a recommendation, and a choice inside the user's own project goes to decide,
   which turns to decision-analysis to compare outside products and proposes a
-  spec when a decision is too large.
+  design when a decision is too large.
 - Scoping: scoping-before-building sends the user's choices to decide, open
-  work in a repository to spec, and a new system to architecture-doc.
+  work in a repository to design, and a new system to architecture-doc.
 - Prompts and handoffs: prompt-optimizer makes a single requested change with
   minimal-editing and sends a repository's =AGENTS.md= to project-setup;
-  context-handoff gives way to session-close inside a repository.
+  context-handoff gives way to close inside a repository.
 - Notes: atomic-notes checks the facts a note depends on through
   efficient-research, gives a small fix of an existing text to
   minimal-editing and a request to learn to tutor.
@@ -473,12 +497,13 @@ Where each tool runs them:
 
 - Claude Code: the guard on =PreToolUse= for =Bash=, the after-edit hook on
   =PostToolUse= for =Edit= and =Write=, the compaction brief on =PreCompact=
-  (manual and automatic), the session refresh on =SessionStart= after
-  =compact= or =resume=, the progress check and the claim check on =Stop=,
-  and the repeated failure hook on =PostToolUseFailure= for =Bash=.
+  (manual and automatic), the session refresh on =SessionStart= for
+  =startup=, =resume=, =clear= and =compact=, the step log and the claim check
+  on =Stop=, the context nudge on =PostToolUse= for =Bash=, and the repeated
+  failure hook on =PostToolUseFailure= for =Bash=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
-  =Write=, =SessionStart= after =compact= or =resume=, whose plain stdout
-  Codex adds as developer context, and =Stop=.
+  =Write=, =SessionStart= for =startup=, =resume=, =clear= and =compact=,
+  whose plain stdout Codex adds as developer context, and =Stop=.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
   =write_file= and =replace=.
 - Antigravity CLI: =PreToolUse= for =run_command=, =PostToolUse= for
@@ -487,13 +512,13 @@ Where each tool runs them:
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
   =str_replace_editor= and =apply_patch=.
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=;
-  its stop input has no =stop_hook_active=, so there the progress check and
-  the claim check let every stop through.
+  its stop input has no =stop_hook_active=, so there the claim check lets
+  every stop through (the step log never blocks).
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
-refresh and the progress check (Claude Code and Codex), the compaction
-brief, the claim check and the repeated failure hook (Claude Code) get
-10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
+refresh and the step log (Claude Code and Codex), the compaction brief, the
+claim check, the context nudge and the repeated failure hook (Claude Code)
+get 10 s. Every hook exits 0 on a payload it cannot read, so a broken payload
 never stops the work, and prints nothing but JSON on Gemini CLI's and
 Antigravity CLI's stdout. In Claude Code the guard's entry sets =onFailure=
 to =block=: a guard that cannot start, crashes or times out blocks the
@@ -502,15 +527,16 @@ command instead of letting it run.
 Compaction brief (=compact_brief.py=):
 
 1. Ask the summary to keep what resuming needs: the task, its slug and the
-   check that says it is done; the branch; the paths of the task's progress
-   log and handoff; the workflow skill and the section or step of it that was
-   running; the current plan step; each decision marked
-   =Review: pending=; each constraint the user stated that no file records,
+   check that says it is done; the branch; the plan file's path; the
+   workflow skill and the section or step of it that was running; the
+   current plan step; each ruling still pending and each choice the user
+   made; each constraint the user stated that no file records,
    word for word, and what is blocked on what; the files changed; the
    commands still needed and the last result of each command run.
 2. Fill in what it can read: the branch, up to 15 lines of
-   =git status --short= and the newest task notes, with session refresh's
-   finder and time budget (8 s).
+   =git status --short=, and the plan file of a task branch (the build
+   skill's =planfile.py=, 1 s per git call) or else the newest plans and
+   handoffs with session refresh's finder, within 8 s.
 3. Print it, cut under Claude Code's 10,000-character cap, and exit 0 every
    time: exit 2 would block the compaction, and when the compaction recovers
    from a full context the request would fail. Its command ends in =|| true=
@@ -518,42 +544,54 @@ Compaction brief (=compact_brief.py=):
 
 Session refresh (=session_refresh.py=):
 
-1. Print the reminder: the agent's memory of the code is a summary; re-read
+1. On a task branch with a plan file, take the plan excerpt from the build
+   skill's =plan_state.py --excerpt= (a subprocess, at most 3 s and 4,000
+   characters): the header, the step in progress, the open rulings and the
+   last log lines, marked as a map. On =startup= or =clear= print only that
+   excerpt, or nothing without a plan, and stop.
+2. After a compaction or a resume, print the reminder: the agent's memory of the code is a summary; re-read
    the files and confirm each symbol before editing. After a compaction, also
    ask the agent to invoke its workflow skill again: Claude Code keeps only the
    first 5,000 tokens of each skill invoked before it, and may drop older
    ones.
-2. Add the branch (or the detached commit), up to 15 lines of
+3. Add the branch (or the detached commit), up to 15 lines of
    =git status --short=, the last five commits and the repository's other
    worktrees with their branches (up to ten). A list that git could not
    give is named as missing, never shown as a clean tree.
-3. Add the three newest files of =.private/progress/= and of
+4. Add the plan excerpt; without one, the three newest plan files of
+   =.private/plans/= (their logs and run outputs left out) and files of
    =.private/handoff/=, with absolute paths, found in the working folder or a
    parent up to the repository root or, in a linked worktree, in the main
-   checkout (the folder of =git rev-parse --git-common-dir=), and ask the
-   agent to re-read the task's progress log. The
-   notes are listed before git runs, so a slow git cannot leave them out; the
-   listing and the git calls share 8 s, under the 10 s timeout past which
-   Claude Code drops the output.
-4. Exit 0; its stdout joins the agent's context.
+   checkout (the folder of =git rev-parse --git-common-dir=); then ask the
+   agent to re-read the plan file. The notes are listed before git runs, so
+   a slow git cannot leave them out; the excerpt, the listing and the git
+   calls share 8 s, under the 10 s timeout past which Claude Code drops the
+   output.
+5. Exit 0; its stdout joins the agent's context.
 
-Progress check (=progress_check.py=):
+Step log (=step_log.py=):
 
-1. Let the stop through unless =stop_hook_active= is =false=: once the agent
-   continues because of a stop hook, the next stop goes through.
-2. On a branch =<type>/<slug>=, find =.private/progress/<slug>.*= with session
-   refresh's finder (in a linked worktree, the main checkout's) and list the
-   branch's own commits, the 50 newest that no other local or
-   remote-tracking branch holds.
-3. When one of them is newer than the log's last change, or no prefix of its
-   hash of at least 7 characters is in the log, answer
-   ={"decision": "block", "reason": ...}=: three lines that name the log and
-   the commits, ask to record each step with its commit and check (after a
-   rebase that only changed the hashes, replacing each old hash with its new
-   one is enough), and then to end the turn.
-4. Anything else, an error or a git slower than 8 s lets the stop through,
-   and its command ends in =|| true=, since exit 2 from a Stop hook keeps the
-   agent going.
+1. On a branch =<type>/<slug>= whose plan file =.private/plans/<slug>.<ext>=
+   exists (the build skill's =planfile.py= finds it; in a linked worktree,
+   the main checkout's), list the branch's own commits, the 50 newest that no
+   other local or remote-tracking branch holds, oldest first.
+2. Append to =<slug>.log= one commit line (time, =commit=, the hash's first
+   12 characters, the subject) for each commit the log does not name yet: a
+   commit counts as named when a commit line holds a prefix of its hash of
+   at least 7 characters.
+3. Print nothing and exit 0 every time, so it never keeps the agent going;
+   an error, a missing build skill or a slow git (1.5 s per call) only skips
+   the writing. Its command ends in =|| true=.
+
+Context nudge (=context_nudge.py=, Claude Code only):
+
+1. After a shell command that ran =git commit=, read the context of the last
+   main request (input, cache-write and cache-read tokens) from the tail of
+   =transcript_path=.
+2. On a task branch whose plan file exists, when that context passed 200,000
+   tokens, print ={"systemMessage": ...}=, which Claude Code shows the user:
+   a good point to clear the session, since the plan holds the state.
+3. Anything else prints nothing; it always exits 0.
 
 Claim check (=claim_check.py=, Claude Code only):
 

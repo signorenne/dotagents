@@ -463,7 +463,47 @@ def check_marketplace(errors: list) -> None:
             errors.append(f"{folder.relative_to(ROOT)}: in {count} packs of tools/build.py (PACKS), not one")
 
 
+SIZE_BASELINE = ROOT / "tools" / "size-baseline.json"
+SIZE_GROWTH = 0.10  # a file may grow this share over its baseline before it fails
+
+
+def sized_files() -> list:
+    """The instruction files whose size is held to a baseline: the global rules, every
+    SKILL.md and every subagent."""
+    files = [HOME / "AGENTS.md"]
+    for root in (HOME / "skills", ONLINE):
+        files += [folder / "SKILL.md" for folder in skill_folders(root) if (folder / "SKILL.md").is_file()]
+    return files + sorted((HOME / "agents").glob("*.md"))
+
+
+def sizes() -> dict:
+    return {path.relative_to(ROOT).as_posix(): len(path.read_bytes()) for path in sized_files()}
+
+
+def check_sizes(errors: list) -> None:
+    """Each instruction file stays within SIZE_GROWTH of its recorded size, so growth is a
+    choice made in a commit (python3 tools/validate.py --write-sizes), never drift."""
+    try:
+        baseline = json.loads(SIZE_BASELINE.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        errors.append("tools/size-baseline.json: missing or unreadable; run python3 tools/validate.py --write-sizes")
+        return
+    current = sizes()
+    for name, size in sorted(current.items()):
+        if name not in baseline:
+            errors.append(f"{name}: no size baseline; run python3 tools/validate.py --write-sizes")
+        elif size > baseline[name] * (1 + SIZE_GROWTH):
+            errors.append(f"{name}: {size} bytes, more than {round(SIZE_GROWTH * 100)}% over its baseline of "
+                          f"{baseline[name]}; cut it, or record the new size with --write-sizes in the same commit")
+    for name in sorted(set(baseline) - set(current)):
+        errors.append(f"tools/size-baseline.json: {name} no longer exists; run python3 tools/validate.py --write-sizes")
+
+
 def main() -> int:
+    if "--write-sizes" in sys.argv[1:]:
+        SIZE_BASELINE.write_text(json.dumps(sizes(), indent=1, sort_keys=True) + "\n", encoding="utf-8")
+        print(f"wrote {SIZE_BASELINE.relative_to(ROOT)}")
+        return 0
     errors: list[str] = []
 
     local, online = skill_folders(HOME / "skills"), skill_folders(ONLINE)
@@ -476,6 +516,7 @@ def main() -> int:
     check_overrides(errors)
     check_path_rules(errors)
     check_marketplace(errors)
+    check_sizes(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)

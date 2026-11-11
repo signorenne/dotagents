@@ -66,6 +66,7 @@ class Tools(unittest.TestCase):
         (skill / "SKILL.md").write_text('---\nname: new-one\ndescription: "Does a new thing. Use when asked."\n'
                                         'license: "MIT"\n---\n\nBody.\n')
         (skill / "LICENSE.txt").write_text("MIT\n")
+        self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
         lines = result.stdout.splitlines()
@@ -136,6 +137,22 @@ class Tools(unittest.TestCase):
         build = self.repo / "tools/build.py"
         build.write_text(build.read_text().replace('"notes-from-work"]', f'"notes-from-work", "{name}"]', 1))
         self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
+        self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
+
+    def test_validate_holds_each_instruction_file_to_its_size_baseline(self):
+        skill = self.repo / "home/.agents/skills/build/SKILL.md"
+        baseline = json.loads((self.repo / "tools/size-baseline.json").read_text())["home/.agents/skills/build/SKILL.md"]
+        limit = int(baseline * 1.1)
+        skill.write_bytes(skill.read_bytes() + b"x" * (limit - baseline))
+        self.assertEqual(self.run_tool("validate.py").returncode, 0)  # 10% more is allowed
+        skill.write_bytes(skill.read_bytes() + b"x")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(f"FAIL home/.agents/skills/build/SKILL.md: {limit + 1} bytes, more than 10% over its baseline "
+                      f"of {baseline}; cut it, or record the new size with --write-sizes in the same commit",
+                      result.stdout.splitlines())
+        self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
+        self.assertEqual(self.run_tool("validate.py").returncode, 0)
 
     def test_validate_rejects_a_skill_body_over_20000_bytes(self):
         # After compaction Claude Code keeps about 5,000 tokens of a skill, about 20,000 bytes.

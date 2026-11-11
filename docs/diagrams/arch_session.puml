@@ -49,8 +49,8 @@ tool --> model : results, reasons\nand notices
 == End of the turn ==
 model -> tool : done
 opt Claude Code and Codex
-  tool -> hooks : progress_check.py
-  hooks --> tool : once, if the progress log\nmisses a commit: update it
+  tool -> hooks : step_log.py
+  hooks --> tool : nothing: it appends the\nbranch's new commits to the plan's log
 end
 
 legend right

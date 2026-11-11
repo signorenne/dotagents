@@ -23,9 +23,9 @@ package "Changes across files" {
 }
 
 component "systematic-debugging" as debug
-component "spec" as spec
+component "design" as spec
 component "trustworthy-tests" as tests
-component "implement" as implement
+component "build" as implement
 
 archdoc --> puml
 asbuilt --> puml

@@ -9,7 +9,7 @@ participant "repeated_failure.py" as failure
 participant "after_edit.py" as edit
 participant "compact_brief.py" as brief
 participant "session_refresh.py" as refresh
-participant "progress_check.py" as progress
+participant "step_log.py" as progress
 participant "git" as git
 collections ".private/" as notes
 participant "claim_check.py" as claim
@@ -17,15 +17,15 @@ participant "transcript" as transcript
 
 == Claude Code: before a compaction ==
 tool -> brief : payload (cwd, trigger)
-brief -> notes : newest progress\nand handoff files
+brief -> notes : the plan file, or the\nnewest plans and handoffs
 brief -> git : branch, status
 brief --> tool : exit 0 always: what\nthe summary must keep
 
-== Claude Code and Codex: after a compaction or resume ==
+== Claude Code and Codex: a new session, a clear, a compaction or a resume ==
 tool -> refresh : payload (cwd, source)
-refresh -> notes : newest progress\nand handoff files\n(a worktree: the main\ncheckout's)
+refresh -> notes : plan excerpt (plan_state.py),\nor the newest plans and handoffs\n(a worktree: the main\ncheckout's)
 refresh -> git : branch, status,\nlast 5 commits,\nother worktrees
-refresh --> tool : stale-memory reminder,\nafter a compaction "invoke\nthe workflow skill again",\ngit state, notes and\n"re-read the progress log"
+refresh --> tool : stale-memory reminder,\nafter a compaction "invoke\nthe workflow skill again",\ngit state, the plan excerpt\nand "re-read the plan file"
 
 == Before a shell command ==
 tool -> guard : payload with the command
@@ -53,13 +53,11 @@ else nothing wrong
   edit --> tool : exit 0, notice if reformatted
 end
 
-== When the agent ends its turn: Claude Code and Codex (progress check), Claude Code (claim check) ==
+== When the agent ends its turn: Claude Code and Codex (step log), Claude Code (claim check) ==
 tool -> progress : payload (cwd, stop_hook_active)
 progress -> git : branch <type>/<slug>,\nits own commits
-progress -> notes : progress/<slug>.*
-opt not yet continued, and a commit\nnewer than the log or not in it
-  progress --> tool : block once: record each\nstep, its commit and check
-end
+progress -> notes : plans/<slug>.log:\nappend missing commit lines
+progress --> tool : nothing, never blocks
 tool -> claim : payload (last message,\ntranscript path)
 claim -> transcript : last 4 MB
 claim -> claim : sort calls after\nthe last edit\n(guard's parser)

@@ -43,7 +43,11 @@ behind this guide is in [[file:../DESIGN.org::#concise-skills][DESIGN.org, under
    after compaction Claude Code keeps only the first 5,000 tokens of each
    loaded skill, so put the most important instructions near the top and
    write them as standing instructions [4]. =tools/validate.py= fails a body
-   over 20,000 bytes, about 5,000 tokens. A reference file over 100 lines
+   over 20,000 bytes, about 5,000 tokens, and holds every =SKILL.md=, subagent
+   and the global rules within 10% of the size recorded in
+   =tools/size-baseline.json=: growth beyond that is recorded with
+   =python3 tools/validate.py --write-sizes= in the same commit, so it is a
+   choice the review sees, never drift. A reference file over 100 lines
    starts with a table of contents [1].
 8. Consistent terms (one word per concept), no time-sensitive statements, and
    an example only where it shows the expected output better than a rule
@@ -52,6 +56,13 @@ behind this guide is in [[file:../DESIGN.org::#concise-skills][DESIGN.org, under
    and Cursor; the claude.ai set also runs in chat, without a repository,
    shell or subagents. A step that needs a feature one of them lacks says what
    to do there.
+10. Wording that holds up in use. Where the model composes text (a plan, a
+   report, a note), give a positive recipe of what to write; for a single act
+   it must never do, a plain prohibition. Of two wordings that work equally,
+   keep the shorter. When a case the stated condition already decides goes
+   wrong in a run, answer it by sharpening the condition, not by adding a
+   patch for the case. Skills name actions, never one tool's own tool names;
+   what differs per tool lives in the installer's tool descriptions.
 
 * Checklist before committing a skill
 

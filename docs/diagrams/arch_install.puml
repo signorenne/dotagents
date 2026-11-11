@@ -13,7 +13,7 @@ collections "&#126;/.copilot\nor $COPILOT_HOME" as copilot
 collections "&#126;/.agents-backup/<time>" as backup
 
 user -> install : python3 install.py
-install -> install : check the source\n(stop if broken)
+install -> install : check the source and\nthe personal layer\n(stop if broken)
 install -> install : detect the tools\n(or --tools)
 
 loop every file or link it replaces
@@ -55,6 +55,8 @@ install -> copilot : write hooks/agents-global.json
 note over agents, claude : Cursor reads the skills of &#126;/.agents,\nand the agents and hooks of &#126;/.claude
 install -> user : note: paste AGENTS.md\ninto User Rules
 
+install -> install : generic targets: link\nskills/ and the rules
+install -> agents : remove what the last\ninstall owned and dropped,\nwrite the manifest
 install -> user : changes, backup folder, notes
 
 legend right

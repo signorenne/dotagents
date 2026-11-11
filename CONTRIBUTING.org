@@ -8,7 +8,7 @@ gates, CI, commit messages and the docs format. [[file:AGENTS.md][AGENTS.md]] ow
 kind of change goes, the hard rules and the review checklist;
 [[file:DESIGN.org][DESIGN.org]] owns the design and the rules that bind;
 [[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written and tested;
-[[file:docs/pipeline.org][docs/pipeline.org]] owns the stages an agent's change goes through;
+[[file:METHOD.org][METHOD.org]] owns the method an agent's change follows;
 [[file:docs/README.org][docs/README.org]] maps every doc.
 
 * Workflow
@@ -23,16 +23,16 @@ kind of change goes, the hard rules and the review checklist;
 4. Run the three local gates, then =python3 install.py --dry-run= and
    =python3 install.py=. Test a behavior change in a real agent session when
    the maintainer asks for it; whether that test was done is noted in the
-   task's progress log or in the pull request, never in a commit, which has
+   task's plan file or in the pull request, never in a commit, which has
    no body. A change to =home/.agents/hooks/guard_bash.py= also runs
    =python3 tools/guard_replay.py --base main= before it lands
    ([[file:DESIGN.org::#guard-replay][DESIGN.org#guard-replay]]): the maintainer judges each command the
-   report lists as newly blocked, and the progress log records the counts
+   report lists as newly blocked, and the plan file records the counts
    and the judgement.
 5. Land the work as small commits, each one logical change that passes the
    gates on its own. Agents never push: the maintainer
    reviews the branch, gives the go to land it, and pushes
-   ([[file:docs/pipeline.org][docs/pipeline.org]]).
+   ([[file:METHOD.org][METHOD.org]]).
 6. After the change lands: paste =home/.agents/AGENTS.md= into claude.ai again
    when the global rules changed, and upload the changed claude.ai skills
    ([[file:claude-ai/README.md][claude-ai/README.md]], "Update a skill").
@@ -58,6 +58,11 @@ python3 tools/validate.py              # skill and subagent format, text rules, 
 python3 -m unittest discover -s tests  # hooks, installer, tools and skill scripts
 python3 tools/build.py                 # claude.ai zips and the project kit into dist/
 #+END_SRC
+
+A change to a skill's pack, a subagent, a hook script or the hooks of
+=adapters/claude/settings.json= also runs =python3 tools/build.py --marketplace=,
+which rewrites the committed =.claude-plugin/marketplace.json= and the links in
+=packs/=; validate fails until they match.
 
 When a gate fails because the change is wrong, fix the change: no skipped,
 deleted or loosened tests and no hook bypass without the maintainer's
@@ -126,7 +131,7 @@ mood stays the author's to keep.
 
 Allowed, with full accountability for every line submitted. Agent and human
 work starts from [[file:AGENTS.md][AGENTS.md]], then the role matrix in [[file:docs/README.org][docs/README.org]].
-Agents keep specs, progress logs and handoffs under the git-ignored =.private/=.
+Agents keep plan files and their logs, designs and handoffs under the git-ignored =.private/=.
 Commits carry no AI trailer. The policy is [[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]].
 
 * Docs

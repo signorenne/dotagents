@@ -18,6 +18,7 @@ open a skill's own =SKILL.md= only when the task touches it.
 | [[file:../README.org][README.org]]               |            |              |          | x          |
 | [[file:../VISION.org][VISION.org]]               | x          | x            |          | x          |
 | [[file:../DESIGN.org][DESIGN.org]]               | x          | x            | x        | x          |
+| [[file:../METHOD.org][METHOD.org]]               | x          | x            | x        | x          |
 | [[file:../AGENTS.md][AGENTS.md]]                | x          | x            | x        |            |
 | [[file:../CONTRIBUTING.org][CONTRIBUTING.org]]         | x          | x            | x        |            |
 | [[file:../AI_DISCLAIMER.org][AI_DISCLAIMER.org]]        | x          | x            | x        |            |
@@ -25,7 +26,6 @@ open a skill's own =SKILL.md= only when the task touches it.
 | [[file:glossary.org][docs/glossary.org]]        | x          | x            | x        | x          |
 | [[file:architecture.org][docs/architecture.org]]    | x          | x            | x        | x          |
 | [[file:workflow.org][docs/workflow.org]]        | x          | x            |          | x          |
-| [[file:pipeline.org][docs/pipeline.org]]        | x          | x            | x        | x          |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | x          | x            | x        |            |
 | [[file:evidence.org][docs/evidence.org]]        | x          | x            | x        | x          |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | x          | x            | x        |            |
@@ -51,6 +51,7 @@ adds it.
 | [[file:../README.org][README.org]]               | Project overview, docs list, install and update, layout, the skills                                              |
 | [[file:../VISION.org][VISION.org]]               | The problem, the mission, core concepts, principles, non-goals                                                   |
 | [[file:../DESIGN.org][DESIGN.org]]               | Public surface, composition, install model, hooks' failure model, model assumptions, naming, the rules that bind |
+| [[file:../METHOD.org][METHOD.org]]               | The method: principles, roles, lanes, the plan file, stops, review, checks, delegation, measuring                |
 | [[file:../AGENTS.md][AGENTS.md]]                | Working-memory floor for agents changing this repository: where changes go, gates, checklist                     |
 | [[file:../CLAUDE.md][CLAUDE.md]]                | Claude Code bridge that imports =AGENTS.md=                                                                      |
 | [[file:../GEMINI.md][GEMINI.md]]                | Gemini CLI bridge that imports =AGENTS.md=                                                                       |
@@ -60,9 +61,8 @@ adds it.
 | [[file:README.org][docs/README.org]]          | This map: role matrix and registry                                                                               |
 | [[file:glossary.org][docs/glossary.org]]        | The repository's terms, one sentence each                                                                        |
 | [[file:architecture.org][docs/architecture.org]]    | System structure, the install flow, a session's runtime view, the skill map and the hooks                        |
-| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org= and =docs/pipeline.org=                              |
+| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org=                                                      |
 | [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene                        |
-| [[file:pipeline.org][docs/pipeline.org]]        | From idea to merge: the stages, their artifacts, landing and pushing, failures, isolation                        |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                                         |
 | [[file:evidence.org][docs/evidence.org]]        | Record of the dropped A/B benchmark: what it measured, how it ran, its limits, its runs                          |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                                                  |

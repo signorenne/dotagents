@@ -3,12 +3,12 @@
 title Which skills and subagents serve each stage of a change?
 
 component "Set up (once): project-setup\nscout, gate-runner" as setup
-package "Decide and specify" {
+package "Decide and design" {
   component "decide" as decide
-  component "spec\nscout, reviewer" as spec
+  component "design\nscout, reviewer" as design
 }
-package "Implement, gates and review" {
-  component "implement\nscout, gate-runner, reviewer" as implement
+package "Build, in its lane" {
+  component "build\nscout, gate-runner, reviewer" as build
   component "trustworthy-tests" as tests
   component "systematic-debugging" as debug
 }
@@ -16,23 +16,23 @@ package "On request" {
   component "gates\ngate-runner" as gates
   component "branch-review\nreviewer" as review
 }
-component "Close: session-close" as close
+component "Close: close" as close
 component "Land and clean up: isolated-work\ngate-runner" as isolated
 
 setup --> decide
-spec -right-> decide
-spec ..> implement
-implement -up-> decide
-implement --> tests
-implement --> debug
-close .up.> implement
-implement ---> isolated
-spec -[hidden]right- gates
+design -right-> decide
+design ..> build
+build -up-> decide
+build --> tests
+build --> debug
+close .up.> build
+build ---> isolated
+design -[hidden]right- gates
 gates -[hidden]right- review
 
 legend right
   Second line: the subagents it may delegate to
   Solid arrow: calls in the same session
-  Dashed arrow: a file read by a fresh session
+  Dashed arrow: a plan file read by a fresh session
 endlegend
 @enduml

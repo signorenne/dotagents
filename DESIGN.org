@@ -9,8 +9,8 @@ assumes about the model, naming, and the rules that bind every change.
 [[file:VISION.org][VISION.org]] owns the direction. [[file:AGENTS.md][AGENTS.md]] owns where each
 change goes, the hard rules and the review checklist.
 [[file:CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflow and the docs format.
-[[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written. [[file:docs/pipeline.org][docs/pipeline.org]]
-owns the stages a change goes through. [[file:docs/architecture.org][docs/architecture.org]] draws the
+[[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written. [[file:METHOD.org][METHOD.org]]
+owns the method a change follows. [[file:docs/architecture.org][docs/architecture.org]] draws the
 structure, the install flow and a session's runtime view.
 
 North star: change a rule once, run the installer, and every agent in every
@@ -22,10 +22,13 @@ The global rules say how to work, a skill says how to do one kind of work, a
 subagent does one job in a fresh context, and a hook enforces what must not
 depend on the model remembering it.
 
-- /Global rules/ : =home/.agents/AGENTS.md=, kept under 200 lines because the
-  same text is pasted into claude.ai. They cover priorities, sufficiency,
-  evidence, refute before you rely, grounding, decisions, output, learning and
-  agentic work, and they bind every skill and subagent.
+- /Global rules/ : =home/.agents/AGENTS.md=, at most 9,000 characters
+  (=tools/validate.py=) because the Claude Code pack prints them from a
+  session-start hook, whose output Claude Code caps at 10,000 characters, and
+  the same text is pasted into claude.ai. They cover priorities, sufficiency,
+  refute before you rely, decisions, output, learning and agentic work in the
+  method's vocabulary, and they bind every skill and subagent. A personal
+  layer may append lines to the installed copy.
 - /Local skills/ : one folder per skill under =home/.agents/skills/=, with a
   =SKILL.md=, a =LICENSE.txt= and, only where a real run showed the need, a
   reference file, templates or a =scripts/= folder.
@@ -39,18 +42,27 @@ depend on the model remembering it.
   model, and where set effort, maxTurns and color), the source of every other
   tool's copy.
 - /Hooks/ : =guard_bash.py=, =after_edit.py=, =session_refresh.py=,
-  =compact_brief.py=, =progress_check.py=, =claim_check.py= and
+  =compact_brief.py=, =step_log.py=, =context_nudge.py=, =claim_check.py= and
   =repeated_failure.py= in =home/.agents/hooks/=,
   shared by every tool; the guard and the after-edit hook learn which tool
-  called them from =--tool=.
+  called them from =--tool=. The plan-file hooks reach the build skill's
+  =planfile.py= by path (=../skills/build/scripts=).
+- /Plan scripts/ : =plan_state.py=, =check_step.py= and =floor_check.py= with
+  their shared =planfile.py= in =home/.agents/skills/build/scripts/=, standard
+  library only (METHOD.org, Checks).
+- /Packs/ : =.claude-plugin/marketplace.json= and =packs/<pack>/=, written by
+  =python3 tools/build.py --marketplace=: four Claude Code plugins (method,
+  craft, docs, chat) whose folders hold only relative links into
+  =home/.agents= and =claude-ai/skills=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
   build commands allowed, =git push= denied (also as =git -C <dir> push=),
   =git reset --hard=, =git clean=, =git rebase=, =git update-ref=,
   =git merge=, =git branch -f= (or =--force=), =-M= and =-C= and a forced =git branch= delete (=-D= and
   each other spelling of =--delete --force=) (all but the first two also as
   =git -C <dir> ...=) and =rm -rf= asked first, =.env= files, =~/.ssh= and =~/.gnupg= unreadable, commit and PR attribution
-  empty, the synced plugin =engineering@synced= turned off, and the hook
-  entries.
+  empty, and the hook entries. The maintainer's own allows (cmake, ctest,
+  clang tools, =./build/*=, the knowledge vault) and plugin switches live in
+  the personal layer, =personal/=.
 
 * How they compose
 
@@ -76,42 +88,44 @@ depend on the model remembering it.
 
 ** Skills hand off to each other
 
-The repository workflow is a chain, which [[file:docs/pipeline.org][docs/pipeline.org]] follows stage
-by stage. =scoping-before-building= or =architecture-doc= sizes the work;
-=spec= writes a self-contained plan and settles each open choice with
-=decide=; a fresh session runs =implement= on the spec, which proposes
-=isolated-work= for a change across modules, a public API change or a
-migration; =implement= ends with the full gates and an independent review;
-=session-close= records the state for the next session; on the maintainer's
-go, =isolated-work= lands the branch and removes its worktree.
+The repository workflow follows [[file:METHOD.org][METHOD.org]]. =scoping-before-building= or
+=architecture-doc= sizes the work; =design= turns work that needs several
+plans into a design and its ordered plans, settling choices with =decide=;
+=build= takes one change through its lane, from the plan file to the
+triaged review, and proposes =isolated-work= for high risk; =close= brings
+the plan files up to date at the end of a session; on the maintainer's go,
+=isolated-work= lands the branch and removes its worktree.
 
 Off the chain: =as-built-docs= sends bugs and anomalies to =code-audit=;
-=code-audit= sends a finding the user wants fixed to =implement=, starting
+=code-audit= sends a finding the user wants fixed to =build=, starting
 with a failing test; =decision-analysis= researches products and returns a
 project's choice to =decide=; =systematic-debugging= comes before
 =event-driven-ui= when a freeze is unexplained, and in a repository leaves the
-failing test and the fix to =implement=; =parallel-agents= runs each writer
-through =isolated-work=; =implement= and the reviewer apply
-=trustworthy-tests= to every new or changed test; =context-handoff= gives way
-to =session-close= inside a git repository.
+failing test and the fix to =build=; =parallel-agents= runs each writer
+through =isolated-work=, each with its own plan file; =build= and the
+reviewer apply =trustworthy-tests= to every new or changed test;
+=context-handoff= gives way to =close= inside a git repository.
 
 ** Skills delegate to subagents
 
-- =spec=, =implement=, =project-setup=, =code-audit= and =architecture-doc= map
-  the code with =scout= before planning. =as-built-docs= reads the code with
-  read-only subagents on the session's model instead (in Claude Code the
-  general-purpose subagent, elsewhere the tool's default general agent).
-- =gates=, =implement=, =project-setup=, =isolated-work=, =as-built-docs= and
+- =design=, =project-setup=, =code-audit= and =architecture-doc= map the
+  code with =scout= before planning; =build= calls it only when the area is
+  unknown or wide. =as-built-docs= reads the code with read-only subagents
+  in a lower tier (in Claude Code the general-purpose subagent on Sonnet at
+  effort medium, elsewhere the tool's default general agent) and measures
+  that tier's coverage and error rate on every run (METHOD.org, Delegation).
+- =gates=, =build=, =project-setup=, =isolated-work=, =as-built-docs= and
   =notes-from-work= run long commands through =gate-runner=, which reports the
   commit it tested, so only verdicts and first errors reach the conversation;
-  =implement= and =isolated-work= also give it the folder and the commit to
+  =build= and =isolated-work= also give it the folder and the commit to
   test, and =parallel-agents= gates each branch through =isolated-work=.
-- =branch-review=, =implement=, =mechanical-changes= and =notes-from-work=
-  hand the finished change to =reviewer=, which reports the HEAD it reviewed;
-  =implement= also gives it the folder and the commit it expects there, and
-  =parallel-agents= runs implement's review on the merged result.
-- =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
-  subagent that did not write them, and =code-audit= has each finding attacked
+- =branch-review=, =build=, =mechanical-changes= and =notes-from-work=
+  hand the finished change to =reviewer= (quick or full mode), which reports
+  the HEAD it reviewed; =build= also gives it the folder, the commit it
+  expects there and the plan file, and =parallel-agents= runs build's review
+  on the merged result.
+- =design=, =build= (full lane), =architecture-doc= and =as-built-docs= verify
+  their documents with a subagent that did not write them, and =code-audit= has each finding attacked
   by one briefed only on the claim and the code: in Claude Code the
   general-purpose subagent told not to edit, elsewhere =reviewer=.
   =notes-from-work= has its claims attacked by one given the claims and their
@@ -124,9 +138,10 @@ to =session-close= inside a git repository.
 ** Working notes
 
 Skills keep their working notes in the git-ignored =.private/= folder of each
-repository: specs in =.private/specs/<slug>.<ext>=, progress logs in
-=.private/progress/<slug>.<ext>=, handoffs in
-=.private/handoff/<YYYY-MM-DD>-<slug>.<ext>=, audit reports in
+repository: plan files and their logs in =.private/plans/<slug>.<ext>= and
+=<slug>.log=, designs in =.private/designs/<slug>.<ext>=, the deferred list
+in =.private/deferred.<ext>=, handoffs (only for a session no plan file
+holds) in =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>=, audit reports in
 =.private/audit/= and the notes of =as-built-docs= in =.private/as-built/=. A
 worktree has no =.private/=, so work in one keeps its notes in the main
 checkout's. A project's decisions go to its own decision log, never to working
@@ -138,12 +153,16 @@ There is one source, =home/.agents=, installed as =~/.agents=
 ([[#one-source][one-source]]). =install.py= copies it there, adds the claude.ai set to
 =~/.agents/skills/=, then links or generates each tool's files from it.
 Nothing is edited in a tool's own folder: a change is made here and the
-installer runs again.
+installer runs again. Each tool is a description in =TOOL_DESCRIPTIONS=
+(its base folder, where its rules, skills, subagents and hooks go, its hook
+format and timeout unit, extra steps, notes), and one engine installs them
+all; =tests/test_install.py= (Descriptions) checks every description with
+one suite.
 
 | Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                                          |
 |-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+----------------------------------------------------------------------------------------------------------------|
-| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PostToolUseFailure, PreCompact, Stop, and SessionStart after compact or resume |
-| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop (approve in Codex)                                                            |
+| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PostToolUseFailure, PreCompact, Stop, and SessionStart on every source         |
+| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop and SessionStart (approve in Codex)                                           |
 | Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                                                      |
 | Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                                                  |
 | Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                                          |
@@ -161,7 +180,26 @@ installer runs again.
   JSON sources first and installs nothing when one is broken.
 - /Backups/ : every file the installer replaces is moved to
   =~/.agents-backup/<timestamp>/= first; =--dry-run= prints every change and
-  touches nothing. A =~/.claude/CLAUDE.md= without the import of
+  touches nothing.
+- /Manifest/ : =~/.agents/.dotagents-manifest.json= records each file and
+  link the installer wrote (its hash or target, and the tool or target it
+  belongs to), each value it merged into a settings file, the folders it
+  made, the personal layer and the targets. A later run replaces a recorded
+  file only while it still holds what was installed; one changed by hand is
+  kept with a note, and =--force= backs it up and replaces it. A recorded
+  file that this version no longer installs is backed up and removed when
+  unchanged. =--uninstall= removes every recorded file still as installed,
+  the hook entries and the recorded values, the folders it made once empty,
+  and the manifest; the files an install replaced stay in the backups.
+- /Personal layer/ : =--personal DIR= (recorded; =--no-personal= stops it)
+  appends =DIR/AGENTS.md= to the installed global rules and merges
+  =DIR/claude-settings.json= into Claude Code's settings after the shared
+  fragment (values only, no hooks); =personal/= is the maintainer's.
+- /Generic target/ : =--target DIR[:RULES]= (recorded) links every skill into
+  =DIR/skills= and the global rules into =DIR/RULES= (=AGENTS.md= by default),
+  for a tool the installer does not describe yet; OpenCode, Goose, Qwen Code
+  and Pi read =~/.agents/skills= themselves, Kimi only when
+  =~/.config/agents/skills= does not exist. A =~/.claude/CLAUDE.md= without the import of
   =~/.agents/AGENTS.md= is replaced by one with it, and the old file is in the
   backup.
 - /Idempotent/ : a file whose bytes already match is left alone, so a second
@@ -170,8 +208,9 @@ installer runs again.
   entries are merged into the tool's settings file: earlier copies of this
   repository's hook entries are removed and the current ones appended, a rule
   the adapter denies is removed from =ask= (where an older install put it),
-  and the rest of the file is kept. The adapter also turns off the synced
-  plugin =engineering@synced=. Antigravity CLI's hooks file maps hook names to
+  and the rest of the file is kept; one merge per file and run, so a value
+  that cannot take ours leaves the whole file alone. Antigravity CLI's hooks
+  file maps hook names to
   events: the installer rewrites its own two names (=dotagents-guard=,
   =dotagents-after-edit=), keeps an =enabled= value set by hand, and adds
   =~/.agents/skills= to the entries of the skills manifest. A file that does
@@ -207,13 +246,15 @@ installer runs again.
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
   to the local one. The installer sets each of those to =off= in
   =~/.claude/settings.json=; a value set by hand wins.
-- /Leftovers/ : a file dropped from a skill folder that still exists goes to
-  the backup, as do the legacy items of older versions (their =learn= and
-  =handoff= skill copies and the hook copies in =~/.claude/hooks=). A whole
-  skill, subagent, hook script or settings entry the repository dropped stays
-  installed. =--audit= lists what in the agents' folders does not come from
-  here, and broken links, and changes nothing; settings entries are removed by
-  hand.
+- /Leftovers of versions without a manifest/ : the first install over one
+  backs up a file dropped from a skill folder that still exists, the skills
+  this repository renamed or dropped (=review=, =implement=, =spec=,
+  =session-close=, when their =SKILL.md= has our name line and license) with
+  their Claude Code links, the renamed hook script =progress_check.py=
+  (whose settings entries the merge recognizes as ours), and the legacy items
+  of older versions (their =learn= and =handoff= skill copies and the hook
+  copies in =~/.claude/hooks=). =--audit= lists what in the agents' folders
+  does not come from here, and broken links, and changes nothing.
 
 Claude Code is tested end to end. The other tools' files follow their official
 documentation, and =tests/test_install.py= checks each generated hook file
@@ -225,9 +266,10 @@ against it (events, matchers, tool names, timeouts).
 |-----------------------+-------------------------------------------------+----------------------------------------+---------|
 | =guard_bash.py=       | before a shell command                          | all six (Cursor through Claude Code's) | 10 s    |
 | =after_edit.py=       | after a file edit or write                      | all six (Cursor through Claude Code's) | 60 s    |
-| =session_refresh.py=  | at session start after a compaction or a resume | Claude Code, Codex                     | 10 s    |
+| =session_refresh.py=  | at session start: new, clear, compact, resume   | Claude Code, Codex                     | 10 s    |
 | =compact_brief.py=    | before a compaction                             | Claude Code                            | 10 s    |
-| =progress_check.py=   | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
+| =step_log.py=         | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
+| =context_nudge.py=    | after a shell command                           | Claude Code                            | 10 s    |
 | =claim_check.py=      | before the agent ends its turn                  | Claude Code                            | 10 s    |
 | =repeated_failure.py= | after a shell command fails                     | Claude Code                            | 10 s    |
 
@@ -260,24 +302,31 @@ a =.clang-format=, on the lines of a C or C++ file that the edit changed (a
 newly written file whole), and checks the syntax of an edited Python, JSON
 or TOML file with the standard library (TOML from Python 3.11, which
 brought =tomllib=).
-The session refresh reminds the agent that its picture of the code is a
-summary (after a compaction, also to invoke its workflow skill again, since
-Claude Code keeps only the start of each skill through one), prints the real
-branch, changes, last commits and other worktrees, lists the newest files of
-=.private/progress/= and =.private/handoff/= (in a linked worktree, the main
-checkout's), and asks the agent to re-read the progress log. The compaction
-brief tells the summary what resuming needs: the task and its slug, the
-branch, the paths of the progress log and handoff, the workflow skill and its
-running section or step, the current plan step, the decisions marked
-Review: pending, the user's constraints that no file records (word for word)
-and what is blocked on what, the files changed and the commands still needed
-with their last results; it fills in the branch, the uncommitted changes and
-the newest task notes itself. The progress check runs when the agent ends
-its turn: on a branch =<type>/<slug>= whose =.private/progress/<slug>.*=
-exists, it sends the agent back once when a commit of the branch (one no
-other local or remote-tracking branch holds) is newer than the log or not
-named in it, to record the step, its commit and its check (after a rebase,
-the new hashes). The claim check runs at the same moment, in Claude Code
+The session refresh prints, on a task branch whose plan file exists, the
+build skill's plan excerpt (=plan_state.py --excerpt=: header, step in
+progress, open rulings, last log lines, marked as a map, at most 4,000
+characters for Codex's cap of about 2,500 tokens); on a new session or a
+clear that is all, and nothing without a plan. After a compaction or a
+resume it first reminds the agent that its picture of the code is a summary
+(after a compaction, also to invoke its workflow skill again, since Claude
+Code keeps only the start of each skill through one) and prints the real
+branch, changes, last commits and other worktrees; without a plan excerpt
+it lists the newest plan files and handoffs (in a linked worktree, the main
+checkout's). The compaction brief tells the summary what resuming needs:
+the task and its slug, the branch, the plan file's path, the workflow skill
+and its running section or step, the current plan step, the rulings still
+pending and the user's choices, the user's constraints that no file records
+(word for word) and what is blocked on what, the files changed and the
+commands still needed with their last results; it fills in the branch, the
+uncommitted changes and the plan file (or the newest notes) itself. The step
+log runs when the agent ends its turn: on a branch =<type>/<slug>= whose plan
+file exists, it appends to =<slug>.log= a commit line for each commit of the
+branch (one no other local or remote-tracking branch holds) that the log
+does not name yet, prints nothing and never keeps the agent going. The
+context nudge runs after a shell command that made a commit, in Claude Code:
+on a task branch with a plan file, when the last request's context passed
+200,000 tokens, it shows the user (=systemMessage=) that this is a good point
+to clear the session. The claim check runs at the same moment, in Claude Code
 only: when the agent's final message says the tests pass ("all tests pass",
 "189 tests OK", "the suite is green", but not a hedged "should pass"), it
 reads the end of the session's transcript and sends the agent back once, to
@@ -325,8 +374,9 @@ The hooks share one failure model:
 - /Send the agent back at most once/ : exit 2 or a block decision from a Stop
   hook keeps the agent going, Codex documents no cap on it, and Cursor runs
   Claude Code's Stop hooks with no cap and without =stop_hook_active=. The
-  progress check and the claim check block only when =stop_hook_active= is
-  =false=, let every error through, and their commands end in =|| true=.
+  claim check blocks only when =stop_hook_active= is =false=; it and the step
+  log (which never blocks) let every error through, and their commands end in
+  =|| true=.
 - /Block with exit 2/ : the reason goes to stderr, which the agent sees.
   Copilot CLI shows stderr only to the user, so the guard also prints a deny
   decision with the reason on stdout, and the after-edit hook sends its report
@@ -339,8 +389,9 @@ The hooks share one failure model:
   model as additional context in each tool's documented format.
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
-  (8 s for the notes listing and the git calls of the session refresh, of
-  the compaction brief and of the progress check, clang-format under 60 s,
+  (8 s for the plan excerpt, the notes listing and the git calls of the
+  session refresh and of the compaction brief, 1 to 1.5 s per git call of
+  the plan-file hooks, clang-format under 60 s,
   the last 4,000,000 bytes of the transcript for the claim check, a regular
   file opened without blocking); the brief also stays under the 10,000
   characters past which Claude Code cuts it.
@@ -409,17 +460,17 @@ not rules: a change that touches a rule that binds still follows that rule.
   reports a wrong verdict or misses a first error (raise its model or
   effort), or when the main model can read gate output as cheaply.
 - /Session refresh and compaction brief/ : assume a compaction summary loses
-  the task's state (the branch, the plan step, the pending decisions, the
+  the task's state (the branch, the plan step, the pending rulings, the
   user's unrecorded constraints) and that the model then trusts its summary
   as the current code; Claude Code also keeps only the first 5,000 tokens of
   each skill invoked before a compaction. Revisit when real sessions show the
   summary keeps that state without the brief (unmeasured today), or
   when the tool keeps whole skills through a compaction.
-- /A fresh session between spec and implement/ : assumes the spec
+- /A fresh session between the plans of a design/ : assumes the design
   conversation (the interview, the rejected options) would steer the
-  implementation, and that only a reader without it shows the spec is
-  self-contained. Revisit when implementations run in the spec's own session
-  match their specs as well, by the reviewer's findings, over several tasks.
+  build, and that only a reader without it shows the design and the plan are
+  self-contained. Revisit when builds run in the design's own session match
+  their plans as well, by the reviewer's findings, over several tasks.
 - /maxTurns caps/ (250 for scout and reviewer, 200 for gate-runner) : assume
   a subagent can loop without converging, so a cap bounds its cost; they sit
   above the longest of about 490 past runs ([[file:docs/architecture.org][docs/architecture.org]]).
@@ -462,6 +513,11 @@ maintainer accepts it. Record a rule when reversing it
 would cost real work, or when someone is likely to propose the rejected option
 again.
 
+The method rework proposes replacing or narrowing five of these rules
+(=stop-on-plan-change=, =grouped-questions=, =progress-log=,
+=tests-attacked=, =as-built-session-model=) and adds others. Until the maintainer
+accepts them, the rules below bind.
+
 Each rule has a stable anchor, its =CUSTOM_ID=, for skills and docs to cite
 (for example =DESIGN.org#no-agent-push=; an Org link adds =::= before the
 =#=), and an "In:" line naming the files that carry it out. A changed rule
@@ -480,7 +536,7 @@ failure hook's reminder.
 
 | Rule                        | Guide                                                                              | Sensor                                                                                                                                                            |
 |-----------------------------+------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| =refute-first=              | global rules (Refute before you rely), session-close (lessons)                     | the reviewer's attack on a change's central claims                                                                                                                |
+| =refute-first=              | global rules (Refute before you rely), close (lessons)                             | the reviewer's attack on a change's central claims                                                                                                                |
 | =stop-on-plan-change=       | global rules (Refute before you rely, Grounding)                                   | none: the model only                                                                                                                                              |
 | =grouped-questions=         | decide, global rules (Decisions)                                                   | none: the model only                                                                                                                                              |
 | =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); the progress check in Claude Code and Codex (a branch commit missing from its log)     |
@@ -488,7 +544,7 @@ failure hook's reminder.
 | =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                              |
 | =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
 | =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
-| =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                      | the reviewer's checklist question; the replay report in the progress log                                                                                          |
+| =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                      | the reviewer's checklist question; the replay report in the plan file                                                                                            |
 | =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                               | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
 | =skills-from-real-runs=     | =docs/skill-authoring.org=                                                         | none: the model only                                                                                                                                              |
 | =light-scripts=             | =AGENTS.md= (Where changes go)                                                     | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
@@ -503,7 +559,7 @@ failure hook's reminder.
 | =confirmed-audit-findings=  | code-audit                                                                         | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                                |
 | =no-agent-push=             | global rules (Agentic work, Git)                                                   | the guard in every tool (=tests/test_hooks.py=, with its bypass battery) and its =onFailure= block in Claude Code, Claude Code's deny rules, the Codex rules file |
 | =main-commits-here=         | =AGENTS.md= (Hard rules)                                                           | the maintainer's review before every push                                                                                                                         |
-| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, implement (section 4) | Claude Code asks before =git rebase=, =git merge=, =git update-ref= and a forced =git branch= move, rename, copy or delete, each also after =git -C <dir>=        |
+| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, build (section 4)     | Claude Code asks before =git rebase=, =git merge=, =git update-ref= and a forced =git branch= move, rename, copy or delete, each also after =git -C <dir>=        |
 | =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                       | Claude Code's empty attribution settings; this repository's =.githooks/commit-msg= once enabled (an AI trailer, the subject format)                               |
 | =mit-license=               | =AGENTS.md= (Hard rules)                                                           | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                                       |
 

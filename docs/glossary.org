@@ -28,9 +28,10 @@ coin a synonym in a local doc when this file already names the concept.
 | token print              | A =gh= command that prints the authentication token (=gh auth token=, =gh auth status -t=, =gh config get oauth_token=), which the guard blocks.                                                 |
 | guard replay             | =tools/guard_replay.py=: the shell commands of past Claude Code sessions judged, never run, by the target branch's guard and a changed one; it reports what the change newly blocks and allows.  |
 | after-edit hook          | =after_edit.py=, the hook that flags em and en dashes, checks Python, JSON and TOML syntax and formats the C and C++ lines an edit changed.                                                      |
-| session refresh          | =session_refresh.py=, the Claude Code and Codex hook that prints the real git state and the newest task notes after a compaction or a resume.                                                    |
-| compaction brief         | =compact_brief.py=, the Claude Code hook that tells a compaction summary what resuming the task needs and fills in the branch and task notes.                                                    |
-| progress check           | =progress_check.py=, the Claude Code and Codex hook that sends the agent back once when its task branch has a commit its progress log misses.                                                    |
+| session refresh          | =session_refresh.py=, the Claude Code and Codex hook that prints the plan excerpt on a new session, a clear, a compaction or a resume, and the real git state after the last two.                |
+| compaction brief         | =compact_brief.py=, the Claude Code hook that tells a compaction summary what resuming the task needs and fills in the branch and the plan file.                                                 |
+| step log                 | =step_log.py=, the Claude Code and Codex hook that appends the branch's new commits to the plan's log when the agent ends its turn.                                                              |
+| context nudge            | =context_nudge.py=, the Claude Code hook that tells the user a large context is a good point to clear after a step's commit.                                                                     |
 | claim check              | =claim_check.py=, the Claude Code hook that sends the agent back once when its final message says the tests pass and no test run passed after its last edit.                                     |
 | known test run           | For the claim check, a test runner, or a script or build target named test, gate, check or verify; its outcome comes from the runner's summary lines, or the exit status when none matches.      |
 | quiet command            | For the claim check, a command that certainly runs no tests (=git status=, =cat=, =grep=); it counts as a run only when its output shows a runner's summary.                                     |
@@ -38,11 +39,17 @@ coin a synonym in a local doc when this file already names the concept.
 | adapter                  | A settings fragment for one tool that the installer merges into that tool's settings; today =adapters/claude/settings.json=.                                                                     |
 | path rule                | An entry of =home/.agents/path-rules.json= that sends work on matching files to a skill; Claude Code gets it as =~/.claude/rules/dotagents-<skill>.md=.                                          |
 | bridge                   | A tool-specific Markdown file (=CLAUDE.md=, =GEMINI.md=, =.github/copilot-instructions.md=) that points to =AGENTS.md= and holds no rule of its own.                                             |
-| install                  | A run of =python3 install.py=: it copies the source to =~/.agents=, links or generates each detected tool's files, and is safe to repeat.                                                        |
+| install                  | A run of =python3 install.py=: it copies the source to =~/.agents=, links or generates each tool's files from its description, records them in the manifest, and is safe to repeat.              |
+| tool description         | An entry of =TOOL_DESCRIPTIONS= in =install.py=: where one tool's rules, skills, subagents and hooks go, its hook format and timeout unit.                                                       |
+| manifest                 | =~/.agents/.dotagents-manifest.json=: each installed file with its hash, the values merged into settings, the personal layer and the targets.                                                    |
+| uninstall                | =install.py --uninstall=, which removes what the manifest records and nobody changed since, and keeps the rest.                                                                                  |
+| personal layer           | A folder applied after the shared layer with =--personal=: lines appended to the global rules and Claude Code settings of one person's own.                                                      |
+| generic target           | A folder given with =--target=, into which the installer links the skills and the global rules for a tool it does not describe.                                                                  |
+| pack                     | A Claude Code plugin of this repository (method, craft, docs, chat), a folder of links under =packs/= listed in =.claude-plugin/marketplace.json=.                                               |
 | dry run                  | =install.py --dry-run=, which prints every change an install would make and changes nothing.                                                                                                     |
 | audit                    | =install.py --audit=, which lists what in the agents' folders does not come from this repository, and broken links, and changes nothing.                                                         |
 | backup                   | The folder =~/.agents-backup/<timestamp>/= where an install moves every file it replaces.                                                                                                        |
-| build                    | =python3 tools/build.py=, which writes the claude.ai zips and the project kit into =dist/=.                                                                                                      |
+| build (tool)             | =python3 tools/build.py=, which writes the claude.ai zips and the project kit into =dist/=, and with =--marketplace= the packs.                                                                  |
 | project kit              | =dist/project-kit.zip=, the project-setup templates for setting up a repository by hand.                                                                                                         |
 | gate                     | A check that must pass before a commit: here =tools/validate.py=, the unittest suites and =tools/build.py=; in a project, its documented commands.                                               |
 | commit-msg hook          | =.githooks/commit-msg=, this repository's check of the commit message format, active once a clone runs =git config core.hooksPath .githooks=.                                                    |
@@ -59,19 +66,25 @@ coin a synonym in a local doc when this file already names the concept.
 
 | Term                   | Definition                                                                                                                                                    |
 |------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| maieutic method        | The Socratic way of working in both directions: the user questions the agent, and the agent settles the user's choices one question at a time.                |
+| maieutic method        | The Socratic way of working in both directions: the user questions the agent, and the agent settles the user's choices with an assumptions table and only the questions that change them. |
 | maintainer             | The person who owns a repository and its decisions, reviews every change and is the only one who pushes; the skills call them the user.                       |
-| pipeline               | The stages a change goes through from idea to merge, each with its skill and what it leaves, described in =docs/pipeline.org=.                                |
-| slug                   | The short kebab-case name of a task, shared by its spec, branch (=<type>/<slug>=), progress log and handoff.                                                  |
+| method                 | The way a change goes from request to landing in this setup: lanes, the plan file, stops, review and checks, owned by =METHOD.org=.                           |
+| slug                   | The short kebab-case name of a change, shared by its plan file (=.private/plans/<slug>.<ext>=), its log and its branch (=<type>/<slug>=).                     |
 | refute before you rely | The core method: each claim the work depends on is a hypothesis to break with the cheapest check that could fail before anything is built on it.              |
-| refuted assumption     | A claim a check proved wrong, recorded with the check and what it changed in the progress log and the handoff.                                                |
+| refuted assumption     | A claim a check proved wrong, recorded with the check and what it changed in the plan file's Assumptions.                                                     |
 | decision               | A choice that belongs to the user (scope, public API, architecture, rules, trade-offs), reached with decide and recorded only after explicit confirmation.    |
-| agent decision         | A routine engineering choice the agent takes inside an approved plan, logged with its reason and =Review: pending= until the maintainer reviews it.           |
-| spec                   | A self-contained implementation plan from the spec skill, by default in =.private/specs/<slug>.<ext>=, that a fresh session can implement.                    |
-| progress log           | The record implement keeps in =.private/progress/<slug>.<ext>=: each step with its commit and check, each decision with who took it, each refuted assumption. |
-| handoff                | The brief session-close writes to =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>= so a fresh session resumes from facts instead of memory.                       |
-| working notes          | The git-ignored =.private/= folder of each repository, holding specs, progress logs, handoffs, audit reports and as-built notes.                              |
-| fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between unrelated tasks and between spec and implement.          |
+| ruling                 | A choice the agent takes during a change that the plan did not settle, recorded in the plan with its reason, alternative and cost if wrong, pending until the maintainer reviews it. |
+| design                 | The document of work that needs several plans: objective, non-goals, decisions, acceptance and the ordered plans, from the design skill in =.private/designs/=. |
+| plan file              | The one file per change in =.private/plans/<slug>.<ext>= that holds its state header, intent, code map, assumptions, steps, rulings, dead ends and review.    |
+| plan log               | =<slug>.log= beside a plan file, written only by scripts and hooks: each check, failing-first run, gate and commit.                                           |
+| lane                   | The size of the process a change takes, said after investigating: direct, quick or full; it can be raised mid-work, never lowered.                            |
+| risk surface           | What forces the full lane: a public API, a data migration, security, a new dependency, threading, the build, an irreversible step.                            |
+| stop list              | The closed list of reasons the agent stops during a build (=METHOD.org=, Questions and stops); everything else is a ruling.                                   |
+| deferred list          | =.private/deferred.<ext>=, one line per issue that is not the current change's problem and that its base commit has too.                                      |
+| verdict                | The main agent's answer to a review finding: real (high, medium, low), false with a disproof, or undecided with what would settle it.                         |
+| handoff                | The brief close writes to =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>= for a session whose state no plan file holds.                                          |
+| working notes          | The git-ignored =.private/= folder of each repository, holding plan files, designs, the deferred list, handoffs, audit reports and as-built notes.            |
+| fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between tasks and between the plans of a design; it resumes from the plan file. |
 | compaction             | The agent's summary of its own conversation when the context fills; after one, the session refresh warns that its memory of the code may be stale.            |
 | narrow gate            | One module's tests, one test case or one file, run while iterating.                                                                                           |
 | full gates             | The project's documented pre-PR gates, run before a change is called done.                                                                                    |
