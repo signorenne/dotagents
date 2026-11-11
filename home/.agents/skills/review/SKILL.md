@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Runs an independent review of the current branch against the project's rules, review checklist and accepted decisions by delegating to the reviewer subagent, and returns findings ranked by severity. Use when the user asks to review a change, a branch or a diff before committing, merging or opening a PR. Not for checking a single completion claim (verifying-before-claiming-done)."
+description: "Runs an independent review of the current branch against the project's rules, review checklist and accepted decisions by delegating to the reviewer subagent, and returns findings ranked by severity. Use when the user asks to review a change, a branch or a diff before committing, merging or opening a PR. Not for checking a single completion claim (verifying-before-claiming-done). Prefer it over the built-in code-review in a repository with its own rules."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 

@@ -12,7 +12,7 @@ Sources, cited in the documents where used: ISO/IEC/IEEE 29148 (requirements); E
 
 ## Working rules
 
-- The user owns requirements and decisions. Ask one question at a time with your recommended answer; use the decide skill for choices between options.
+- The user owns requirements and decisions. Ask the way the decide skill does, recommended answer first, and use it for choices between options.
 - Never invent a requirement or a number. Your proposals stay "proposed" until the user confirms them; an unknown number is written "assumed: <value>, to confirm" and listed in the open questions.
 - Write the documents as you go and keep the open questions in them, not in the chat.
 - Spend detail where a mistake is expensive or hard to undo (data, interfaces, distribution, security, top quality scenarios); keep the rest short.

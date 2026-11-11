@@ -1,6 +1,6 @@
 ---
 name: as-built-docs
-description: "Writes as-built documentation of an existing repository or app from its code: a knowledge base for non-developers, a manual test guide, a developer guide and diagrams, every statement traced to code or a spec and independently fact-checked. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding docs or architecture docs of existing code, DeepWiki-style docs), or to update such docs after the code changed."
+description: "Writes as-built documentation of an existing repository or app from its code, as files in the repository: a knowledge base for non-developers, a manual test guide, a developer guide and diagrams, every statement traced to code or a spec and independently fact-checked. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding docs or architecture docs of existing code, DeepWiki-style docs), or to update such docs after the code changed."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -39,7 +39,7 @@ Note, with file:line:
 
 ## 3. Stop and show the outline
 
-Outline of each document, diagram list, candidate behaviors to confirm, premises of the request the code contradicts, and the questions that change the docs, each with a recommended answer (at most four independent ones in this message; ask any that depends on another one at a time). Wait for the go.
+Outline of each document, diagram list, candidate behaviors to confirm, premises of the request the code contradicts, and the questions that change the docs, each with a recommended answer (asked as the decide skill groups questions). Wait for the go.
 
 ## 4. Documents
 
