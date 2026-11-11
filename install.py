@@ -392,15 +392,20 @@ def merge_event_hooks(existing, ours: dict) -> dict:
 
 def merge_values(base, extra, added: list = None, path: tuple = ()):
     """Add keys and list items from extra; existing scalar values win. When added is a list,
-    each addition is recorded in it for --uninstall: ["key", path, value] for a new key,
-    ["item", path, value] for a new list item."""
+    each addition is recorded in it for --uninstall, leaf by leaf so that each one can be
+    taken back alone even after later runs or the user add beside it: ["container", path]
+    for a new object or list, ["key", path, value] for a new scalar, ["item", path, value]
+    for a new list item."""
     if isinstance(base, dict) and isinstance(extra, dict):
         for key, value in extra.items():
             if key in base:
                 base[key] = merge_values(base[key], value, added, path + (key,))
+            elif added is not None and isinstance(value, (dict, list)):
+                added.append(["container", list(path + (key,))])
+                base[key] = merge_values({} if isinstance(value, dict) else [], value, added, path + (key,))
             else:
-                base[key] = value
-                if added is not None:  # a copy: a later merge may change the value in place
+                base[key] = json.loads(json.dumps(value))
+                if added is not None:
                     added.append(["key", list(path + (key,)), json.loads(json.dumps(value))])
         return base
     if isinstance(base, list) and isinstance(extra, list):
@@ -416,6 +421,12 @@ def at(data, path: list):
     for key in path:
         data = data.get(key) if isinstance(data, dict) else None
     return data
+
+
+def take_back_all(data: dict, records: list) -> None:
+    """Undo recorded additions deepest first, containers after what they hold."""
+    for record in sorted(records, key=lambda r: (r[0] == "container", -len(r[1]))):
+        take_back(data, record)
 
 
 def take_back(data: dict, record: list) -> None:
@@ -557,11 +568,20 @@ class Installer:
     # Manifest ---------------------------------------------------------------
 
     def read_manifest(self) -> dict:
+        """The last install's manifest, {} when there is none; a manifest that exists but
+        does not parse sets self.broken, because reading it as none would lose its records."""
+        self.broken = None
+        if not self.manifest_path.exists():
+            return {}
         try:
             data = json.loads(self.manifest_path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
+        except (OSError, ValueError) as error:
+            self.broken = str(error)
             return {}
-        return data if isinstance(data, dict) and isinstance(data.get("files"), dict) else {}
+        if not (isinstance(data, dict) and isinstance(data.get("files"), dict)):
+            self.broken = "not a manifest object"
+            return {}
+        return data
 
     def write_manifest(self) -> None:
         files = dict(self.owned)
@@ -571,6 +591,9 @@ class Installer:
             if path not in files and entry.get("scope") not in installed:
                 files[path] = entry
         for path, entry in self.old.get("merged", {}).items():
+            # Without a personal layer now, its records were taken back: drop them.
+            entry = {**entry, "added": [r for r in entry.get("added", [])
+                                        if self.personal or r[-1:] != ["personal"]]}
             if path in merged:
                 kept = [r for r in entry.get("added", []) if r not in merged[path]["added"]]
                 merged[path] = {**merged[path], "added": kept + merged[path]["added"],
@@ -579,9 +602,11 @@ class Installer:
                 merged[path] = entry
         data = {"version": 1, "source": str(PACK), "personal": str(self.personal) if self.personal else None,
                 "targets": self.targets, "files": files, "merged": merged, "dirs": sorted(self.made)}
-        if not self.dry:
+        if not self.dry:  # through a temporary file, so an interrupted run leaves the old one whole
             self.manifest_path.parent.mkdir(parents=True, exist_ok=True)
-            self.manifest_path.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            temporary = self.manifest_path.with_name(self.manifest_path.name + ".tmp")
+            temporary.write_text(json.dumps(data, indent=1, ensure_ascii=False) + "\n", encoding="utf-8")
+            os.replace(temporary, self.manifest_path)
 
     # File operations --------------------------------------------------------
 
@@ -620,10 +645,12 @@ class Installer:
             return False  # not ours, or gone: nothing of the user's to keep
         if "link" in entry:
             return not (path.is_symlink() and os.readlink(path) == entry["link"])
+        if path.is_symlink() or not path.is_file():
+            return True  # a link or a folder where the file was: not ours to touch
         try:
-            return path.is_symlink() or digest(path.read_bytes()) != entry.get("sha256")
+            return digest(path.read_bytes()) != entry.get("sha256")
         except OSError:
-            return False
+            return True  # unreadable: when unsure, keep it
 
     def refuse(self, path: Path) -> bool:
         if self.force or not self.changed_by_hand(path):
@@ -891,9 +918,16 @@ class Installer:
         if self.personal and (self.personal / PERSONAL_CLAUDE).is_file():
             personal = json.loads((self.personal / PERSONAL_CLAUDE).read_text(encoding="utf-8"))
 
+        old_personal = [r[:-1] for r in self.old.get("merged", {}).get(str(base / "settings.json"), {})
+                        .get("added", []) if r[-1:] == ["personal"]]
+
         def mutate(settings: dict, added: list) -> dict:
+            if not self.personal:  # --no-personal: what the layer added comes out
+                take_back_all(settings, old_personal)
             settings = merge_values(settings, fragment, added)
-            settings = merge_values(settings, personal, added)
+            from_personal = []
+            settings = merge_values(settings, personal, from_personal)
+            added += [r + ["personal"] for r in from_personal]
             settings = self.with_hooks(settings, ours, added)
             # A rule this repository now denies leaves ask, where an older install put it.
             permissions = settings.get("permissions")
@@ -1033,9 +1067,7 @@ class Installer:
             before = json.loads(json.dumps(data))
             if isinstance(data.get("hooks"), dict):
                 data["hooks"] = merge_event_hooks(data["hooks"], {})
-            # List items first, so a key holds only what was added with it; empty containers last.
-            for record in sorted(entry.get("added", []), key=lambda r: {"item": 0, "container": 2}.get(r[0], 1)):
-                take_back(data, record)
+            take_back_all(data, [r[:-1] if r[-1:] == ["personal"] else r for r in entry.get("added", [])])
             if entry.get("created") and empty(data):
                 self.backup(path)
                 self.prune(path.parent)
@@ -1123,7 +1155,14 @@ def main() -> int:
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
 
+    if args.uninstall and (args.tools is not None or args.target or args.personal or args.no_personal or args.force):
+        parser.error("--uninstall removes everything the manifest records; it takes no --tools, --target, "
+                     "--personal, --no-personal or --force")
     probe = Installer(home, True, tools)
+    if probe.broken:
+        print(f"{probe.manifest_path} does not parse ({probe.broken}): nothing changed. Fix it, or move it away "
+              "to install as over a version without a manifest.", file=sys.stderr)
+        return 1
     if args.uninstall:
         return Installer(home, args.dry_run, tools).uninstall()
     personal = None if args.no_personal else (

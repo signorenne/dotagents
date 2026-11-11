@@ -1032,7 +1032,8 @@ class Manifest(unittest.TestCase):
     def run_install(self, *args, code=0):
         env = {**{k: v for k, v in os.environ.items() if k != "COPILOT_HOME"}, "HOME": str(self.home),
                "PATH": "/usr/bin:/bin"}
-        result = subprocess.run([sys.executable, "-B", str(INSTALL), "--tools", "claude", *args], env=env,
+        scope = [] if "--uninstall" in args else ["--tools", "claude"]  # --uninstall takes no scope
+        result = subprocess.run([sys.executable, "-B", str(INSTALL), *scope, *args], env=env,
                                 capture_output=True, text=True, check=False)
         self.assertEqual(result.returncode, code, result.stderr)
         return result.stdout
@@ -1101,6 +1102,71 @@ class Manifest(unittest.TestCase):
         self.run_install("--uninstall")
         self.assertFalse((self.home / ".claude/settings.json").exists())
         self.assertEqual(sorted(p.name for p in self.home.iterdir()), [".agents-backup", ".claude", "layer"])
+
+    def test_uninstall_takes_back_values_a_later_run_nested_in_ours(self):
+        # A key added whole in one run and extended in a later one (a personal subkey, a new
+        # skillOverrides entry, the user's own rule) must still come out piece by piece.
+        settings = self.home / ".claude/settings.json"
+        layer = self.home / "layer"
+        layer.mkdir()
+        (layer / "claude-settings.json").write_text(json.dumps({"permissions": {"defaultMode": "plan"}}))
+        self.run_install()
+        self.run_install("--personal", str(layer))
+        self.run_install("--uninstall")
+        self.assertFalse(settings.exists())
+        self.run_install()
+        data = json.loads(settings.read_text())
+        data["permissions"]["allow"].append("Bash(make *)")
+        settings.write_text(json.dumps(data))
+        self.run_install("--uninstall")
+        self.assertEqual(json.loads(settings.read_text()), {"permissions": {"allow": ["Bash(make *)"]}})
+
+    def test_no_personal_takes_the_personal_values_back(self):
+        layer = self.home / "layer"
+        layer.mkdir()
+        (layer / "claude-settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash(make *)"]},
+                                                                "enabledPlugins": {"x@y": False}}))
+        settings = self.home / ".claude/settings.json"
+        self.run_install("--personal", str(layer))
+        self.run_install("--no-personal")
+        data = json.loads(settings.read_text())
+        self.assertNotIn("Bash(make *)", data["permissions"]["allow"])
+        self.assertNotIn("enabledPlugins", data)
+        self.assertIn("Bash(git status *)", data["permissions"]["allow"])
+        self.run_install("--uninstall")
+        self.assertFalse(settings.exists())
+
+    def test_uninstall_keeps_what_it_cannot_read_or_is_now_a_folder(self):
+        self.run_install()
+        scout = self.home / ".claude/agents/scout.md"
+        scout.unlink()
+        scout.mkdir()
+        out = self.run_install("--uninstall")
+        self.assertTrue(scout.is_dir())
+        self.assertIn(f"- Kept {scout}: changed by hand since the install.", out.splitlines())
+
+    def test_a_broken_manifest_stops_the_installer(self):
+        self.run_install()
+        manifest = self.home / ".agents" / install.MANIFEST_NAME
+        manifest.write_text("{broken")
+        for args in ((), ("--uninstall",)):
+            with self.subTest(args=args):
+                env = {**{k: v for k, v in os.environ.items() if k != "COPILOT_HOME"}, "HOME": str(self.home),
+                       "PATH": "/usr/bin:/bin"}
+                result = subprocess.run([sys.executable, "-B", str(INSTALL), *args], env=env,
+                                        capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(f"{manifest} does not parse", result.stderr)
+        self.assertEqual(manifest.read_text(), "{broken")
+
+    def test_uninstall_takes_no_tools_or_targets(self):
+        env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
+        for extra in (("--tools", "codex"), ("--target", str(self.home / "x")), ("--force",)):
+            with self.subTest(extra=extra):
+                result = subprocess.run([sys.executable, "-B", str(INSTALL), "--uninstall", *extra], env=env,
+                                        capture_output=True, text=True, check=False)
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("--uninstall", result.stderr)
 
     def test_a_personal_layer_with_hooks_is_refused_before_writing(self):
         layer = self.home / "layer"
