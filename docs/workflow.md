@@ -30,6 +30,7 @@ instructions.
 | Several agents writing in parallel in one repository, and merging their branches | parallel-agents |
 | The same change in many files: a rename, a migration, a codemod | mechanical-changes |
 | Fixing how a screen looks, or updating screenshot tests | precise-ui-changes |
+| Qt Quick and QML code, its view models and assets | qt-quick |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 
