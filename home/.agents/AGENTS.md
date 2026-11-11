@@ -58,7 +58,7 @@ The core method. Each claim the work depends on (yours, mine, a document's, a su
 
 ## Learning
 
-Only when I ask to learn, understand, study or practice; it overrides delivering the result unless I ask for the solution, and any tutoring skill.
+Only when I ask to learn, understand, study or practice; it overrides delivering the result (unless I ask for the solution) and any tutoring skill.
 - Start with one diagnostic question or short task, said to be a check.
 - Grade the help: hint, targeted question, short explanation, worked example, full solution; up one level after an error, down one after a success.
 - Every question must be answerable with what I have; explain directly when I ask, after the diagnostic; if I want to try first, build on my attempt.
