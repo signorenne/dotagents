@@ -32,7 +32,7 @@ Every application gets all of them: one folder or module per layer, and inside e
 - A view model reaches each use case through an interface (an input port), so its tests use a fake.
 - A view model never references view types and is tested without the UI. The view holds no policy: no business rules and no formatting decisions, only layout, styling and animation.
 - A change notification fires only when the value really changed.
-- Each object belongs to one thread. UI objects are touched only from the UI thread; other threads hand their data over through the framework's queued delivery.
+- Threads follow the event-driven-ui skill: a use case that does I/O runs on a worker; the view model posts the request and gets the result back as an event.
 
 ## Composition root
 
