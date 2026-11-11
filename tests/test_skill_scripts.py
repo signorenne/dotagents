@@ -480,6 +480,13 @@ class PlanScripts(unittest.TestCase):
         self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
         self.assertEqual(self.log()[-1][3], "uncommitted(1)")
 
+    def test_the_working_notes_never_make_a_run_uncommitted(self):
+        (self.repo / ".gitignore").write_text("")  # a project that does not ignore .private
+        self.git("commit", "-q", "-am", "track nothing ignored")
+        for _ in range(2):  # the second run sees the first run's output and log in .private
+            self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
+        self.assertEqual(self.log()[-1][3], self.git("rev-parse", "--short", "HEAD"))
+
     def test_a_command_that_never_started_is_no_failing_run(self):
         result = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--", "no-such-program-xyz --flag")
         self.assertEqual(result.returncode, 2, result.stdout)

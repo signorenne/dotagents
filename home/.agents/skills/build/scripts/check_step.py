@@ -116,7 +116,9 @@ def main(argv=None) -> int:
     passed = result.returncode == 0
     count = test_count(output)
     label = "fail-first" if args.expect_fail else "baseline" if args.baseline else "gate" if args.gate else "check"
-    dirty = (state.get("dirty", []) + state.get("untracked", [])) if state else []
+    # Untracked files count, except the working notes (where this script writes its output).
+    untracked = [path for path in state.get("untracked", []) if path.split("/")[0] != ".private"] if state else []
+    dirty = (state.get("dirty", []) + untracked) if state else []
     commit = f"uncommitted({len(dirty)})" if dirty else (state.get("head") or "-") if state else "-"
     print(f"exit {result.returncode}, {'pass' if passed else 'fail'}, tests {count}, {commit}"
           + (f", output {saved}" if saved else ""))
