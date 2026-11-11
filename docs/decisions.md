@@ -183,3 +183,27 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: A light fill set without its text colour made diagrams unreadable in the dark Emacs preview. PlantUML applies a style's dark block on -darkmode renders (tested through the picoweb server the preview uses), so one file serves both themes; styles do not reach stereotype labels, which stay small and grey.
 - Rejected: No colours at all (readable but plain); fixed light colours (unreadable in dark previews); separate day and night files (the diagram would have to switch includes).
 - Revisit if: the nexenne palette changes (copy its new values), or PlantUML starts writing the dark block into SVG output.
+
+## D-0016: Skills from the case studies, checked against primary sources
+
+- Status: Accepted
+- Proposed by: maintainer (new skills from five case studies, every assumption checked online, an MVVM skill), agent (which skills, the four fixes, the Qt split, the bundled script)
+- Decided by: maintainer
+- Date: 2026-11-11
+- Rule in: home/.agents/skills/ (parallel-agents, mechanical-changes, precise-ui-changes and its scripts/nothing_moved.py, qt-quick, clean-architecture, implement), claude-ai/skills/ (verifying-before-claiming-done, systematic-debugging)
+- Decision: Five skills built from five real case studies (several agents on one repository, a refactor across many files, precise UI fixes, a live theme switch, SVG icons), each rule checked against primary sources, and five rules added to existing skills: full gates on the final commit, generated files changed at their generator, testing the current build, trusting a check script only after it catches a planted case, measuring slowness. The Qt facts and the Qt way to apply MVVM live in qt-quick, so clean-architecture stays language-neutral. precise-ui-changes bundles one tested script for its check that nothing else moved. A script a skill runs uses only the standard library plus at most one common package, and has tests that run in CI without that package (AGENTS.md, Where changes go).
+- Why: The case studies are real runs that showed each need (docs/skill-authoring.md, principle 7). The sources refuted some of their claims, corrected in the skills: an SVG sourceSize multiplied by the pixel ratio counts it twice; a diff threshold of 40 let through shifts of 11 to 14 levels where the measured noise was 1; fixed time limits in the normal test suite are flaky; checks without a build only add to a build. The cost is five more skills to maintain and keep apart, and Qt facts to recheck as Qt changes.
+- Rejected: one skill for Qt MVVM apps (not reusable outside Qt); precise-ui-changes without a script (the threshold mistake would recur); the case studies' claims taken unchecked.
+- Revisit if: a new skill fails to trigger or misfires in real sessions, a Qt release changes the SVG or image behavior described, or the diff script misjudges a real change.
+
+## D-0017: Every application gets every clean-architecture layer
+
+- Status: Accepted
+- Proposed by: maintainer (domain, infrastructure, repositories, DAOs and use cases, as the books describe them), agent (the recorded exception, use cases that return their results)
+- Decided by: maintainer
+- Date: 2026-11-11
+- Rule in: home/.agents/skills/clean-architecture/SKILL.md
+- Decision: Every application gets the domain, application (use cases), infrastructure (repository implementations, DAOs and data sources), presentation (view models and views) and composition root layers, with dependencies pointing inward and the repository interfaces in the domain. A use case that would only forward one call may be left out only as a decision recorded in the project's decision log. A use case returns its result; updates over time go through an output port.
+- Why: The maintainer wants one structure in every project, as Martin, Evans, Fowler and Cockburn describe it. No source makes every layer mandatory (Android adds use cases "only when required", Gossman calls MVVM overkill for simple UIs, Ardalis keeps a single-project template for small apps); the recorded exception keeps the structure without use cases that only forward calls. It makes small apps heavier than they would otherwise be.
+- Rejected: every layer with no exception (use cases that only forward calls); layers added only when needed, as in Android's guide (against the maintainer's structure); a domain that depends on the data layer, as in Android (against Martin, Cockburn, Vernon and the reference templates).
+- Revisit if: the layers cost more than they give in a project, or projects stop following them.
