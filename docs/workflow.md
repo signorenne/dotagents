@@ -32,6 +32,7 @@ instructions.
 | Fixing how a screen looks, or updating screenshot tests | precise-ui-changes |
 | Qt Quick and QML code, its view models and assets | qt-quick |
 | Where code belongs: layers, MVVM, repositories, use cases, dependency checks | clean-architecture |
+| A UI that freezes or stutters, or work to move off the UI or render thread | event-driven-ui |
 
 Slash command form in Claude Code, Copilot and Cursor: /name. Codex: $name. Gemini CLI activates a skill when you ask for it in words.
 
