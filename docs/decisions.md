@@ -255,3 +255,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: False positives make people ignore a report (Google keeps its checks under 10% effective false positives; Coverity saw users stop above 30%), so only independently confirmed findings are reported and doubts become questions, as SARIF's review and open kinds and SonarQube's hotspots do. The cost: some real problems wait in Questions until the user answers.
 - Rejected: extending review (it checks one change before a commit); a committed report (findings are working notes until the owner acts).
 - Revisit if: the questions pile up unanswered, or confirmed findings turn out wrong.
+
+## D-0022: The as-built docs show the UI with rendered, annotated pictures
+
+- Status: Accepted
+- Proposed by: maintainer (describe the UI, its structure and behavior with pictures, at each document's level; render rather than ask), agent (markers and legend by a bundled script, recipes for sync)
+- Decided by: maintainer
+- Date: 2026-11-12
+- Rule in: home/.agents/skills/as-built-docs/ (SKILL.md, scripts/annotate.py)
+- Decision: Each document shows the UI for its reader: the knowledge base one picture per screen with numbered markers and a legend, and before and after pictures for behavior that changes the screen; the test guide each starting state and cropped expected screens; the developer guide a component diagram of the UI with the view model behind each element, and the annotated pictures naming the components. Pictures come only from the real app, run and driven to each state with its real input and grabbed from the window or framebuffer, each with a recipe in the notes so an update renders it again. When the app cannot run or be driven, the user is asked for the pictures; nothing is sketched in their place. A check fails when a picture lacks its recipe or its legend does not match its markers.
+- Why: A complete description of an app includes what the user sees; words alone made the generated docs harder to follow. Rendered pictures stay true to the code and can be synced; a numbered legend explains elements without crowding the picture. The cost: rendering needs the app to run on the machine, and pictures add binary files to the repository.
+- Rejected: a fourth UI document (one more file to sync, readers jump between documents); screenshots always from the user (they drift from the code); captions without markers (elements stay ambiguous); wireframe sketches when no picture exists (the maintainer wants only what the real app shows).
+- Revisit if: the pictures grow the repository too much, or rendering proves unreliable on the projects' machines.
