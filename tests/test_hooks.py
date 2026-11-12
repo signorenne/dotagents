@@ -240,6 +240,22 @@ class GuardBash(unittest.TestCase):
             "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x git commit -m x",
         ])
 
+    def test_more_git_gh_and_wrapper_forms(self):
+        self.assert_blocked([
+            "git --attr-source HEAD push -f",
+            "git.exe push -f",
+            "function f { git push -f; }; f",
+            "coproc git push -f",
+            "setsid git push -f",
+            "stdbuf -oL git push -f",
+            "ionice -c 3 git push -f",
+            "flock /tmp/lock git push -f",
+            "taskset 0x1 git push -f",
+            "git config core.hooksPath /dev/null/",
+            "gh pr -R o/r merge 1 --admin",
+            "gh -R o/r pr merge 1 --admin",
+        ])
+
     def test_admin_merge_skips_required_checks(self):
         self.assert_blocked(["gh pr merge 12 --admin --squash", "gh pr merge --admin"])
         self.assert_allowed(["gh pr merge 12 --squash --auto", "gh pr view 12"])

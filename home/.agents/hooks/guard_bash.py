@@ -28,8 +28,9 @@ The text is split as a shell does: quotes, escapes, comments, newlines, the oper
 is a shift) and here-documents, whose body is text, not commands. So a commit message that mentions -n or --no-verify is not mistaken for a
 flag. Text that does not parse (an unbalanced quote) is checked by a rough split that
 ignores quoting, so a parse error never lets a forbidden command through. This guards
-the usual forms; it is not a security boundary (bash -c "...", eval, aliases and
-scripts are not inspected).
+the usual forms; it is not a security boundary (commands passed as one string, as to
+bash -c, env -S, flock -c or git submodule foreach, and eval, aliases and scripts are
+not inspected).
 
 Blocking: exit 2 with the reason on stderr (Claude Code, Codex, Gemini CLI, Cursor).
 Copilot denies on exit 2 but shows stderr only to the user, so it also gets
@@ -52,7 +53,7 @@ ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.DOTALL)
 FALSY = {"", "0", "false", "no", "off"}
 OFF = {"0", "false", "no", "off"}
 
-KEYWORDS = {"!", "{", "if", "then", "elif", "else", "while", "until", "do"}
+KEYWORDS = {"!", "{", "if", "then", "elif", "else", "while", "until", "do", "coproc"}
 DECLARATIONS = {"export", "declare", "typeset", "local", "readonly"}
 # Commands that run the command after them: (short options taking a value, long options
 # taking the next word as value, operands before the command).
@@ -62,11 +63,16 @@ WRAPPERS = {
     "doas": ("Cu", (), 0),
     "env": ("CSu", ("--chdir", "--split-string", "--unset"), 0),
     "exec": ("a", (), 0),
+    "flock": ("Ew", ("--conflict-exit-code", "--timeout", "--wait"), 1),
+    "ionice": ("cnpPu", ("--class", "--classdata", "--pgid", "--pid", "--uid"), 0),
     "nice": ("n", ("--adjustment",), 0),
     "nohup": ("", (), 0),
+    "setsid": ("", (), 0),
+    "stdbuf": ("eio", ("--error", "--input", "--output"), 0),
     "sudo": ("CDghpRrTtUu", ("--chdir", "--chroot", "--close-from", "--command-timeout",
                              "--group", "--host", "--other-user", "--prompt", "--role",
                              "--type", "--user"), 0),
+    "taskset": ("", (), 1),
     "time": ("fo", ("--format", "--output"), 0),
     "timeout": ("ks", ("--kill-after", "--signal"), 1),
     "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--max-args", "--max-chars",
@@ -75,7 +81,8 @@ WRAPPERS = {
 HOOK_RUNNERS = {"git", "pre-commit"}
 ROUGH_PROGRAMS = HOOK_RUNNERS | {"gh"}
 
-GIT_VALUE_OPTIONS = {"-C", "-c", "--config-env", "--git-dir", "--namespace", "--work-tree"}
+GIT_VALUE_OPTIONS = {"-C", "-c", "--attr-source", "--config-env", "--git-dir", "--namespace",
+                     "--work-tree"}
 HOOK_SUBCOMMANDS = {"am", "cherry-pick", "commit", "merge", "pull", "push", "rebase"}
 # Per subcommand: (short options taking a value, short options whose optional value can
 # only be glued, long options taking the next word as value).
@@ -377,6 +384,8 @@ def split_command(words: list) -> tuple:
             index += 1
         elif word in KEYWORDS:
             index += 1
+        elif word == "function":
+            index += 2  # and the function name; the body follows
         elif word in DECLARATIONS:
             index = skip_options(words, index + 1, "", ())
         elif name in WRAPPERS:
@@ -391,7 +400,8 @@ def split_command(words: list) -> tuple:
 
 
 def program_of(words: list) -> str:
-    return os.path.basename(words[0]) if words else ""
+    name = os.path.basename(words[0]) if words else ""
+    return name[:-4] if name.lower().endswith(".exe") else name  # git.exe from WSL
 
 
 def abbreviates(name: str, option: str, shortest: int) -> bool:
@@ -486,7 +496,8 @@ def config_reason(args: list) -> str:
         return "unsetting core.hooksPath disables the repository's git hooks"
     reading = action in ("get", "list") or any(o.startswith("--get") or o in ("-l", "--list")
                                                for o in options)
-    if not reading and len(operands) > 1 and operands[1].strip() in ("", "/dev/null"):
+    value = operands[1].strip() if len(operands) > 1 else None
+    if not reading and value is not None and (not value or os.path.normpath(value) == "/dev/null"):
         return "core.hooksPath set to an empty path or /dev/null disables the repository's git hooks"
     return ""
 
@@ -519,9 +530,17 @@ def git_reasons(words: list, plain_push_allowed: bool) -> list:
 
 
 def gh_reasons(words: list) -> list:
-    if words[1:3] != ["pr", "merge"]:
+    operands, index = [], 1
+    while index < len(words):
+        word = words[index]
+        index += 1
+        if word in ("-R", "--repo"):
+            index += 1  # gh takes the repository flag before or after the subcommand
+        elif not word.startswith("-"):
+            operands.append(word)
+    if operands[:2] != ["pr", "merge"]:
         return []
-    for word in words[3:]:
+    for word in words[1:]:
         name, _, value = word.partition("=")
         if name == "--admin" and value.lower() not in ("false", "0"):
             return ["gh pr merge --admin merges without the required checks and reviews"]
