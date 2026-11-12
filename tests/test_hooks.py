@@ -14,6 +14,7 @@ from pathlib import Path
 
 HOOKS = Path(__file__).resolve().parent.parent / "home" / ".agents" / "hooks"
 EM, EN = "\u2014", "\u2013"
+DEEP_JSON = "[" * 100000
 
 
 def run(script: str, payload, tool: str = "claude") -> subprocess.CompletedProcess:
@@ -31,11 +32,17 @@ class GuardBash(unittest.TestCase):
         "git commit -m 'feat(x): y' --no-verify",
         "git commit -n -m x",
         "git commit -nm x",
+        "git commit -anm x",
+        "git commit -vn",
+        "git commit -m x -n",
+        "git commit --amend -n",
         "NEXENNE_SKIP_HOOK=1 git push",
         "cd a && NEXENNE_SKIP_HOOK=1 git commit -m x",
         "export NEXENNE_SKIP_HOOK=1; git commit -m x",
         "HUSKY=0 git commit -m x",
         "SKIP=clang-format git commit -m x",
+        "export SKIP=clang-format; git commit -m x",
+        "SKIP=clang-format pre-commit run --all-files",
         "git push --force origin main",
         "git push -f",
         "git push origin +main",
@@ -64,17 +71,81 @@ class GuardBash(unittest.TestCase):
         "git commit -F msg.txt -a",
     ]
 
-    def test_blocks_gate_bypass_and_history_rewrite(self):
-        for command in self.BLOCKED:
-            with self.subTest(command=command):
-                result = run("guard_bash.py", bash(command))
-                self.assertEqual(result.returncode, 2)
+    def assert_blocked(self, commands, tool: str = "claude"):
+        for command in commands:
+            with self.subTest(command=command, tool=tool):
+                result = run("guard_bash.py", bash(command), tool)
+                self.assertEqual(result.returncode, 2, result.stderr)
                 self.assertIn("Blocked:", result.stderr)
 
+    def assert_allowed(self, commands, tool: str = "claude"):
+        for command in commands:
+            with self.subTest(command=command, tool=tool):
+                result = run("guard_bash.py", bash(command), tool)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stderr, "")
+
+    def test_blocks_gate_bypass_and_history_rewrite(self):
+        self.assert_blocked(self.BLOCKED)
+
     def test_allows_ordinary_commands(self):
-        for command in self.ALLOWED:
-            with self.subTest(command=command):
-                self.assertEqual(run("guard_bash.py", bash(command)).returncode, 0)
+        self.assert_allowed(self.ALLOWED)
+
+    def test_newline_separates_commands(self):
+        self.assert_blocked([
+            "cd repo\ngit commit --no-verify -m x",
+            "git fetch\ngit push -f origin feat",
+            "cd repo\nHUSKY=0 git commit -m x",
+            "git add -A\ngit commit --no-verify -m x",
+            "git push \\\n  --force origin main",
+        ])
+        # A newline inside quotes stays in the message.
+        self.assert_allowed(['git commit -m "fix: x\n\nKeep the -n flag\nand --no-verify docs"'])
+
+    def test_merged_punctuation_is_an_operator(self):
+        self.assert_blocked([
+            "(cd a);git push -f",
+            "(cd a)&&git push -f",
+            "git status;(git push -f)",
+            "true&&git push -f",
+            "(cd a && git push -f)",
+            "git push origin main 2>&1 --force",
+            "git push -f&>/dev/null",
+            "echo $(git push -f)",
+        ])
+
+    def test_unparsable_command_is_checked_cautiously(self):
+        self.assert_blocked([
+            "git commit --no-verify -m x # skip hooks, they're slow",
+            "git push -f origin main  # don't worry, it's my branch",
+            "git push -f; echo $'don\\'t'",
+            "cat <<'X' > a.txt\nit's\nX\ngit push -f",
+            'git push -f origin main; echo "unterminated',
+            "git commit -m x ` -n 'unterminated",
+            "echo $(git push -f; echo 'unterminated",
+        ])
+        self.assert_allowed([
+            "git commit -m 'unbalanced",
+            'echo "it\'s',
+            "ls # it's fine",
+        ])
+
+    def test_heredoc_body_is_not_a_command(self):
+        self.assert_allowed([
+            "cat > notes.md <<'X'\nNever run: true && git push -f\nX",
+            "cat > guide.md <<'X'\nRun: cd repo && git push -f only with approval\nX",
+            "cat <<-X > a.md\n\tgit commit --no-verify\n\tX\necho done",
+            "git commit -F - <<'X'\nAdd the -n flag to the CLI\nX",
+            "git commit -F - <<'X'\ndocs: never use --no-verify\nX",
+            "git commit -F- <<'X'\nfix(x): handle -n flag\nX",
+            "git commit -m \"$(cat <<'EOF'\nfix: x\n\nNever run git push -f; it's \"banned\".\nEOF\n)\"",
+            "cat <<'X'\n$(git push -f) and `git push -f`\nX",
+        ])
+        # The shell runs the substitutions in the body of an unquoted delimiter.
+        self.assert_blocked([
+            "cat <<X\n$(git push -f)\nX",
+            "cat <<X\nsee `git push -f`\nX",
+        ])
 
     def test_payload_shapes_of_each_agent(self):
         bad = "git push --force"
@@ -95,6 +166,12 @@ class GuardBash(unittest.TestCase):
     def test_unreadable_input_never_blocks(self):
         self.assertEqual(run("guard_bash.py", "not json").returncode, 0)
         self.assertEqual(run("guard_bash.py", "not json", "gemini").stdout.strip(), "{}")
+
+    def test_deeply_nested_json_never_blocks(self):
+        for payload in (DEEP_JSON, {"toolArgs": DEEP_JSON}):
+            with self.subTest(payload=str(payload)[:20]):
+                result = run("guard_bash.py", payload, "gemini")
+                self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
 
 
 class AfterEdit(unittest.TestCase):
