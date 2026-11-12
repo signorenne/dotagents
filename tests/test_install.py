@@ -30,10 +30,13 @@ class Install(unittest.TestCase):
         for folder in (".claude", ".codex", ".gemini", ".copilot", ".cursor"):
             (self.home / folder).mkdir()
 
-    def install(self, *args: str) -> str:
+    def run_install(self, *args: str, installer: Path = INSTALL) -> subprocess.CompletedProcess:
         env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
-        result = subprocess.run([sys.executable, "-B", str(INSTALL), *args], env=env,
-                                capture_output=True, text=True, check=False)
+        return subprocess.run([sys.executable, "-B", str(installer), *args], env=env,
+                              capture_output=True, text=True, check=False)
+
+    def install(self, *args: str) -> str:
+        result = self.run_install(*args)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
@@ -63,6 +66,28 @@ class Install(unittest.TestCase):
         self.assertIn("@~/.agents/AGENTS.md", (self.home / ".claude/CLAUDE.md").read_text())
         for name in AGENTS:
             self.assertTrue((self.home / ".claude/agents" / f"{name}.md").is_file())
+
+    def test_skills_folder_shared_with_agents_is_left_alone(self):
+        shared = self.home / ".agents/skills"
+        shared.mkdir(parents=True)
+        (self.home / ".claude/skills").symlink_to(shared)
+        out = self.install()
+        for name in PACK_SKILLS + ONLINE_SKILLS:
+            self.assertFalse((shared / name).is_symlink(), name)
+            self.assertTrue((shared / name / "SKILL.md").is_file(), name)
+        self.assertFalse((self.home / ".agents-backup").exists())
+        self.assertIn(f"{self.home / '.claude/skills'} resolves to {shared.resolve()}", out)
+        self.assertIn("0 change(s).", self.install().splitlines())
+
+    def test_link_reached_through_a_linked_folder_is_left_alone(self):
+        (self.home / ".codex").rmdir()
+        (self.home / ".agents").mkdir()
+        (self.home / ".codex").symlink_to(self.home / ".agents")
+        out = self.install("--tools", "codex")
+        instructions = self.home / ".agents/AGENTS.md"
+        self.assertFalse(instructions.is_symlink())
+        self.assertEqual(instructions.read_bytes(), (ROOT / "home/.agents/AGENTS.md").read_bytes())
+        self.assertIn(f"{self.home / '.codex/AGENTS.md'} resolves to {instructions}; left as it is.", out)
 
     def test_synced_copies_of_repository_skills_are_turned_off(self):
         settings = self.home / ".claude/settings.json"

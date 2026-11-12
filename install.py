@@ -138,6 +138,14 @@ def codex_agent(meta: dict, body: str) -> str:
     return "\n".join(lines) + "\n"
 
 
+def real_path(path: Path):
+    """The path with every link resolved, or None for a link loop."""
+    try:
+        return path.resolve()
+    except (OSError, RuntimeError):
+        return None
+
+
 def is_ours(command: str) -> bool:
     return HOOK_MARK in command or any(mark in command for mark in OLD_HOOK_MARKS)
 
@@ -222,6 +230,11 @@ class Installer:
     def link(self, path: Path, target: Path) -> None:
         if path.is_symlink() and os.readlink(path) == str(target):
             return
+        if real_path(path) is not None and real_path(path) == real_path(target):
+            # Reached through a linked folder, path is the target itself: replacing it
+            # would move the target away and leave a link to itself.
+            self.notes.append(f"{path} resolves to {target}; left as it is.")
+            return
         if path.exists() or path.is_symlink():
             self.backup(path)
         if not self.dry:
@@ -297,8 +310,14 @@ class Installer:
             old = base / "skills" / name / "SKILL.md"
             if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
                 self.backup(old.parent)
-        for name in self.skills() + self.online_skills():
-            self.link(base / "skills" / name, self.agents_home / "skills" / name)
+        skills, agents_home = base / "skills", real_path(self.agents_home)
+        resolved = real_path(skills)
+        if resolved and agents_home and (resolved == agents_home or agents_home in resolved.parents):
+            self.notes.append(f"Claude Code: {skills} resolves to {resolved}, inside {self.agents_home}; "
+                              "the skills were not linked into it.")
+        else:
+            for name in self.skills() + self.online_skills():
+                self.link(skills / name, self.agents_home / "skills" / name)
         for path, meta, body in self.subagents():
             self.write(base / "agents" / path.name, path.read_text(encoding="utf-8"))
         for old_hook in ("guard_bash.py", "after_edit.py"):
