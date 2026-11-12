@@ -41,8 +41,16 @@ OUR_HOOK = re.compile(r"(?:{})(?![\w.-])".format("|".join(
     [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS]
     + [re.escape(f"/.claude/hooks/{name}") for name in OLD_HOOK_SCRIPTS])))
 OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
+CLAUDE_IMPORT = "@~/.agents/AGENTS.md"
 CLAUDE_MD = (
-    "@~/.agents/AGENTS.md\n\n"
+    f"{CLAUDE_IMPORT}\n\n"
+    "<!-- Global instructions shared by every coding agent. install.py overwrites "
+    "~/.agents/AGENTS.md: edit home/.agents/AGENTS.md in the dotagents repository, "
+    "then run install.py again. -->\n"
+)
+# What an older install.py wrote, replaced because it said to edit ~/.agents/AGENTS.md.
+OLD_CLAUDE_MD = (
+    f"{CLAUDE_IMPORT}\n\n"
     "<!-- Global instructions live in ~/.agents/AGENTS.md, shared by every coding agent. "
     "Edit them there. -->\n"
 )
@@ -220,7 +228,7 @@ class Installer:
         self.changes += change
         print(f"{'(dry) ' if self.dry else ''}{action:10} {text}")
 
-    def backup(self, path: Path, replacing: bool = False) -> None:
+    def backup(self, path: Path, replacing: bool = False) -> Path:
         """Move path to the backup folder; replacing: the caller writes path again and
         counts the change."""
         try:
@@ -233,23 +241,27 @@ class Installer:
             shutil.move(str(path), str(target))
         self.backups += 1
         self.say("backed up", f"{path} -> {target}", change=not replacing)
+        return target
 
-    def write(self, path: Path, data, executable: bool = False) -> None:
+    def write(self, path: Path, data, executable: bool = False):
+        """Write path, backing up what it replaces; return the backup path, if any."""
         data = data.encode("utf-8") if isinstance(data, str) else data
+        saved = None
         if path.is_symlink():
-            self.backup(path, replacing=True)
+            saved = self.backup(path, replacing=True)
         elif path.exists():
             if path.read_bytes() == data:
                 if executable and not self.dry:
                     path.chmod(0o755)
-                return
-            self.backup(path, replacing=True)
+                return None
+            saved = self.backup(path, replacing=True)
         if not self.dry:
             path.parent.mkdir(parents=True, exist_ok=True)
             path.write_bytes(data)
             if executable:
                 path.chmod(0o755)
         self.say("wrote", str(path))
+        return saved
 
     def link(self, path: Path, target: Path) -> None:
         if path.is_symlink() and os.readlink(path) == str(target):
@@ -335,8 +347,12 @@ class Installer:
     def install_claude(self) -> None:
         base = self.home / ".claude"
         claude_md = base / "CLAUDE.md"
-        if not (claude_md.exists() and "@~/.agents/AGENTS.md" in claude_md.read_text(encoding="utf-8")):
-            self.write(claude_md, CLAUDE_MD)
+        current = claude_md.read_text(encoding="utf-8", errors="replace") if claude_md.is_file() else ""
+        if CLAUDE_IMPORT not in current or current == OLD_CLAUDE_MD:
+            saved = self.write(claude_md, CLAUDE_MD)
+            if saved and current != OLD_CLAUDE_MD:
+                self.notes.append(f"Claude Code: replaced {claude_md}, which did not import "
+                                  f"~/.agents/AGENTS.md; the old one {'would be' if self.dry else 'is'} in {saved}.")
         for name, marker in OLD_PACK_SKILLS.items():
             old = base / "skills" / name / "SKILL.md"
             if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
@@ -365,10 +381,10 @@ class Installer:
             settings = merge_values(settings, fragment)
             settings["hooks"] = merge_event_hooks(settings.get("hooks"), ours)
             return settings
-        self.merge_json(base / "settings.json", mutate)
-        self.notes.append(
-            "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
-            "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
+        if self.merge_json(base / "settings.json", mutate):
+            self.notes.append(
+                "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
+                "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
 
     def install_codex(self) -> None:
         base = self.home / ".codex"

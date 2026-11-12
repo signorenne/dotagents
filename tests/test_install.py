@@ -275,9 +275,29 @@ class Install(unittest.TestCase):
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")
-        self.install()
+        out = self.install()
         backups = list((self.home / ".agents-backup").rglob("CLAUDE.md"))
         self.assertEqual([b.read_text() for b in backups], ["my old notes\n"])
+        self.assertIn(f"- Claude Code: replaced {claude_md}, which did not import ~/.agents/AGENTS.md; "
+                      f"the old one is in {backups[0]}.", out.splitlines())
+
+    def test_claude_md_sends_edits_to_the_repository(self):
+        claude_md = self.home / ".claude/CLAUDE.md"
+        old_generated = ("@~/.agents/AGENTS.md\n\n<!-- Global instructions live in ~/.agents/AGENTS.md, "
+                         "shared by every coding agent. Edit them there. -->\n")
+        claude_md.write_text(old_generated)
+        out = self.install("--tools", "claude")
+        text = claude_md.read_text()
+        self.assertTrue(text.startswith("@~/.agents/AGENTS.md\n"))
+        self.assertIn("home/.agents/AGENTS.md", text)
+        self.assertNotIn("Edit them there", text)
+        self.assertNotIn("did not import", out)
+
+    def test_skill_overrides_note_needs_merged_settings(self):
+        (self.home / ".claude/settings.json").write_text("{not json")
+        out = self.install("--tools", "claude")
+        self.assertIn("Could not parse", out)
+        self.assertNotIn("skillOverrides", out)
 
 
 if __name__ == "__main__":
