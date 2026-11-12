@@ -3,33 +3,40 @@
 title What does an agent session load, and when?
 
 actor User as user
-participant "Agent" as agent
+participant "Tool\n(harness)" as tool
+participant "Model" as model
 collections "Instructions" as rules
 collections "Skills" as skills
 participant "Hooks" as hooks
 participant "Subagent" as sub
 
 == Session start ==
-agent -> rules : global rules\n(&#126;/.agents/AGENTS.md)
-agent -> rules : the project's AGENTS.md
-agent -> skills : name and description\nof every skill
+tool -> rules : global rules\n(&#126;/.agents/AGENTS.md)
+tool -> rules : the project's AGENTS.md
+tool -> skills : name and description\nof every skill
+tool -> model : all of it, as context
 opt Claude Code, after a compaction or resume
-  agent -> hooks : session_refresh.py
-  hooks --> agent : reminder and git state
+  tool -> hooks : session_refresh.py
+  hooks --> tool : reminder, git state,\nnewest task notes
+  tool -> model : added to the context
 end
 
 == A request ==
-user -> agent : request or /name
-agent -> skills : body of the matching\nSKILL.md
-agent -> sub : delegate: scout,\ngate-runner or reviewer
+user -> tool : request or /name
+tool -> model : the request
+model -> skills : body of the matching\nSKILL.md
+model -> sub : delegate: scout,\ngate-runner or reviewer
 note right of sub : fresh context, its own\ninstructions and tools
-sub --> agent : brief, gate table\nor findings
+sub --> model : brief, gate table\nor findings
 
 == Each tool call ==
-agent -> hooks : before a shell command:\nguard_bash.py
-hooks --> agent : allow, or block\nwith the reason
-agent -> hooks : after an edit:\nafter_edit.py
-hooks --> agent : dash report or\nformat notice
+model -> tool : shell command
+tool -> hooks : before it: guard_bash.py
+hooks --> tool : allow, or block\nwith the reason
+model -> tool : file edit
+tool -> hooks : after it: after_edit.py
+hooks --> tool : dash report or\nformat notice
+tool --> model : results, reasons\nand notices
 
 legend right
   Solid arrow: a read or a call

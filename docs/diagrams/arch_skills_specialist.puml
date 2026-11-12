@@ -19,6 +19,7 @@ package "Documents and audits" {
 package "Changes across files" {
   component "mechanical-changes" as mech
   component "parallel-agents" as parallel
+  component "isolated-work" as isolated
 }
 
 component "systematic-debugging" as debug
@@ -31,17 +32,23 @@ asbuilt --> puml : diagrams
 asbuilt --> preciseui : pictures
 asbuilt --> audit : list for the audit
 archdoc --> spec : build order
+archdoc -- clean : layers
 audit --> implement : fixes
 preciseui --> tests : behavior test
 
 parallel -- mech : split
 mech --> implement : as a task
-parallel --> implement : from step 5
+parallel --> implement : from section 5
+parallel ---> isolated : each writer
+isolated --> implement : works through
+mech -[hidden]down- isolated
 
 clean -- qt : in Qt
 clean --> events : threads
 qt -- events : threads
 events -- debug : freezes
+clean --> spec : plan steps
+clean ---> implement : plan steps
 
 legend right
   Solid arrow: hands work to
