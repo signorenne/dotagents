@@ -15,12 +15,17 @@ Usage in a hook config: python3 "$HOME/.agents/hooks/after_edit.py" --tool <clau
 
 Payload shapes understood: Claude Code and Cursor (Write/Edit with file_path, content,
 new_string), Gemini CLI (write_file/replace with file_path, content, new_string), Codex
-(apply_patch with the patch text in tool_input.command), Copilot (path, file_text,
-new_str), Cursor native afterFileEdit (file_path, edits[].new_string).
+(apply_patch with the patch text in tool_input.command), Copilot (toolArgs as a JSON
+string with path, file_text, new_str), Cursor native afterFileEdit (file_path,
+edits[].new_string).
 
-Problems: exit 2 with the report on stderr, which the agent sees. Unreadable input
-exits 0 so a broken payload never stops normal work. Gemini CLI needs JSON on stdout
-when the hook succeeds; Claude Code receives the reformat notice as additionalContext.
+Problems: exit 2 with the report on stderr, which the agent sees; Copilot shows that
+only to the user, so there the report goes to the model as additionalContext with exit
+0. Unreadable input exits 0 so a broken payload never stops normal work. Gemini CLI
+needs JSON on stdout when the hook succeeds. The reformat notice reaches the agent as
+additionalContext in each agent's documented format: hookSpecificOutput for Claude
+Code and Codex (PostToolUse) and Gemini CLI (AfterTool), a top-level field for Copilot.
+Cursor runs the Claude Code hook command and gets its format.
 """
 
 import argparse
@@ -161,12 +166,15 @@ def run_clang_format(file_path: Path, deadline: float) -> tuple[str, str]:
 
 
 def finish(tool: str, notices: list[str]) -> int:
-    if tool == "claude" and notices:
+    context = "\n".join(notices)
+    if tool in ("claude", "codex") and notices:
         print(json.dumps({"hookSpecificOutput": {
-            "hookEventName": "PostToolUse",
-            "additionalContext": "\n".join(notices)}}))
+            "hookEventName": "PostToolUse", "additionalContext": context}}))
     elif tool == "gemini":
-        print("{}")
+        print(json.dumps({"hookSpecificOutput": {
+            "hookEventName": "AfterTool", "additionalContext": context}}) if notices else "{}")
+    elif tool == "copilot" and notices:
+        print(json.dumps({"additionalContext": context}))
     return 0
 
 
@@ -198,7 +206,10 @@ def main() -> int:
         if error:
             problems.append(error)
 
-    if problems:
+    if problems and tool == "copilot":
+        # Copilot shows a postToolUse exit 2 only to the user; the context reaches the model.
+        notices = ["\n\n".join(problems + notices)]
+    elif problems:
         print("\n\n".join(problems + notices), file=sys.stderr)
         return 2
     return finish(tool, notices)
