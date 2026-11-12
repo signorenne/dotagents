@@ -475,7 +475,12 @@ def main() -> int:
     args = parser.parse_args()
 
     home = Path(os.environ.get("HOME", "~")).expanduser()
-    tools = [t.strip() for t in args.tools.split(",")] if args.tools else detect(home)
+    if args.tools is None:
+        tools = detect(home)
+    else:
+        tools = list(dict.fromkeys(t.strip() for t in args.tools.split(",") if t.strip()))
+        if not tools:
+            parser.error("--tools needs at least one of: " + ",".join(TOOLS))
     unknown = [t for t in tools if t not in TOOLS]
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
@@ -488,7 +493,8 @@ def main() -> int:
     for tool in tools:
         getattr(installer, f"install_{tool}")()
 
-    backups = f" Replaced files saved in {installer.backup_root}" if installer.backups else ""
+    saved = "would be saved" if args.dry_run else "saved"
+    backups = f" Replaced files {saved} in {installer.backup_root}" if installer.backups else ""
     print(f"\n{installer.changes} change(s).{backups}")
     for note in installer.notes:
         print(f"- {note}")
