@@ -386,6 +386,14 @@ class PlanScripts(unittest.TestCase):
         self.assertNotIn("old.md", result.stdout)
         self.assertEqual(self.run_script("plan_state.py", "--excerpt").stdout, "")
 
+    def test_plan_state_never_lists_working_notes_as_untracked(self):
+        (self.repo / ".gitignore").write_text("")
+        self.git("commit", "-q", "-am", "track nothing ignored")
+        (self.repo / "new.txt").write_text("x\n")
+        result = self.run_script("plan_state.py")
+        self.assertIn("Untracked: 1: new.txt", result.stdout)
+        self.assertNotIn(".private", result.stdout.split("Untracked:")[1].splitlines()[0])
+
     def test_outside_a_repository_plan_state_exits_2(self):
         outside = self.root / "plain"
         outside.mkdir()

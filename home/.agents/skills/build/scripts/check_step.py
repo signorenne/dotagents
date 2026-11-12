@@ -116,15 +116,7 @@ def main(argv=None) -> int:
     passed = result.returncode == 0
     count = test_count(output)
     label = "fail-first" if args.expect_fail else "baseline" if args.baseline else "gate" if args.gate else "check"
-    # Untracked files count, except working notes (every .private folder, where this script
-    # writes its output); excluded by pathspec, so a folder that holds only notes is not
-    # listed as untracked either.
-    untracked = []
-    if state:
-        top, found = planfile.git(["rev-parse", "--show-toplevel"], args.cwd)
-        listed, ok = planfile.git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal",
-                                   "--", ".", ":(exclude,glob)**/.private/**"], top if found else args.cwd)
-        untracked = [line[3:] for line in listed.splitlines() if line.startswith("??")] if ok else state["untracked"]
+    untracked = state.get("untracked", []) if state else []  # working notes left out by planfile
     dirty = (state.get("dirty", []) + untracked) if state else []
     commit = f"uncommitted({len(dirty)})" if dirty else (state.get("head") or "-") if state else "-"
     print(f"exit {result.returncode}, {'pass' if passed else 'fail'}, tests {count}, {commit}"

@@ -160,8 +160,9 @@ def commit_of(revision: str, cwd) -> str | None:
 
 
 def head_state(cwd, full: bool = True) -> dict:
-    """Branch, short HEAD, modified tracked files and untracked files of the repository at
-    cwd; {} outside one. Without full, only the branch, for hooks that run on every turn."""
+    """Branch, short HEAD, modified tracked files and untracked files (working notes left out)
+    of the repository at cwd; {} outside one. Without full, only the branch, for hooks that
+    run on every turn."""
     branch, ok = git(["branch", "--show-current"], cwd)
     if not ok:
         return {}
@@ -169,7 +170,9 @@ def head_state(cwd, full: bool = True) -> dict:
         return {"branch": branch, "head": "", "dirty": [], "untracked": []}
     head, _ = git(["rev-parse", "--short", "HEAD"], cwd)
     status, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd)
-    untracked, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal"], cwd)
+    # Every .private folder holds working notes (and this skill's own output): never counted.
+    untracked, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal", "--", ":/",
+                        ":(top,exclude,glob)**/.private/**"], cwd)
     return {"branch": branch, "head": head, "dirty": [line for line in status.splitlines() if line],
             "untracked": [line[3:] for line in untracked.splitlines() if line.startswith("??")]}
 
