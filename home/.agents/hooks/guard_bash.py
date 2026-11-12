@@ -15,8 +15,8 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - hooks disabled through core.hooksPath: git config [--]unset core.hooksPath, git config
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
-  - every git push, git subtree push, gh pr create (or gh pr new) and gh pr merge, in
-    every agent: the maintainer reviews everything before it leaves the machine, so
+  - every git push, git subtree push, gh pr create (or gh pr new), gh pr merge, gh
+    release create and gh repo sync, in every agent: the maintainer reviews everything before it leaves the machine, so
     pushing and publishing are the maintainer's. A push that also rewrites or deletes
     published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
     --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
@@ -100,7 +100,10 @@ PUSH_REASON = "git push publishes commits to a remote"
 SUBTREE_PUSH_REASON = "git subtree push publishes commits to a remote"
 PR_CREATE_REASON = "gh pr create publishes a branch as a pull request"
 PR_MERGE_REASON = "gh pr merge merges into a published branch"
-PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON}
+RELEASE_REASON = "gh release create publishes a release"
+REPO_SYNC_REASON = "gh repo sync pushes to a repository"
+PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON,
+                   RELEASE_REASON, REPO_SYNC_REASON}
 PUBLISH_ADVICE = ("Pushing and publishing are the maintainer's: they review every change before "
                   "it leaves this machine. Do not push or publish another way; stop and tell the "
                   "user the work is ready for their review.")
@@ -553,6 +556,10 @@ def gh_reasons(words: list) -> list:
             operands.append(word)
     if operands[:2] in (["pr", "create"], ["pr", "new"]):
         return [PR_CREATE_REASON]
+    if operands[:2] == ["release", "create"]:
+        return [RELEASE_REASON]
+    if operands[:2] == ["repo", "sync"]:
+        return [REPO_SYNC_REASON]
     if operands[:2] != ["pr", "merge"]:
         return []
     reasons = [PR_MERGE_REASON]
