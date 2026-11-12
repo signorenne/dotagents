@@ -1,0 +1,95 @@
+#+TITLE: dotagents roadmap
+#+SUBTITLE: what works today, what is open, and the rules proposed
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the state of the work: what works today, what is open, and the
+rules proposed but not yet accepted. [[file:../DESIGN.org][DESIGN.org]] owns the design and the
+rules that bind; [[file:../CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflow.
+
+* How status is kept
+
+- =[ ]= open, =[-]= in progress, =[X]= done. A done item names the commit or
+  the test that proves it when that is not obvious.
+- Status is updated in the same commit as the change that moves it. No other
+  doc carries status.
+- An item dropped from the plan stays where it was with "(dropped: reason)"
+  and is never deleted.
+- A proposed rule waits under [[*Proposed rules][Proposed rules]] until the maintainer decides:
+  accepted, it moves to DESIGN.org under Rules that bind; rejected, it stays
+  here marked "(rejected: reason)".
+- "Untested" means nobody has run the case; "unverified" means the claim comes
+  from a source not yet checked against a primary one.
+
+* Status
+
+As of 12 November 2026:
+
+- [X] One source in =home/.agents=, installed as =~/.agents=, with the global
+  rules, the local skills, the claude.ai set, three subagents and three hooks.
+- [X] The installer for Claude Code, Codex, Gemini CLI, Copilot CLI and
+  Cursor, with backups, a dry run, an audit and idempotent reruns.
+- [X] Claude Code tested end to end. The other tools' files follow their
+  official documentation, and =tests/test_install.py= checks each generated
+  hook file against it (events, matchers, tool names, timeouts).
+- [X] CI runs validate, tests and build on Ubuntu (Python 3.9, and 3.12 with
+  Pillow) and on macOS (Python 3.12).
+- [X] claude.ai: the global rules are pasted and the skill zips uploaded by
+  hand, from =dist/claude-ai/=.
+
+* Open
+
+** Hooks and the guard
+
+- [ ] Cursor's shell tool may be named =Shell= rather than =Bash=, so the
+  guard's =Bash= matcher may not fire there. Untested.
+- [ ] An empty hook reply may block in Cursor. Untested.
+- [ ] The guard does not inspect =git subtree push= or =gh pr create=.
+- [ ] The field names inside Copilot's =toolArgs= for edits are undocumented;
+  =after_edit.py= reads =path=, =file_text= and =new_str=, as its tests do.
+- [ ] Hook time budgets assume each tool's default timeouts: the session
+  refresh keeps its git calls under 8 s and the after-edit hook bounds
+  clang-format under 60 s. Untested outside Claude Code.
+
+** Tools and platforms
+
+- [ ] A fetched page claims Gemini CLI was replaced by Antigravity CLI in June
+  2026. Unverified; check a primary source before changing the Gemini CLI
+  install.
+- [ ] Codex's default sandbox blocks =git commit=, so =implement= asks for
+  approval there or leaves the step uncommitted and logged.
+- [ ] The installer ignores =COPILOT_HOME= and always writes to =~/.copilot=.
+- [ ] Test whether claude.ai still caps skill descriptions at 200 characters;
+  =tools/validate.py= enforces that limit for the claude.ai set and the
+  overrides.
+- [ ] Check whether =/review= in Claude Code runs this repository's =review=
+  skill or Claude Code's built-in one.
+- [ ] The subagent copies the installer writes for Codex, Gemini CLI and
+  Copilot drop the =model= field, so =scout= and =gate-runner= run on the
+  session's model there; only Claude Code honours the cheaper models.
+- [ ] Only Claude Code has a session start hook, so the reminder after
+  compaction (=session_refresh.py=) reaches no other tool; =docs/workflow.org=
+  and =README.org= do not say so.
+- [ ] =adapters/claude/settings.json= turns off the synced plugin
+  =engineering@synced=; no doc explains why.
+- [ ] Both hooks accept =--tool cursor= and =after_edit.py= reads Cursor's
+  own edit payload, but no installed configuration uses them: Cursor runs
+  the Claude Code commands with =--tool claude=.
+- [ ] Gemini CLI may load =AGENTS.md= twice on a machine set up by the
+  installer: once through =context.fileName= and once through the
+  =@AGENTS.md= import in =GEMINI.md=.
+
+** Skills
+
+- [ ] First real runs of the new =as-built-docs= on ATC and ASM.
+- [ ] First real run of =code-audit=.
+
+* Proposed rules
+
+- [ ] One source of truth in =~/.agents=, generated copies per tool.
+  Instructions, skills, subagents and hooks have one source (=home/.agents=,
+  installed as =~/.agents=); =install.py= links or generates each tool's files
+  from it, and nothing is edited in a tool's own folder. Why: five agents read
+  different file names and formats, and hand-kept copies drift. Proposed by an
+  agent; revisit if the tools converge on one standard location for
+  instructions, skills and subagents.

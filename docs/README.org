@@ -1,0 +1,67 @@
+#+TITLE: dotagents docs map
+#+SUBTITLE: role-based entry points and documentation ownership
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the docs map: which doc to load for each role, and the registry
+of every doc with its purpose. Each doc owns one job and opens by saying what
+it owns; [[file:../CONTRIBUTING.org][CONTRIBUTING.org]] owns the docs format. If a fact lives in two
+docs, one of them is stale: keep the rule in its owner and link to it.
+
+* Role to doc matrix
+
+An =x= means "load this when working in that role". Load top to bottom, then
+open a skill's own =SKILL.md= only when the task touches it.
+
+| Doc                      | maintainer | skill author | reviewer | new reader |
+|--------------------------+------------+--------------+----------+------------|
+| [[file:../README.org][README.org]]               |            |              |          | x          |
+| [[file:../VISION.org][VISION.org]]               | x          | x            |          | x          |
+| [[file:../DESIGN.org][DESIGN.org]]               | x          | x            | x        | x          |
+| [[file:../AGENTS.md][AGENTS.md]]                | x          | x            | x        |            |
+| [[file:../CONTRIBUTING.org][CONTRIBUTING.org]]         | x          | x            | x        |            |
+| [[file:../AI_DISCLAIMER.org][AI_DISCLAIMER.org]]        | x          | x            | x        |            |
+| [[file:README.org][docs/README.org]]          | x          | x            | x        | x          |
+| [[file:glossary.org][docs/glossary.org]]        | x          | x            | x        | x          |
+| [[file:architecture.org][docs/architecture.org]]    | x          | x            | x        | x          |
+| [[file:workflow.org][docs/workflow.org]]        | x          | x            |          | x          |
+| [[file:skill-authoring.org][docs/skill-authoring.org]] | x          | x            | x        |            |
+| [[file:roadmap.org][docs/roadmap.org]]         | x          | x            |          |            |
+| [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | x          | x            | x        |            |
+| [[file:../claude-ai/README.md][claude-ai/README.md]]      | x          | x            |          |            |
+
+Role names:
+
+- /maintainer/ changes the installer, the hooks, the tools, the tests and the
+  rules.
+- /skill author/ writes or changes a skill, a subagent or the claude.ai set.
+- /reviewer/ checks a finished change against the rules and the review
+  checklist.
+- /new reader/ learns what the setup does, how to install it and how to use
+  it.
+
+* Registry
+
+Every doc and its purpose. A new doc is registered here in the commit that
+adds it.
+
+| Doc                      | Purpose                                                                                       |
+|--------------------------+-----------------------------------------------------------------------------------------------|
+| [[file:../README.org][README.org]]               | Project overview, docs list, install and update, layout, the skills                           |
+| [[file:../VISION.org][VISION.org]]               | The problem, the mission, core concepts, principles, non-goals                                |
+| [[file:../DESIGN.org][DESIGN.org]]               | Public surface, composition, install model, hooks' failure model, naming, the rules that bind |
+| [[file:../AGENTS.md][AGENTS.md]]                | Working-memory floor for agents changing this repository: where changes go, gates, checklist  |
+| [[file:../CLAUDE.md][CLAUDE.md]]                | Claude Code bridge that imports =AGENTS.md=                                                   |
+| [[file:../GEMINI.md][GEMINI.md]]                | Gemini CLI bridge that imports =AGENTS.md=                                                    |
+| [[file:../.github/copilot-instructions.md][copilot-instructions.md]]  | GitHub Copilot bridge to =AGENTS.md=                                                          |
+| [[file:../CONTRIBUTING.org][CONTRIBUTING.org]]         | Workflow, where each change goes, local gates, CI, commit messages, docs format               |
+| [[file:../AI_DISCLAIMER.org][AI_DISCLAIMER.org]]        | Accountability for AI-assisted work                                                           |
+| [[file:README.org][docs/README.org]]          | This map: role matrix and registry                                                            |
+| [[file:glossary.org][docs/glossary.org]]        | The repository's terms, one sentence each                                                     |
+| [[file:architecture.org][docs/architecture.org]]    | System structure, the install flow, a session's runtime view, the skill map and the hooks     |
+| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org=                                   |
+| [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene     |
+| [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                      |
+| [[file:roadmap.org][docs/roadmap.org]]         | Status, what is open, and the rules proposed but not yet accepted                             |
+| [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                               |
+| [[file:../claude-ai/README.md][claude-ai/README.md]]      | The claude.ai skill set: upload and update                                                    |

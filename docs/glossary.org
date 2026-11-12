@@ -1,0 +1,62 @@
+#+TITLE: dotagents glossary
+#+SUBTITLE: the terms the docs, skills and commits use
+#+OPTIONS: toc:nil num:nil ^:nil
+#+STARTUP: showall
+
+This file owns the canonical terms of dotagents. Use them every time; do not
+coin a synonym in a local doc when this file already names the concept.
+[[file:README.org][docs/README.org]] maps the docs that use them.
+
+* Setup terms
+
+| Term            | Definition                                                                                                                                                  |
+|-----------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| global rules    | The working instructions in =home/.agents/AGENTS.md= that every agent and claude.ai read at the start of every session.                                     |
+| skill           | A folder with a =SKILL.md= (name, description, license and instructions) that an agent loads when a request matches its description or the user names it.   |
+| local skill     | A skill under =home/.agents/skills/=, installed for every local agent and uploaded to claude.ai only through an override.                                   |
+| claude.ai set   | The skills under =claude-ai/skills/=, uploaded to claude.ai as zips and installed locally for every agent too.                                              |
+| override        | An entry in =claude-ai/overrides.json= that uploads a local skill to claude.ai with a description of at most 200 characters, instead of a copy.             |
+| synced copy     | The copy of an uploaded skill that claude.ai syncs into Claude Code as =anthropic-skills:<name>=, turned off by the installer.                              |
+| skillOverrides  | The setting in =~/.claude/settings.json= where the installer turns each synced copy off; a value set by hand wins.                                          |
+| subagent        | An agent with a fresh context, one narrow job and its own tool list, written in Claude Code format under =home/.agents/agents/= and generated for the rest. |
+| scout           | The read-only subagent that maps code and docs and returns a compact cited brief instead of file contents.                                                  |
+| gate-runner     | The subagent that runs build, test, lint and docs gates and returns only the verdict and the first actionable errors.                                       |
+| reviewer        | The subagent that reviews a finished change in a fresh context against the project's rules and returns findings ranked by severity.                         |
+| hook            | A script a tool runs on its own at an event (before a shell command, after an edit, at session start), outside the model.                                   |
+| guard           | =guard_bash.py=, the hook that blocks git gate bypasses, history rewrites and deletions, and every push outside Claude Code.                                |
+| after-edit hook | =after_edit.py=, the hook that flags em and en dashes in text just written and runs clang-format on C and C++ files.                                        |
+| session refresh | =session_refresh.py=, the Claude Code hook that prints the real branch, changes and last commits after a compaction or a resume.                            |
+| adapter         | A settings fragment for one tool that the installer merges into that tool's settings; today =adapters/claude/settings.json=.                                |
+| bridge          | A tool-specific Markdown file (=CLAUDE.md=, =GEMINI.md=, =.github/copilot-instructions.md=) that points to =AGENTS.md= and holds no rule of its own.        |
+| install         | A run of =python3 install.py=: it copies the source to =~/.agents=, links or generates each detected tool's files, and is safe to repeat.                   |
+| dry run         | =install.py --dry-run=, which prints every change an install would make and changes nothing.                                                                |
+| audit           | =install.py --audit=, which lists what in the agents' folders does not come from this repository, and broken links, and changes nothing.                    |
+| backup          | The folder =~/.agents-backup/<timestamp>/= where an install moves every file it replaces.                                                                   |
+| build           | =python3 tools/build.py=, which writes the claude.ai zips and the project kit into =dist/=.                                                                 |
+| project kit     | =dist/project-kit.zip=, the project-setup templates for setting up a repository by hand.                                                                    |
+| gate            | A check that must pass before a commit: here =tools/validate.py=, the unittest suites and =tools/build.py=; in a project, its documented commands.          |
+| rule that binds | An accepted decision kept in DESIGN.org under Rules that bind, which every later change follows until the maintainer changes it.                            |
+| proposed rule   | A rule an agent or the maintainer has suggested but the maintainer has not accepted; it waits in =docs/roadmap.org= and binds nobody.                       |
+
+* Workflow terms
+
+| Term                   | Definition                                                                                                                                                 |
+|------------------------+------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| maieutic method        | The Socratic way of working in both directions: the user questions the agent, and the agent settles the user's choices one question at a time.             |
+| refute before you rely | The core method: each claim the work depends on is a hypothesis to break with the cheapest check that could fail before anything is built on it.           |
+| refuted assumption     | A claim a check proved wrong, recorded with the check and what it changed in the progress log and the handoff.                                             |
+| decision               | A choice that belongs to the user (scope, public API, architecture, rules, trade-offs), reached with decide and recorded only after explicit confirmation. |
+| agent decision         | A routine engineering choice the agent takes inside an approved plan, logged with its reason and pending until the user keeps or changes it.               |
+| spec                   | A self-contained implementation plan from the spec skill, by default in =.private/specs/<slug>=, that a fresh session can implement.                       |
+| progress log           | The record implement keeps in =.private/progress/<slug>=: each step with its commit and check, each decision with who took it, each refuted assumption.    |
+| handoff                | The brief session-close writes to =.private/handoff/<date>-<slug>= so a fresh session resumes from facts instead of memory.                                |
+| working notes          | The git-ignored =.private/= folder of each repository, holding specs, progress logs, handoffs, audit reports and as-built notes.                           |
+| fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between unrelated tasks and between spec and implement.       |
+| compaction             | The agent's summary of its own conversation when the context fills; after one, the session refresh warns that its memory of the code may be stale.         |
+| narrow gate            | One module's tests, one test case or one file, run while iterating.                                                                                        |
+| full gates             | The project's documented pre-PR gates, run before a change is called done.                                                                                 |
+| worktree               | A separate git working tree of the same repository on its own branch, which parallel-agents gives each agent so their edits do not collide.                |
+| project layer          | The files each repository needs once (=AGENTS.md=, a decision log, an agent workflows doc, =.private/= in =.gitignore=), set up by project-setup.          |
+| as-built docs          | Docs of an existing repository written from its code by as-built-docs: a knowledge base, a test guide and a developer guide, synced when the code changes. |
+| audit report           | The local report code-audit writes in =.private/audit/=, with confirmed findings and questions for the user.                                               |
+| palette                | =palette.iuml= of the plantuml-diagrams skill: the nexenne day and night colours every diagram includes.                                                   |
