@@ -69,6 +69,6 @@ A minor finding this change caused may instead stay unfixed, with its reason. Ne
 
 ## 10. Report
 
-Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions, Verify before use), plus the commit list, the final commit's hash with its gate results, and the path of the progress log. List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place, and the review findings not fixed, each with its disposition. Never push.
+Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions, Verify before use, How to check it), plus the commit list, the final commit's hash with its gate results, and the path of the progress log. How to check it is a recipe for the user: for each acceptance criterion (each success criterion without a spec), the command or the steps and the visible result to expect, marking each check that needs a human look (a screen, a rendered document, a sound). List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place, and the review findings not fixed, each with its disposition. Never push.
 
 After two failed attempts at the same problem, use the systematic-debugging skill if it is available.

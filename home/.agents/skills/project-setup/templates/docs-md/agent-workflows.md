@@ -99,6 +99,7 @@ Commands still needed:
 Risks:
 Refuted assumptions (assumed, check that broke it, what changed):
 Verify before use (files and symbols the next session depends on):
+How to check it (per acceptance criterion: command or steps, expected visible result; mark what needs a human look):
 ```
 
 A handoff that must outlive the session goes to

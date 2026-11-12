@@ -128,9 +128,11 @@ add the skill, the subagents and where a fresh session starts.
   per-agent logs of parallel work too) and brings this session's up to date
   from git and the commands that ran.
 - /Produces/ : the handoff (goal, files touched, decisions, open questions,
-  commands run, commands still needed, risks, refuted assumptions), a draft
-  rule change for each lesson, and the list of decisions waiting for the
-  maintainer.
+  commands run, commands still needed, risks, refuted assumptions, and how
+  to check it: for each acceptance criterion, the command or the steps and
+  the visible result to expect, with each check that needs a human look
+  marked), a draft rule change for each lesson, and the list of decisions
+  waiting for the maintainer.
 - /Lives in/ : =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>=, git-ignored.
 - /Next/ : the reply names the handoff and the single next action for a fresh
   session.
@@ -140,7 +142,8 @@ add the skill, the subagents and where a fresh session starts.
 - /Who/ : the maintainer.
 - /Reads/ : the branch (=git log= and =git diff= from its base commit), the
   gate results with the commit they ran on, the reviewer's findings, the
-  progress log and the handoff.
+  progress log and the handoff, whose "How to check it" says how to try each
+  acceptance criterion.
 - /Decides/ : keeps or changes each agent decision (below), accepts or rejects
   each Proposed decision and each rule draft, and then gives the go to land,
   asks for changes, or drops the work.
