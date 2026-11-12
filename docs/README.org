@@ -25,6 +25,7 @@ open a skill's own =SKILL.md= only when the task touches it.
 | [[file:glossary.org][docs/glossary.org]]        | x          | x            | x        | x          |
 | [[file:architecture.org][docs/architecture.org]]    | x          | x            | x        | x          |
 | [[file:workflow.org][docs/workflow.org]]        | x          | x            |          | x          |
+| [[file:pipeline.org][docs/pipeline.org]]        | x          | x            | x        | x          |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | x          | x            | x        |            |
 | [[file:roadmap.org][docs/roadmap.org]]         | x          | x            |          |            |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | x          | x            | x        |            |
@@ -59,8 +60,9 @@ adds it.
 | [[file:README.org][docs/README.org]]          | This map: role matrix and registry                                                            |
 | [[file:glossary.org][docs/glossary.org]]        | The repository's terms, one sentence each                                                     |
 | [[file:architecture.org][docs/architecture.org]]    | System structure, the install flow, a session's runtime view, the skill map and the hooks     |
-| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org=                                   |
+| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org= and =docs/pipeline.org=           |
 | [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene     |
+| [[file:pipeline.org][docs/pipeline.org]]        | From idea to merge: the stages, their artifacts, landing and pushing, failures, isolation     |
 | [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                      |
 | [[file:roadmap.org][docs/roadmap.org]]         | Status, what is open, and the rules proposed but not yet accepted                             |
 | [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                               |
