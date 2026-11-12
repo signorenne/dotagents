@@ -6,10 +6,14 @@
 Usage: python3 tools/validate.py     (exit code 1 when anything fails)
 
 Checks:
+- every folder in a skills root holds a SKILL.md, and no skill name is in both roots;
 - skills follow the Agent Skills format: name, description and license fields only,
-  name in lowercase kebab case and equal to the folder name, description within the
-  limit (1024 characters locally, 200 for the claude.ai set), a LICENSE.txt next to it,
-  no inline backticks outside fenced blocks;
+  name in lowercase kebab case, equal to the folder name, without the reserved words
+  anthropic and claude and not synced, description within the limit (1024 characters
+  locally, 200 for the claude.ai set) and without angle brackets, a LICENSE.txt next to
+  it, no inline backticks outside fenced blocks;
+- each override in claude-ai/overrides.json names a local skill and has a description
+  of 1 to 200 characters without angle brackets;
 - subagents carry name, description, tools and model, the name matches the file, and
   the body has no ''' (the Codex copy holds it in a TOML literal string);
 - no em dash or en dash in any text file;
@@ -31,6 +35,10 @@ TEMPLATES = HOME / "skills" / "project-setup" / "templates"
 TEXT_SUFFIXES = {".md", ".txt", ".py", ".json", ".yml", ".yaml", ".org", ".template", ".toml", ""}
 SKIP_DIRS = {".git", "dist", "__pycache__"}
 NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
+# Words Anthropic reserves in skill names, and names Claude Code uses for its own folders.
+RESERVED_WORDS = ("anthropic", "claude")
+RESERVED_NAMES = {"synced", "anthropic-skills"}
+CLAUDE_AI_LIMIT = 200
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
 DASHES = ("\u2014", "\u2013")
@@ -58,9 +66,21 @@ def inline_backticks(body: str) -> bool:
     return "`" in without_fences
 
 
+def skill_folders(root: Path) -> list:
+    """Every folder in a skills root; stray files such as .DS_Store are not skills."""
+    return sorted(p for p in root.iterdir() if p.is_dir() and p.name not in SKIP_DIRS)
+
+
+def angle_brackets(text: str) -> bool:
+    return "<" in text or ">" in text
+
+
 def check_skill(folder: Path, limit: int, errors: list[str]) -> None:
     skill = folder / "SKILL.md"
     rel = skill.relative_to(ROOT)
+    if not skill.is_file():
+        errors.append(f"{folder.relative_to(ROOT)}: SKILL.md missing")
+        return
     try:
         fields, body = frontmatter(skill)
     except (ValueError, json.JSONDecodeError) as error:
@@ -72,11 +92,15 @@ def check_skill(folder: Path, limit: int, errors: list[str]) -> None:
     name = fields.get("name", "")
     if not NAME.match(name) or len(name) > 64:
         errors.append(f"{rel}: invalid name {name!r}")
+    elif name in RESERVED_NAMES or any(word in name for word in RESERVED_WORDS):
+        errors.append(f"{rel}: reserved name {name!r}")
     if name != folder.name:
         errors.append(f"{rel}: name {name!r} differs from folder {folder.name!r}")
     description = fields.get("description", "")
     if not description or len(description) > limit:
         errors.append(f"{rel}: description length {len(description)} (limit {limit})")
+    if angle_brackets(description):
+        errors.append(f"{rel}: angle brackets in the description")
     if not (folder / "LICENSE.txt").is_file():
         errors.append(f"{rel}: LICENSE.txt missing")
     if inline_backticks(body):
@@ -99,6 +123,33 @@ def check_agent(path: Path, errors: list[str]) -> None:
         errors.append(f"{rel}: body contains ''', which ends the TOML literal string of the Codex copy")
 
 
+def check_overrides(errors: list[str]) -> None:
+    rel = OVERRIDES.relative_to(ROOT)
+    if not OVERRIDES.is_file():
+        return
+    try:
+        overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))
+    except ValueError as error:
+        errors.append(f"{rel}: {error}")
+        return
+    skills = overrides.get("skills") if isinstance(overrides, dict) else None
+    if not isinstance(skills, dict):
+        errors.append(f"{rel}: no skills object")
+        return
+    for name, override in skills.items():
+        if not (HOME / "skills" / name / "SKILL.md").is_file():
+            errors.append(f"{rel}: unknown skill {name!r}")
+        if (ONLINE / name).exists():
+            errors.append(f"claude-ai/skills/{name}: also listed in overrides.json")
+        description = override.get("description") if isinstance(override, dict) else None
+        if not isinstance(description, str) or not description.strip() \
+                or len(description) > CLAUDE_AI_LIMIT:
+            errors.append(f"{rel}: {name}: description must be a string of 1 to "
+                          f"{CLAUDE_AI_LIMIT} characters")
+        elif angle_brackets(description):
+            errors.append(f"{rel}: {name}: description has angle brackets")
+
+
 def text_files():
     for path in sorted(ROOT.rglob("*")):
         if path.is_file() and not SKIP_DIRS & set(path.relative_to(ROOT).parts):
@@ -109,19 +160,14 @@ def text_files():
 def main() -> int:
     errors: list[str] = []
 
-    for folder in sorted((HOME / "skills").iterdir()):
+    local, online = skill_folders(HOME / "skills"), skill_folders(ONLINE)
+    for folder in local:
         check_skill(folder, 1024, errors)
-    for folder in sorted(ONLINE.iterdir()):
-        check_skill(folder, 200, errors)
-    overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))["skills"]
-    for name, override in overrides.items():
-        if not (HOME / "skills" / name / "SKILL.md").is_file():
-            errors.append(f"claude-ai/overrides.json: unknown skill {name!r}")
-        if len(override.get("description", "")) > 200:
-            errors.append(f"claude-ai/overrides.json: {name} description over 200 characters")
-    for name in overrides:
-        if (ONLINE / name).exists():
-            errors.append(f"claude-ai/skills/{name}: also listed in overrides.json")
+    for folder in online:
+        check_skill(folder, CLAUDE_AI_LIMIT, errors)
+    for name in sorted({p.name for p in local} & {p.name for p in online}):
+        errors.append(f"{name}: skill in both home/.agents/skills and claude-ai/skills")
+    check_overrides(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)
