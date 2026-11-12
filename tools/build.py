@@ -63,11 +63,18 @@ def build_skill_zip(folder: Path, out: Path, description: str | None = None) -> 
 
 
 def main() -> int:
+    overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))["skills"]
+    for name, override in sorted(overrides.items()):
+        description = override.get("description") if isinstance(override, dict) else None
+        if not isinstance(description, str) or not description.strip():
+            print(f"claude-ai/overrides.json: {name} has no claude.ai description; "
+                  "python3 tools/validate.py lists every problem", file=sys.stderr)
+            return 1
+
     if DIST.exists():
         shutil.rmtree(DIST)
     (DIST / "claude-ai").mkdir(parents=True)
 
-    overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))["skills"]
     built = []
     for folder in sorted(p for p in ONLINE.iterdir() if (p / "SKILL.md").is_file()):
         out = DIST / "claude-ai" / f"{folder.name}.zip"
