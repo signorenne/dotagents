@@ -286,6 +286,21 @@ class GuardBash(unittest.TestCase):
             "cat <<X\nsee `git push -f`\nX",
         ])
 
+    def test_arithmetic_shift_is_not_a_heredoc(self):
+        self.assert_blocked([
+            'echo "$((1<<2))"\ngit push -f origin main',
+            "(( x = 1 << 2 ))\ngit commit --no-verify -m x",
+            "for ((i = 0; i < 1 << 2; i++)); do git push -f; done",
+            "echo $[1<<2]\ngit push -f",
+            "echo $(( $(git push -f) + 1 ))",
+        ])
+        self.assert_allowed([
+            "echo $((1 + (2 * 3)))",
+            "x=$(( (1 + 2) * 3 )); echo $x",
+            "( (cd a && ls) )",
+            "echo $( (cd a && ls) )",
+        ])
+
     def test_payload_shapes_of_each_agent(self):
         bad = "git push --force"
         shapes = {
