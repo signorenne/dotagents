@@ -1,0 +1,93 @@
+#+TITLE: dotagents vision
+#+SUBTITLE: why the setup exists and what it optimizes for
+#+OPTIONS: toc:2 num:nil ^:nil
+#+STARTUP: showall
+
+This file owns dotagents' direction: the problem, the mission, the core
+concepts, the principles and the non-goals. [[file:DESIGN.org][DESIGN.org]] owns how the pieces
+compose and install, and the rules that bind every change.
+[[file:docs/README.org][docs/README.org]] maps the rest of the docs.
+
+* The problem
+
+Every coding agent is configured on its own. Claude Code reads
+=~/.claude/CLAUDE.md=, Codex =~/.codex/AGENTS.md=, Gemini CLI
+=~/.gemini/GEMINI.md=, Copilot CLI =~/.copilot/copilot-instructions.md=, and
+Cursor keeps its rules in a settings field; claude.ai has its own instructions
+box and its own skill upload. Subagents and hooks take a different file name
+and format in each tool.
+
+Kept by hand, these copies drift. A rule fixed in one tool stays wrong in
+another, a skill edited on claude.ai differs from the one a local agent loads,
+and a hook that blocks a gate bypass in one tool is missing in the next. The
+agent's behavior then depends on which tool happens to be open, and nobody can
+tell which version of a rule a session followed.
+
+* The mission
+
+dotagents is one source of truth for every agent and for claude.ai. The global
+rules, the skills, the subagents and the hooks live once in this repository,
+and an installer turns them into each tool's files. The same rules hold in
+every chat and every repository, and a change is made, validated and tested
+once before it reaches any tool.
+
+* Core concepts
+
+- /Global rules/ : the working instructions every agent and every chat reads,
+  in =home/.agents/AGENTS.md=, installed as =~/.agents/AGENTS.md= and pasted
+  into claude.ai.
+- /Skill/ : a folder with a =SKILL.md= that an agent loads when a request
+  matches its description: a workflow (=spec=, =implement=, =review=) or a body
+  of knowledge (=qt-quick=). Local skills live in =home/.agents/skills/=.
+- /Subagent/ : an agent with a fresh context and one narrow job (=scout=,
+  =gate-runner=, =reviewer=), written in Claude Code format in
+  =home/.agents/agents/= and generated for every other tool.
+- /Hook/ : a script the tool runs around a tool call, outside the model: the
+  guard before a shell command, the after-edit check after a file edit, the
+  session refresh after a compaction.
+- /Installer/ : =install.py=, which copies the source to =~/.agents=, links or
+  generates each tool's files from it, and backs up whatever it replaces.
+- /claude.ai set/ : the skills under =claude-ai/skills/= that also run in chat,
+  built into zips for upload and installed locally for every agent too.
+
+* Principles
+
+1. Refute before you rely. Every claim a piece of work depends on is a
+   hypothesis to break with the cheapest check that could fail; rereading is
+   not a check. The global rules, the workflow skills and the reviewer all
+   apply it.
+2. Concise and complete skills. A skill holds every step and rule a model would
+   otherwise get wrong, each stated once, and nothing a capable model already
+   knows.
+3. One owner per rule. Each rule lives in one file and everything else links
+   to it: the global rules for how agents work, [[file:AGENTS.md][AGENTS.md]] for how this
+   repository changes, [[file:DESIGN.org][DESIGN.org]] for the rules that bind. A second copy
+   goes stale.
+4. The user owns decisions. Scope, public API, architecture, rules and
+   trade-offs are settled with the user, one question at a time; routine
+   engineering inside an approved plan is the agent's, and it is recorded.
+5. Every agent gets the same rules. One tool's files differ from another's in
+   format only, or where a tool lacks a feature, and then the difference is
+   stated: an agent outside Claude Code cannot push, because nothing there
+   asks the user first.
+6. Verified, not assumed. Nothing is called working, passing or done before a
+   check ran. =tests/test_install.py= checks each generated hook file against
+   the tool's documentation, and a behavior change to a skill is tested in a
+   real session, or the commit says it was not.
+
+* Non-goals
+
+- A security boundary. The guard blocks the usual forms of a gate bypass or a
+  history rewrite; commands passed as one string, =eval=, aliases and scripts
+  are not inspected.
+- Removing what the repository no longer has. The installer adds and replaces,
+  and moves what it replaces to a backup; a skill, subagent, hook script or
+  settings entry dropped from the repository stays installed, and =--audit=
+  lists it for the maintainer.
+- Holding a project's own rules. Each repository keeps its own =AGENTS.md=,
+  decision log and agent workflows, created by =project-setup=; the global
+  layer tells agents how to work, not what a project decided.
+- A rule set per tool. No rule is written for one tool unless that tool lacks
+  what the rule needs.
+- Deciding for the user. Agents propose and recommend; they never accept a rule
+  or a decision on the user's behalf.
