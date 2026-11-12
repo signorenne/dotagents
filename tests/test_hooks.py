@@ -287,6 +287,18 @@ class GuardBash(unittest.TestCase):
             with self.subTest(tool=tool):
                 self.assertEqual(run("guard_bash.py", payload, tool).returncode, 2)
 
+    def test_copilot_deny_reason_reaches_the_agent(self):
+        # Copilot CLI shows stderr of a denying hook only to the user; the agent sees
+        # permissionDecisionReason (docs.github.com/en/copilot/reference/hooks-reference).
+        payload = {"toolName": "bash", "toolArgs": json.dumps({"command": "git push --force"})}
+        result = run("guard_bash.py", payload, "copilot")
+        self.assertEqual(result.returncode, 2)
+        output = json.loads(result.stdout)
+        self.assertEqual(output["permissionDecision"], "deny")
+        self.assertIn("force push", output["permissionDecisionReason"])
+        allowed = run("guard_bash.py", {"toolName": "bash", "toolArgs": json.dumps({"command": "ls"})}, "copilot")
+        self.assertEqual((allowed.returncode, allowed.stdout), (0, ""))
+
     def test_gemini_needs_json_on_success(self):
         result = run("guard_bash.py", bash("ls"), "gemini")
         self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
