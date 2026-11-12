@@ -17,7 +17,9 @@ ROOT = Path(__file__).resolve().parent.parent
 class Tools(unittest.TestCase):
     def setUp(self):
         self.repo = Path(tempfile.mkdtemp()) / "repo"
-        shutil.copytree(ROOT, self.repo, ignore=shutil.ignore_patterns(".git", "dist", "__pycache__"))
+        # Local state stays out: .private notes and .claude (settings, agent worktrees).
+        shutil.copytree(ROOT, self.repo, ignore=shutil.ignore_patterns(
+            ".git", "dist", "__pycache__", ".private", ".claude"))
         self.addCleanup(shutil.rmtree, self.repo.parent)
 
     def run_tool(self, name: str) -> subprocess.CompletedProcess:
@@ -90,6 +92,34 @@ class Tools(unittest.TestCase):
         for name in ("tagged", "compared"):
             self.assertIn(f"home/.agents/skills/{name}/SKILL.md: angle brackets in the description", out)
         self.assertNotIn("ok-skill", out)
+
+    def test_validate_scans_files_of_any_suffix_for_dashes(self):
+        palette = self.repo / "home/.agents/skills/plantuml-diagrams/palette.iuml"
+        palette.write_text(palette.read_text() + "' a note \u2014 here\n")
+        private = self.repo / ".private/notes.md"
+        private.parent.mkdir()
+        private.write_text("a scratch note \u2014 here\n")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("palette.iuml", result.stdout)
+        self.assertNotIn(".private", result.stdout)
+
+    @unittest.skipIf(shutil.which("git") is None, "git is not installed")
+    def test_validate_scans_the_files_git_tracks_or_would_track(self):
+        git = ["git", "-c", "init.defaultBranch=main"]
+        subprocess.run(git + ["init", "-q"], cwd=self.repo, check=True)
+        subprocess.run(git + ["add", "-A"], cwd=self.repo, check=True)
+        palette = self.repo / "home/.agents/skills/plantuml-diagrams/palette.iuml"
+        palette.write_text(palette.read_text() + "' a note \u2014 here\n")
+        (self.repo / "docs/new-note.txt").write_text("not added yet \u2013 here\n")
+        for ignored in (".private/notes.md", "dist/notes.md"):
+            (self.repo / ignored).parent.mkdir(exist_ok=True)
+            (self.repo / ignored).write_text("ignored \u2014 here\n")
+        out = self.run_tool("validate.py").stdout
+        self.assertIn("FAIL home/.agents/skills/plantuml-diagrams/palette.iuml:", out)
+        self.assertIn("FAIL docs/new-note.txt:1: em or en dash", out)
+        self.assertNotIn(".private", out)
+        self.assertNotIn("dist/", out)
 
     def test_validate_catches_broken_skills_and_dashes(self):
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"

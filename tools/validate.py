@@ -16,14 +16,17 @@ Checks:
   of 1 to 200 characters without angle brackets;
 - subagents carry name, description, tools and model, the name matches the file, and
   the body has no ''' (the Codex copy holds it in a TOML literal string);
-- no em dash or en dash in any text file;
+- no em dash or en dash in any text file git tracks or would track (every file
+  outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
 - the global instructions stay under 200 lines;
 - every Python file compiles.
 """
 
 import json
+import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -32,8 +35,7 @@ HOME = ROOT / "home" / ".agents"
 ONLINE = ROOT / "claude-ai" / "skills"
 OVERRIDES = ROOT / "claude-ai" / "overrides.json"
 TEMPLATES = HOME / "skills" / "project-setup" / "templates"
-TEXT_SUFFIXES = {".md", ".txt", ".py", ".json", ".yml", ".yaml", ".org", ".template", ".toml", ""}
-SKIP_DIRS = {".git", "dist", "__pycache__"}
+SKIP_DIRS = {".git", "dist", "__pycache__", ".private"}
 NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 # Words Anthropic reserves in skill names, and names Claude Code uses for its own folders.
 RESERVED_WORDS = ("anthropic", "claude")
@@ -150,11 +152,38 @@ def check_overrides(errors: list[str]) -> None:
             errors.append(f"{rel}: {name}: description has angle brackets")
 
 
+def git_files():
+    """Files git tracks or would track (untracked, not ignored); None without git."""
+    try:
+        top = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=ROOT,
+                             capture_output=True, text=True, check=True).stdout.strip()
+        if Path(top).resolve() != ROOT.resolve():  # ROOT is a plain folder inside another repository
+            return None
+        listed = subprocess.run(["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+                                cwd=ROOT, capture_output=True, check=True).stdout
+    except (OSError, subprocess.CalledProcessError):
+        return None
+    return sorted({ROOT / name for name in os.fsdecode(listed).split("\0") if name})
+
+
+def walked_files():
+    for folder, dirs, files in os.walk(ROOT):
+        here = Path(folder)
+        # A folder with its own .git (a nested repository or worktree) is not part of this one.
+        dirs[:] = sorted(d for d in dirs if d not in SKIP_DIRS and not (here / d / ".git").exists())
+        for name in sorted(files):
+            yield here / name
+
+
 def text_files():
-    for path in sorted(ROOT.rglob("*")):
-        if path.is_file() and not SKIP_DIRS & set(path.relative_to(ROOT).parts):
-            if path.suffix in TEXT_SUFFIXES:
-                yield path
+    """Every text file of the repository, as (path, text); binary files are skipped."""
+    paths = git_files()
+    for path in walked_files() if paths is None else paths:
+        if SKIP_DIRS & set(path.relative_to(ROOT).parts) or path.is_symlink() or not path.is_file():
+            continue
+        data = path.read_bytes()
+        if b"\0" not in data:
+            yield path, data.decode("utf-8", errors="replace")
 
 
 def main() -> int:
@@ -172,8 +201,7 @@ def main() -> int:
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)
 
-    for path in text_files():
-        text = path.read_text(encoding="utf-8", errors="replace")
+    for path, text in text_files():
         rel = path.relative_to(ROOT)
         for number, line in enumerate(text.splitlines(), start=1):
             if any(dash in line for dash in DASHES):
