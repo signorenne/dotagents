@@ -180,6 +180,9 @@ a new plan; they are not converted.
   change in progress.
 - A second reviewer pass, limited to the fixes, happens only when the risk is
   high or a fix added a public surface; its findings are triaged the same way.
+- The maintainer can pin the review in the request: "no review" (recorded in
+  the intent; floor_check and the gates still run) or "thorough review" (the
+  full mode and a second pass on the fixes, whatever the lane).
 - What is not this change's problem goes to =.private/deferred.<ext>=, one
   line each, only when the base commit has it too.
 - A finding that shows the plan was wrong sends the work back to the plan,
@@ -203,7 +206,9 @@ Three standard-library scripts in the build skill, each one call:
 
 The full lane runs the baseline (the narrow check and the tests that pin the
 unchanged behavior) on the base commit before the first step; the quick
-lane does not. The narrow check runs per step, the full gates once on the
+lane does not. A step ends when its check passes, and the work when the
+acceptance checks pass: nothing is polished after them, and anything worth
+more becomes a deferred line or a new plan. The narrow check runs per step, the full gates once on the
 last commit, through gate-runner.
 
 * Resume and short contexts
@@ -222,6 +227,13 @@ last commit, through gate-runner.
 
 - Every delegation names its return form and a size limit, the model and the
   effort.
+- A worker's report has one fixed form, so less enters the caller's context:
+  the first line is a status word with one clause of reason (done, partial,
+  too-big, needs-confirm, blocked), then one row per result (=path:line |
+  fact=, or the job's own row, such as a finding or a claim's verdict), no
+  prose and no restatement of the brief, within the size limit. The caller
+  reads the status first: partial or too-big re-splits the job, needs-confirm
+  goes to the caller's own check, blocked to its stop list.
 - scout is called only when the area is unknown or wide; the quick lane reads
   its few files itself. gate-runner runs on the smallest model at low effort.
   The reviewer and every agent that judges (fact-checks, verdicts) run on the

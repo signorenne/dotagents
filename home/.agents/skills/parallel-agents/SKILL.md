@@ -39,7 +39,7 @@ An agent knows this conversation only through its brief (it does load the projec
 - the build and test commands for its worktree, the commit style and the gates;
 - the rules: follow the build skill's sections 5 and 6 with the steps of its plan file, when available (no review of its own: the coordinator reviews the merged result); commit each verified step; never merge, push, or touch the target branch or the main checkout, except its plan file and log in the main checkout's .private/plans/; stop and report at a choice that belongs to the user; report anything it finds that affects another agent;
 - the model and effort it runs on: writers on the session's model and effort, since they make the code's choices;
-- what to return, in at most 30 lines: its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
+- what to return, in at most 30 lines, opening with a status word (done, partial, blocked or needs-confirm, with its reason): its commits, the tests it saw failing first, the gate results with the commit they ran on, and what is left open.
 
 ## 4. Watch
 
