@@ -2,6 +2,9 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """Tests for the shared hooks, fed with each agent's payload shape."""
 
+import contextlib
+import importlib.util
+import io
 import json
 import os
 import shutil
@@ -11,6 +14,7 @@ import tempfile
 import time
 import unittest
 from pathlib import Path
+from unittest import mock
 
 HOOKS = Path(__file__).resolve().parent.parent / "home" / ".agents" / "hooks"
 EM, EN = "\u2014", "\u2013"
@@ -29,6 +33,13 @@ def run(script: str, payload, tool: str = "claude", env: dict = None) -> subproc
 
 def bash(command: str) -> dict:
     return {"tool_name": "Bash", "tool_input": {"command": command}}
+
+
+def fake_program(folder: Path, name: str, body: str) -> Path:
+    program = folder / name
+    program.write_text("#!/bin/sh\n" + body)
+    program.chmod(0o755)
+    return program
 
 
 class GuardBash(unittest.TestCase):
@@ -348,7 +359,63 @@ class AfterEdit(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("b.md", result.stderr)
 
+    def test_codex_patch_line_starting_with_plus_plus(self):
+        # apply_patch has no "+++" file headers: "+++i;" is the added line "++i;".
+        patch = f"*** Begin Patch\n*** Update File: c.cpp\n@@\n-i++;\n+++i; // a {EM} b\n*** End Patch\n"
+        payload = {"tool_name": "apply_patch", "cwd": str(self.tmp), "tool_input": {"command": patch}}
+        result = run("after_edit.py", payload, "codex")
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("++i; // a", result.stderr)
+
+    def test_wrong_types_never_fail(self):
+        target = str(self.tmp / "a.md")
+        payloads = [
+            {"cwd": 5, "tool_input": {"file_path": "a.md", "new_string": "x"}},
+            {"tool_input": {"file_path": 5, "new_string": "x"}},
+            {"tool_input": {"file_path": ["a"], "content": "x"}},
+            {"tool_input": {"file_path": target, "new_string": 5}},
+            {"file_path": target, "edits": [{"new_string": 5}]},
+            {"tool_input": {"command": "*** Begin Patch\n*** Add File: x\n+a\n*** End Patch"}, "cwd": 5},
+            {"toolArgs": "[1]"},
+            [1],
+            DEEP_JSON,
+        ]
+        for payload in payloads:
+            with self.subTest(payload=str(payload)[:60]):
+                result = run("after_edit.py", payload, "gemini")
+                self.assertEqual((result.returncode, result.stdout.strip(), result.stderr), (0, "{}", ""))
+
+    def fake_clang_format(self, body: str) -> dict:
+        (self.tmp / ".clang-format").write_text("BasedOnStyle: LLVM\n")
+        bin_dir = self.tmp / "bin"
+        bin_dir.mkdir()
+        return {"CLANG_FORMAT": str(fake_program(bin_dir, "clang-format", body))}
+
+    def test_formatting_stays_within_hook_timeout(self):
+        # In-process with a 3 s budget, so the test does not wait for the real 60 s timeout.
+        env = self.fake_clang_format("exec sleep 2\n")
+        names = ["a.cpp", "b.cpp", "c.cpp", "d.cpp"]
+        for name in names:
+            (self.tmp / name).write_text("int x;\n")
+        patch = "*** Begin Patch\n" + "".join(f"*** Add File: {n}\n+int x;\n" for n in names) + "*** End Patch\n"
+        payload = json.dumps({"tool_name": "apply_patch", "cwd": str(self.tmp), "tool_input": {"command": patch}})
+        spec = importlib.util.spec_from_file_location("after_edit_under_test", HOOKS / "after_edit.py")
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        module.DEADLINE_SECONDS = 3
+        stderr = io.StringIO()
+        start = time.monotonic()
+        with mock.patch.dict(os.environ, env), mock.patch.object(sys, "argv", ["after_edit.py", "--tool", "codex"]), \
+                mock.patch.object(sys, "stdin", io.StringIO(payload)), contextlib.redirect_stderr(stderr), \
+                contextlib.redirect_stdout(io.StringIO()):
+            code = module.main()
+        self.assertLess(time.monotonic() - start, 5)
+        self.assertEqual(code, 2)
+        self.assertIn("Formatting not applied", stderr.getvalue())
+        self.assertIn("d.cpp", stderr.getvalue())
+
     @unittest.skipUnless(shutil.which("clang-format"), "clang-format not installed")
+
     def test_formats_cpp_when_project_has_clang_format(self):
         (self.tmp / ".clang-format").write_text("BasedOnStyle: LLVM\n")
         source = self.tmp / "a.cpp"
