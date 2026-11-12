@@ -20,7 +20,7 @@ HOOKS = Path(__file__).resolve().parent.parent / "home" / ".agents" / "hooks"
 EM, EN = "\u2014", "\u2013"
 DEEP_JSON = "[" * 100000
 # Variables that change a hook's behavior; tests set them explicitly when they need them.
-HOOK_ENV = ("CURSOR_VERSION",)
+HOOK_ENV = ("CURSOR_VERSION", "CLANG_FORMAT")
 
 
 def run(script: str, payload, tool: str = "claude", env: dict = None) -> subprocess.CompletedProcess:
@@ -337,14 +337,28 @@ class AfterEdit(unittest.TestCase):
             ("claude", {"tool_name": "Edit", "tool_input": {"file_path": target, "old_string": "a", "new_string": f"a {EM} b"}}),
             ("claude", {"tool_name": "Write", "tool_input": {"file_path": target, "content": f"1{EN}2"}}),
             ("gemini", {"tool_name": "replace", "tool_input": {"file_path": target, "new_string": f"x {EM} y"}}),
-            ("copilot", {"tool_name": "Write", "tool_input": {"path": target, "file_text": f"a {EN} b"}}),
             ("cursor", {"file_path": target, "edits": [{"old_string": "a", "new_string": f"q {EM} r"}]}),
         ]
         for tool, payload in cases:
-            with self.subTest(tool=tool):
+            with self.subTest(tool=tool, payload=payload):
                 result = run("after_edit.py", payload, tool)
                 self.assertEqual(result.returncode, 2)
                 self.assertIn("Em/en dash", result.stderr)
+
+    def test_copilot_gets_problems_as_context(self):
+        # Copilot CLI shows a postToolUse exit 2 only to the user; additionalContext with
+        # exit 0 reaches the model (docs.github.com/en/copilot/reference/hooks-reference).
+        target = str(self.tmp / "notes.md")
+        cases = [
+            {"toolName": "edit", "toolArgs": json.dumps({"path": target, "old_str": "a", "new_str": f"x {EM} y"})},
+            {"toolName": "create", "toolArgs": json.dumps({"path": target, "file_text": f"a {EN} b"})},
+        ]
+        for payload in cases:
+            with self.subTest(payload=payload):
+                result = run("after_edit.py", payload, "copilot")
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertIn("Em/en dash", json.loads(result.stdout)["additionalContext"])
+                self.assertIn(target, json.loads(result.stdout)["additionalContext"])
 
     def test_clean_text_passes(self):
         payload = {"tool_name": "Edit", "tool_input": {"file_path": str(self.tmp / "a.md"), "new_string": "plain - hyphen"}}
@@ -391,6 +405,28 @@ class AfterEdit(unittest.TestCase):
         bin_dir.mkdir()
         return {"CLANG_FORMAT": str(fake_program(bin_dir, "clang-format", body))}
 
+    def test_reformat_notice_reaches_each_agent(self):
+        # The fake formatter rewrites the file named last on its command line.
+        env = self.fake_clang_format('for f; do :; done\nprintf "int f();\\n" > "$f"\n')
+        source = self.tmp / "a.cpp"
+        expected = {
+            "claude": lambda out: out["hookSpecificOutput"],
+            "codex": lambda out: out["hookSpecificOutput"],
+            "gemini": lambda out: out["hookSpecificOutput"],
+            "copilot": lambda out: out,
+        }
+        events = {"claude": "PostToolUse", "codex": "PostToolUse", "gemini": "AfterTool"}
+        for tool, context_of in expected.items():
+            with self.subTest(tool=tool):
+                source.write_text("int   f( );\n")
+                payload = {"tool_name": "Write", "tool_input": {"file_path": str(source), "content": "int   f( );\n"}}
+                result = run("after_edit.py", payload, tool, env)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                context = context_of(json.loads(result.stdout))
+                self.assertIn("reformatted", context["additionalContext"])
+                if tool in events:
+                    self.assertEqual(context["hookEventName"], events[tool])
+
     def test_formatting_stays_within_hook_timeout(self):
         # In-process with a 3 s budget, so the test does not wait for the real 60 s timeout.
         env = self.fake_clang_format("exec sleep 2\n")
@@ -415,7 +451,6 @@ class AfterEdit(unittest.TestCase):
         self.assertIn("d.cpp", stderr.getvalue())
 
     @unittest.skipUnless(shutil.which("clang-format"), "clang-format not installed")
-
     def test_formats_cpp_when_project_has_clang_format(self):
         (self.tmp / ".clang-format").write_text("BasedOnStyle: LLVM\n")
         source = self.tmp / "a.cpp"
