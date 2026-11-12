@@ -501,6 +501,20 @@ class PlanScripts(unittest.TestCase):
         last = plan.with_suffix(".log").read_text().splitlines()[-1].split("\t")
         self.assertEqual(last[3], self.git("rev-parse", "--short", "HEAD"))
 
+    def test_a_notes_folder_in_an_untracked_folder_is_left_out_too(self):
+        (self.repo / ".gitignore").write_text("")
+        self.git("commit", "-q", "-am", "track nothing ignored")
+        sub = self.repo / "sub"  # holds nothing tracked: git lists only "?? sub/"
+        (sub / ".private" / "plans").mkdir(parents=True)
+        plan = sub / ".private/plans/widget.org"
+        plan.write_text(PLAN.format(base=self.base, lane="full"))
+        self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass", cwd=sub)
+        last = plan.with_suffix(".log").read_text().splitlines()[-1].split("\t")
+        self.assertEqual(last[3], self.git("rev-parse", "--short", "HEAD"))
+        (sub / "real.txt").write_text("x\n")  # a real untracked file beside it still counts
+        self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass", cwd=sub)
+        self.assertEqual(plan.with_suffix(".log").read_text().splitlines()[-1].split("\t")[3], "uncommitted(1)")
+
     def test_a_command_that_never_started_is_no_failing_run(self):
         result = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--", "no-such-program-xyz --flag")
         self.assertEqual(result.returncode, 2, result.stdout)
