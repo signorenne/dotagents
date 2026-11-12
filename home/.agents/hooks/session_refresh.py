@@ -22,32 +22,44 @@ MAX_STATUS_LINES = 15
 DEADLINE_SECONDS = 8
 CALL_TIMEOUT_SECONDS = 5
 MIN_CALL_SECONDS = 0.5
+TIMED_OUT = "did not finish in time"
+FAILED = "failed"
 
 
-def git(*args: str, cwd: str, deadline: float) -> str | None:
-    """Output of git, "" when it fails, None when it timed out or was skipped for time."""
+def git(*args: str, cwd: str, deadline: float) -> tuple[str, str]:
+    """Return (output, problem): problem is "" on success, TIMED_OUT when git did not
+    answer in time or was skipped for lack of time, FAILED when it failed."""
     left = deadline - time.monotonic()
     if left < MIN_CALL_SECONDS:
-        return None
+        return "", TIMED_OUT
     try:
         result = subprocess.run(["git", *args], cwd=cwd, capture_output=True, text=True,
                                 timeout=min(CALL_TIMEOUT_SECONDS, left), check=False)
     except subprocess.TimeoutExpired:
-        return None
+        return "", TIMED_OUT
     except OSError:
-        return ""
+        return "", FAILED
+    if result.returncode != 0:
+        return "", FAILED
     # Only trailing newlines: a leading space is the index column of git status --short.
-    return result.stdout.rstrip("\n") if result.returncode == 0 else ""
+    return result.stdout.rstrip("\n"), ""
+
+
+def text_field(payload: dict, key: str, default: str) -> str:
+    value = payload.get(key)
+    return value if isinstance(value, str) and value else default
 
 
 def main() -> int:
     deadline = time.monotonic() + DEADLINE_SECONDS
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
+    except (ValueError, RecursionError):
         payload = {}
-    cwd = payload.get("cwd") or "."
-    source = payload.get("source") or "resume or compaction"
+    if not isinstance(payload, dict):
+        payload = {}
+    cwd = text_field(payload, "cwd", ".")
+    source = text_field(payload, "source", "resume or compaction")
 
     lines = [
         f"Session restarted from {source}. Everything you remember about the code is a "
@@ -55,27 +67,34 @@ def main() -> int:
         "editing or calling code, re-read the files involved and confirm each symbol "
         "with a search; state in one line what you will change before each edit.",
     ]
-    # A list that is missing for lack of time is named, so it is never read as a clean tree.
-    branch = git("branch", "--show-current", cwd=cwd, deadline=deadline)
-    if branch is None:
+    # A list that is missing for lack of time or a git error is named, so it is never
+    # read as a clean tree. Outside a repository git branch fails and nothing is shown.
+    branch, problem = git("branch", "--show-current", cwd=cwd, deadline=deadline)
+    if problem == TIMED_OUT:
         lines.append("Git state not shown: git did not answer in time.")
-    elif branch:
-        lines.append(f"Current branch: {branch}")
+    elif not problem:
+        if branch:
+            lines.append(f"Current branch: {branch}")
+        else:
+            head, problem = git("rev-parse", "--short", "HEAD", cwd=cwd, deadline=deadline)
+            lines.append(f"Detached HEAD at {head}" if head
+                         else f"Detached HEAD; its commit not shown: git rev-parse {problem}.")
         # --no-optional-locks: a status stopped by the timeout leaves no .git/index.lock.
         # --no-branch: with status.branch set, the "## branch" line is not a change.
-        status = git("--no-optional-locks", "status", "--short", "--no-branch", cwd=cwd,
-                     deadline=deadline)
-        if status is None:
-            lines.append("Uncommitted changes not shown: git status did not finish in time.")
+        status, problem = git("--no-optional-locks", "status", "--short", "--no-branch",
+                              cwd=cwd, deadline=deadline)
+        if problem:
+            lines.append(f"Uncommitted changes not shown: git status {problem}.")
         elif status:
             changes = status.splitlines()
             shown = changes[:MAX_STATUS_LINES]
             more = len(changes) - len(shown)
             lines.append("Uncommitted changes:\n" + "\n".join(shown)
                          + (f"\n... and {more} more" if more > 0 else ""))
-        recent = git("log", "--oneline", "-5", cwd=cwd, deadline=deadline)
-        if recent is None:
-            lines.append("Last commits not shown: git log did not finish in time.")
+        # git log fails in a repository without commits; that needs no notice.
+        recent, problem = git("log", "--oneline", "-5", cwd=cwd, deadline=deadline)
+        if problem == TIMED_OUT:
+            lines.append(f"Last commits not shown: git log {problem}.")
         elif recent:
             lines.append("Last commits:\n" + recent)
     print("\n".join(lines))

@@ -470,18 +470,21 @@ class AfterEdit(unittest.TestCase):
 
 
 class SessionRefresh(unittest.TestCase):
+    def refresh_with(self, payload, env: dict = None) -> subprocess.CompletedProcess:
+        data = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")], input=data,
+                              capture_output=True, text=True, check=False, env=env)
+
     def test_prints_reminder_and_git_state(self):
         repo = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, repo)
         subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True)
-        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
-                                input=json.dumps({"cwd": str(repo), "source": "compact"}),
-                                capture_output=True, text=True, check=False)
+        result = self.refresh_with({"cwd": str(repo), "source": "compact"})
         self.assertEqual(result.returncode, 0)
         self.assertIn("Session restarted from compact", result.stdout)
         self.assertIn("Current branch: work", result.stdout)
 
-    def committed_repo(self) -> tuple[Path, dict]:
+    def committed_repo(self) -> tuple:
         # An empty global config keeps the user's git settings out of the test; status.branch
         # is a setting some users have, and its "## branch" line is not a change.
         repo = Path(tempfile.mkdtemp())
@@ -497,9 +500,7 @@ class SessionRefresh(unittest.TestCase):
         return repo, env
 
     def refresh(self, repo: Path, env: dict) -> subprocess.CompletedProcess:
-        return subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
-                              input=json.dumps({"cwd": str(repo), "source": "resume"}),
-                              capture_output=True, text=True, check=False, env=env)
+        return self.refresh_with({"cwd": str(repo), "source": "resume"}, env)
 
     def test_status_keeps_the_index_column(self):
         # " M" (changed, not staged) must not lose its space and read as "M " (staged).
@@ -516,17 +517,44 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Last commits:", result.stdout)
         self.assertNotIn("Uncommitted changes", result.stdout)
 
+    def test_detached_head_shows_the_commit(self):
+        repo, env = self.committed_repo()
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "--detach"], check=True, env=env)
+        head = subprocess.run(["git", "-C", str(repo), "rev-parse", "--short", "HEAD"], check=True,
+                              capture_output=True, text=True, env=env).stdout.strip()
+        (repo / "tracked.txt").write_text("two\n")
+        result = self.refresh(repo, env)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn(f"Detached HEAD at {head}", result.stdout)
+        self.assertIn("Uncommitted changes:\n M tracked.txt\n", result.stdout)
+        self.assertIn("Last commits:", result.stdout)
+
+    def test_failed_status_is_not_reported_as_clean(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        fake_program(tmp, "git", '[ "$1" = branch ] && echo work && exit 0\n'
+                                 '[ "$1" = log ] && echo "abc123 init" && exit 0\n'
+                                 'echo "fatal: index file corrupt" >&2\nexit 128\n')
+        env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
+        result = self.refresh_with({"cwd": str(tmp), "source": "resume"}, env)
+        self.assertEqual(result.returncode, 0)
+        self.assertIn("Current branch: work", result.stdout)
+        self.assertIn("Uncommitted changes not shown: git status failed", result.stdout)
+
+    def test_wrong_types_never_fail(self):
+        for payload in ([1], {"cwd": 5}, {"cwd": [], "source": 5}, {"source": {"a": 1}}, DEEP_JSON):
+            with self.subTest(payload=str(payload)[:40]):
+                result = self.refresh_with(payload)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertIn("Session restarted from resume or compaction.", result.stdout)
+
     def test_slow_git_stays_within_hook_timeout(self):
         tmp = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, tmp)
-        fake = tmp / "git"
-        fake.write_text('#!/bin/sh\nsleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
-        fake.chmod(0o755)
+        fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
         env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
         start = time.monotonic()
-        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")],
-                                input=json.dumps({"cwd": str(tmp), "source": "resume"}),
-                                capture_output=True, text=True, check=False, env=env)
+        result = self.refresh_with({"cwd": str(tmp), "source": "resume"}, env)
         self.assertEqual(result.returncode, 0)
         self.assertLess(time.monotonic() - start, 9.5)
         self.assertIn("Session restarted from resume", result.stdout)
