@@ -487,6 +487,20 @@ class PlanScripts(unittest.TestCase):
             self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
         self.assertEqual(self.log()[-1][3], self.git("rev-parse", "--short", "HEAD"))
 
+    def test_nested_working_notes_never_make_a_run_uncommitted_either(self):
+        (self.repo / ".gitignore").write_text("")
+        sub = self.repo / "sub"
+        (sub / ".private" / "plans").mkdir(parents=True)
+        (sub / "keep.txt").write_text("x\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "sub")
+        plan = sub / ".private/plans/widget.org"
+        plan.write_text(PLAN.format(base=self.base, lane="full"))
+        for _ in range(2):
+            self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass", cwd=sub)
+        last = plan.with_suffix(".log").read_text().splitlines()[-1].split("\t")
+        self.assertEqual(last[3], self.git("rev-parse", "--short", "HEAD"))
+
     def test_a_command_that_never_started_is_no_failing_run(self):
         result = self.run_script("check_step.py", "--step", "S2", "--expect-fail", "--", "no-such-program-xyz --flag")
         self.assertEqual(result.returncode, 2, result.stdout)

@@ -116,8 +116,17 @@ def main(argv=None) -> int:
     passed = result.returncode == 0
     count = test_count(output)
     label = "fail-first" if args.expect_fail else "baseline" if args.baseline else "gate" if args.gate else "check"
-    # Untracked files count, except the working notes (where this script writes its output).
-    untracked = [path for path in state.get("untracked", []) if path.split("/")[0] != ".private"] if state else []
+    # Untracked files count, except the working notes (where this script writes its output),
+    # wherever the located notes folder sits in the repository.
+    notes = ".private"
+    top, found = planfile.git(["rev-parse", "--show-toplevel"], args.cwd)
+    if private is not None and found:
+        try:
+            notes = private.resolve().relative_to(Path(top).resolve()).as_posix()
+        except ValueError:  # the main checkout's notes, outside a linked worktree
+            notes = ".private"
+    untracked = [path for path in state.get("untracked", [])
+                 if path.rstrip("/") != notes and not path.startswith(notes + "/")] if state else []
     dirty = (state.get("dirty", []) + untracked) if state else []
     commit = f"uncommitted({len(dirty)})" if dirty else (state.get("head") or "-") if state else "-"
     print(f"exit {result.returncode}, {'pass' if passed else 'fail'}, tests {count}, {commit}"
