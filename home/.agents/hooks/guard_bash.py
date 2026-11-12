@@ -6,7 +6,8 @@ gates or rewrite published history.
 
 Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|copilot>
 
-Blocks, in every simple command of the text:
+Blocks, in every simple command of the text (also after keywords such as if, do, ! and
+wrappers such as sudo, env, xargs, time, nice, timeout):
   - git ... --no-verify, and git commit -n (skip hooks);
   - *_SKIP_HOOK(S)=<non-zero>, HUSKY=0, SKIP=<ids> assignments (hook skip switches);
   - git config --unset core.hooksPath, git -c core.hooksPath=... (disable hooks);
@@ -37,6 +38,26 @@ WORD_END = BLANKS + OPERATOR_CHARS + "<>"
 REDIRECTION = re.compile(r"&>>?|<<<|<<-?|<>|<&|>>|>&|>\||<|>")
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.DOTALL)
 
+KEYWORDS = {"!", "{", "if", "then", "elif", "else", "while", "until", "do"}
+DECLARATIONS = {"export", "declare", "typeset", "local", "readonly"}
+# Commands that run the command after them: (short options taking a value, long options
+# taking the next word as value, operands before the command).
+WRAPPERS = {
+    "builtin": ("", (), 0),
+    "command": ("", (), 0),
+    "doas": ("Cu", (), 0),
+    "env": ("CSu", ("--chdir", "--split-string", "--unset"), 0),
+    "exec": ("a", (), 0),
+    "nice": ("n", ("--adjustment",), 0),
+    "nohup": ("", (), 0),
+    "sudo": ("CDghpRrTtUu", ("--chdir", "--chroot", "--close-from", "--command-timeout",
+                             "--group", "--host", "--other-user", "--prompt", "--role",
+                             "--type", "--user"), 0),
+    "time": ("fo", ("--format", "--output"), 0),
+    "timeout": ("ks", ("--kill-after", "--signal"), 1),
+    "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--max-args", "--max-chars",
+                           "--max-procs", "--process-slot-var"), 0),
+}
 HOOK_RUNNERS = {"git", "pre-commit"}
 
 COMMIT_VALUE_OPTIONS = {"-m", "-F", "-c", "-C", "-t", "--message", "--file",
@@ -256,6 +277,56 @@ def rough_commands(text: str) -> list:
     return commands
 
 
+def skip_options(words: list, index: int, short_values: str, long_values) -> int:
+    """Return the index of the first operand after the options at words[index:]."""
+    while index < len(words):
+        word = words[index]
+        if word == "--":
+            return index + 1
+        if not word.startswith("-") or word == "-":
+            return index
+        index += 1
+        if word.startswith("--"):
+            if "=" not in word and word in long_values:
+                index += 1
+            continue
+        for position, letter in enumerate(word[1:], start=2):
+            if letter in short_values:
+                if position == len(word):
+                    index += 1  # the value is the next word
+                break
+    return index
+
+
+def split_command(words: list) -> tuple:
+    """Return (assignments before the program, the program and its arguments)."""
+    assignments, index = [], 0
+    while index < len(words):
+        word = words[index]
+        match = ASSIGNMENT.match(word)
+        name = os.path.basename(word)
+        if match:
+            assignments.append((match.group(1), match.group(2)))
+            index += 1
+        elif word in KEYWORDS:
+            index += 1
+        elif word in DECLARATIONS:
+            index = skip_options(words, index + 1, "", ())
+        elif name in WRAPPERS:
+            short_values, long_values, operands = WRAPPERS[name]
+            index = skip_options(words, index + 1, short_values, long_values)
+            while name == "env" and index < len(words) and words[index] == "-":
+                index += 1
+            index += operands
+        else:
+            break
+    return assignments, words[index:]
+
+
+def program_of(words: list) -> str:
+    return os.path.basename(words[0]) if words else ""
+
+
 def assignment_reason(name: str, value: str) -> str:
     falsy = value.strip().lower() in {"", "0", "false", "no", "off"}
     if re.search(r"SKIP_HOOKS?$", name) and not falsy:
@@ -319,21 +390,13 @@ def git_reasons(tokens: list) -> list:
 
 def command_reasons(commands: list) -> list:
     reasons = []
-    for tokens in commands:
-        rest = list(tokens)
-        while rest and rest[0] in {"export", "env"}:
-            rest = rest[1:]
-        while rest:
-            match = ASSIGNMENT.match(rest[0])
-            if not match:
-                break
-            reason = assignment_reason(match.group(1), match.group(2))
-            if reason:
-                reasons.append(reason)
-            rest = rest[1:]
-        if rest and (rest[0] == "git" or rest[0].endswith("/git")):
+    for words in commands:
+        assignments, rest = split_command(words)
+        for name, value in assignments:
+            reasons.append(assignment_reason(name, value))
+        if program_of(rest) == "git":
             reasons.extend(git_reasons(rest))
-    return list(dict.fromkeys(reasons))
+    return list(dict.fromkeys(reason for reason in reasons if reason))
 
 
 def extract_command(payload: dict) -> str:
