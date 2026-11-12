@@ -4,12 +4,13 @@
 #+STARTUP: showall
 
 This file owns how the pieces work together once installed: the maieutic
-method, the daily loop (which skill to run when), context hygiene, the
-per-project layer and the setup steps. [[file:pipeline.org][docs/pipeline.org]] owns the stages a
-change goes through from idea to merge; [[file:../DESIGN.org][DESIGN.org]] owns how the pieces
-compose and install; [[file:../README.org][README.org]] owns the quick start. The method is the
-same in every chat and every project because claude.ai and every local agent
-read the same global rules.
+method, the daily loop (which skill to run when), context hygiene, cost and
+cache habits with how to measure them, the per-project layer and the setup
+steps. [[file:pipeline.org][docs/pipeline.org]] owns the stages a change goes through from idea
+to merge; [[file:../DESIGN.org][DESIGN.org]] owns how the pieces compose and install;
+[[file:../README.org][README.org]] owns the quick start. The method is the same in every chat
+and every project because claude.ai and every local agent read the same
+global rules.
 
 * Two-way maieutic method
 
@@ -79,7 +80,56 @@ first errors, reviewer reviews a finished change in a fresh context.
 - implement keeps =.private/progress/<slug>.<ext>= current after every step;
   how you review the agent decisions it marks =Review: pending= is in
   [[file:pipeline.org][docs/pipeline.org]].
-- Check where tokens go with =/context= and =/usage= in Claude Code.
+
+* Cost and cache habits
+
+In Claude Code every request sends the whole conversation again, and the
+prompt cache serves the part that did not change at a fraction of the input
+price. These habits keep that part intact:
+
+- Pick the model and the effort at session start. Each model has its own
+  cache, so a switch reads the whole conversation again uncached. A change of
+  effort does too, except on Opus 5.5, Sonnet 5.5, Haiku 5.5 and Fable 5.1 or
+  later with an API key or a subscription.
+- Do not toggle plugins or MCP servers mid-task: when tools load upfront
+  (tool search off or unavailable), a changed tool list rebuilds the cache.
+- Compact at natural breaks, between tasks: a compaction replaces the
+  conversation with a summary, which starts a new cache.
+- =/clear= costs nothing: use it, not a compaction, when the next task does
+  not need this conversation.
+- To abandon a path, =/rewind= to the turn before it rather than compacting:
+  the earlier part of the conversation is still cached.
+- Keep the =model= field out of skills: a skill that names another model
+  switches to it for that turn, uncached. =tools/validate.py= allows only
+  =name=, =description= and =license=.
+
+Source: Anthropic, [[https://code.claude.com/docs/en/prompt-caching][How Claude Code uses prompt caching]] (vendor documentation).
+
+* Measure before and after
+
+To tell whether a change to the setup (a shorter skill, a new hook, a rule
+moved) saves tokens, measure sessions, not file sizes:
+
+1. Keep the rest fixed: the same model and effort, the same Claude Code
+   version, and the same kind of task.
+2. In a fresh session, before the first prompt, run =/context=: it shows the
+   fixed overhead every request carries (system prompt, tools, memory files)
+   and the Skills row, the skill descriptions.
+3. At the end of each session, before =/clear= resets it, run =/usage=: the
+   Session block gives the tokens per model (input, output, cache read, cache
+   write), and its =Prompt cache (main)= line the share of input served from
+   the cache and the misses, with their likely cause. That line covers the
+   main conversation only, not subagents.
+4. Run five or more sessions on each side and compare the medians: single
+   sessions vary too much to judge.
+5. Compare billed-equivalent tokens, not bytes or raw token counts: weight
+   each kind by its price relative to base input on the [[https://platform.claude.com/docs/en/about-claude/pricing][model's pricing page]]
+   (on current models a cache read costs a tenth of an input token or less, a
+   cache write 1.25 or 2 times as much, output 5 times). Bytes removed from a
+   cached prefix save little; a change that causes cache misses can cost more
+   than it saves.
+
+Source: Anthropic, [[https://code.claude.com/docs/en/costs][Manage costs effectively]] (vendor documentation).
 
 * Per project
 
