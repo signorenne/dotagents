@@ -20,7 +20,7 @@ Unless the change fits in one sentence and one or two known files, delegate to s
 
 ## 4. Plan
 
-List the steps. Each step is one logical change that becomes one commit, with its files and its check. Name the assumptions the plan rests on that would change it if they were wrong (how a symbol behaves, a tool's limit, a fact from the docs), each with the check that could refute it, and run each check before the step that depends on it. Wait for the user's approval when the plan touches more than one file, changes a public API, or meets a choice that belongs to the user (use the decide skill for it). A conflict with an Accepted decision stops the work until the user resolves it.
+List the steps. Each step is one logical change that becomes one commit, with its files and its check. Name the assumptions the plan rests on that would change it if they were wrong (how a symbol behaves, a tool's limit, a fact from the docs), each with the check that could refute it, and run each check before the step that depends on it. Propose running the change with the isolated-work skill when it spans modules, changes a public API, or migrates data or many files; the user approves it with the plan. Wait for the user's approval when the plan touches more than one file, changes a public API, or meets a choice that belongs to the user (use the decide skill for it). A conflict with an Accepted decision stops the work until the user resolves it.
 
 ## 5. Progress log
 
@@ -37,7 +37,7 @@ Write the log from what happened (commands run, git), never from intent. It is l
 
 ## 6. Branch
 
-If on main or master, create a branch first: <type>/<slug>, with the type from the project's commit types. When the spec added entries to a decision log that git tracks and they are not committed yet, commit them on their own as the branch's first commit.
+With isolation approved, isolated-work creates the branch and its worktree. Otherwise, if on main or master, create a branch first: <type>/<slug>, with the type from the project's commit types. When the spec added entries to a decision log that git tracks and they are not committed yet, commit them on their own as the branch's first commit.
 
 ## 7. Build each step
 
