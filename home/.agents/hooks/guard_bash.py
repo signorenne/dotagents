@@ -20,7 +20,8 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - every git push when the agent is not Claude Code, since Claude Code asks the user
     before a push and the others do not. Cursor runs the Claude Code hook command as
     well; it is told apart by its documented CURSOR_VERSION variable or the
-    cursor_version payload field.
+    cursor_version payload field;
+  - gh pr merge --admin (merges without the required checks).
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
 ; & | ( ), redirections, command substitutions and here-documents, whose body is text,
@@ -70,6 +71,7 @@ WRAPPERS = {
                            "--max-procs", "--process-slot-var"), 0),
 }
 HOOK_RUNNERS = {"git", "pre-commit"}
+ROUGH_PROGRAMS = HOOK_RUNNERS | {"gh"}
 
 GIT_VALUE_OPTIONS = {"-C", "-c", "--config-env", "--git-dir", "--namespace", "--work-tree"}
 HOOK_SUBCOMMANDS = {"am", "cherry-pick", "commit", "merge", "pull", "push", "rebase"}
@@ -282,7 +284,7 @@ def parse_commands(text: str) -> list:
 
 def rough_commands(text: str) -> list:
     """Split text that does not parse while ignoring quotes and backticks, and start a
-    new command at every git or pre-commit word, so a forbidden command is still
+    new command at every git, gh or pre-commit word, so a forbidden command is still
     found (words inside quotes may then read as flags)."""
     text = re.sub(r"\\\n", "", text)
     text = re.sub(r"&>|[<>]&", " > ", text)
@@ -291,7 +293,7 @@ def rough_commands(text: str) -> list:
     for piece in re.split(r"[;&|()\n]+", text):
         command = []
         for word in piece.split():
-            if command and os.path.basename(word) in HOOK_RUNNERS:
+            if command and os.path.basename(word) in ROUGH_PROGRAMS:
                 commands.append(command)
                 command = []
             command.append(word)
@@ -474,6 +476,16 @@ def git_reasons(words: list, plain_push_allowed: bool) -> list:
     return [reason for reason in reasons if reason]
 
 
+def gh_reasons(words: list) -> list:
+    if words[1:3] != ["pr", "merge"]:
+        return []
+    for word in words[3:]:
+        name, _, value = word.partition("=")
+        if name == "--admin" and value.lower() not in ("false", "0"):
+            return ["gh pr merge --admin merges without the required checks and reviews"]
+    return []
+
+
 def command_reasons(commands: list, plain_push_allowed: bool) -> list:
     reasons = []
     split = [split_command(words) for words in commands]
@@ -484,6 +496,8 @@ def command_reasons(commands: list, plain_push_allowed: bool) -> list:
             reasons.append(assignment_reason(name, value, program, runs_hook_runner))
         if program == "git":
             reasons.extend(git_reasons(rest, plain_push_allowed))
+        elif program == "gh":
+            reasons.extend(gh_reasons(rest))
     return list(dict.fromkeys(reason for reason in reasons if reason))
 
 

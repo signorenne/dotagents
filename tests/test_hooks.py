@@ -229,6 +229,10 @@ class GuardBash(unittest.TestCase):
             "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x git commit -m x",
         ])
 
+    def test_admin_merge_skips_required_checks(self):
+        self.assert_blocked(["gh pr merge 12 --admin --squash", "gh pr merge --admin"])
+        self.assert_allowed(["gh pr merge 12 --squash --auto", "gh pr view 12"])
+
     def test_no_verify_prefixes_on_hook_subcommands(self):
         self.assert_blocked([
             "git commit --no-verif -m x",
