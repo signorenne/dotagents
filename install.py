@@ -68,13 +68,15 @@ GEMINI_HOOKS = {
     "AfterTool": [{"matcher": "write_file|replace",
                    "hooks": [hook(script("after_edit.py", "gemini"), name="agents-after-edit", timeout=60000)]}],
 }
+# Copilot CLI's native format: camelCase events send toolName and toolArgs, and a
+# matcher is a regex on the whole native tool name (GitHub's hooks reference).
 COPILOT_HOOKS = {
     "version": 1,
     "hooks": {
-        "PreToolUse": [{"type": "command", "matcher": "Bash", "timeoutSec": 10,
+        "preToolUse": [{"type": "command", "matcher": "bash", "timeoutSec": 10,
                         "bash": script("guard_bash.py", "copilot")}],
-        "PostToolUse": [{"type": "command", "matcher": "Edit|Write", "timeoutSec": 60,
-                         "bash": script("after_edit.py", "copilot")}],
+        "postToolUse": [{"type": "command", "matcher": "edit|create|str_replace_editor|apply_patch",
+                         "timeoutSec": 60, "bash": script("after_edit.py", "copilot")}],
     },
 }
 
