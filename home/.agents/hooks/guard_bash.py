@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """Shell-command guard shared by every coding agent: block commands that bypass git
-gates or rewrite published history.
+gates or rewrite or delete published history.
 
-Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|copilot>
+Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|copilot|cursor>
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
 wrappers such as sudo, env, xargs, time, nice, timeout):
@@ -15,7 +15,12 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - hooks disabled through core.hooksPath: git config [--]unset core.hooksPath, git config
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
-  - git push --force / -f / --force-with-lease / +refspec (rewrite published history).
+  - git push that rewrites or deletes published history: --force, -f, --force-with-lease,
+    --force-if-includes, +refspec, --delete, -d, :ref, --mirror, --prune;
+  - every git push when the agent is not Claude Code, since Claude Code asks the user
+    before a push and the others do not. Cursor runs the Claude Code hook command as
+    well; it is told apart by its documented CURSOR_VERSION variable or the
+    cursor_version payload field.
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
 ; & | ( ), redirections, command substitutions and here-documents, whose body is text,
@@ -76,7 +81,9 @@ GIT_OPTIONS = {
                                 "--message", "--pathspec-from-file", "--reedit-message",
                                 "--reuse-message", "--squash", "--template", "--trailer",
                                 "--unified"}),
+    "push": ("o", "", {"--exec", "--push-option", "--receive-pack", "--repo"}),
 }
+FORCE_OPTIONS = ("--force", "--force-with-lease", "--force-if-includes")
 CONFIG_VALUE_OPTIONS = {"-f", "--blob", "--comment", "--default", "--file", "--type",
                         "--url", "--value"}
 CONFIG_ACTIONS = {"edit", "get", "list", "remove-section", "rename-section", "set", "unset"}
@@ -398,6 +405,24 @@ def parse_git_options(args: list, short_values: str, short_optional: str, long_v
     return shorts, longs, operands
 
 
+def push_reasons(shorts: set, longs: list, operands: list, plain_push_allowed: bool) -> list:
+    reasons = []
+    if not plain_push_allowed:
+        reasons.append("git push runs only in Claude Code, which asks the user before each push")
+    if "f" in shorts or any(abbreviates(n, o, 3) for n in longs for o in FORCE_OPTIONS):
+        reasons.append("force push rewrites published history")
+    if any(o.startswith("+") and len(o) > 1 for o in operands):
+        reasons.append("a +refspec push rewrites published history")
+    if ("d" in shorts or any(abbreviates(n, "--delete", 3) for n in longs)
+            or any(o.startswith(":") and len(o) > 1 for o in operands)):
+        reasons.append("deleting a remote ref destroys published history")
+    if any(abbreviates(n, "--mirror", 3) for n in longs):
+        reasons.append("git push --mirror overwrites and deletes remote refs")
+    if any(abbreviates(n, "--prune", 3) for n in longs):
+        reasons.append("git push --prune deletes remote refs")
+    return reasons
+
+
 def config_reason(args: list) -> str:
     options, operands = [], []
     index = 0
@@ -422,7 +447,7 @@ def config_reason(args: list) -> str:
     return ""
 
 
-def git_reasons(words: list) -> list:
+def git_reasons(words: list, plain_push_allowed: bool) -> list:
     reasons = []
     index = 1
     while index < len(words) and words[index].startswith("-"):
@@ -436,26 +461,20 @@ def git_reasons(words: list) -> list:
         index += 1
     sub = words[index] if index < len(words) else ""
     args = words[index + 1:]
-    shorts, longs, _ = parse_git_options(args, *GIT_OPTIONS.get(sub, ("", "", ())))
+    shorts, longs, operands = parse_git_options(args, *GIT_OPTIONS.get(sub, ("", "", ())))
     if sub in HOOK_SUBCOMMANDS:
         if any(abbreviates(name, "--no-verify", len("--no-v")) for name in longs):
             reasons.append(f"git {sub} --no-verify skips the repository's git hooks")
         if sub in ("am", "commit") and "n" in shorts:
             reasons.append(f"git {sub} -n skips the repository's git hooks")
     if sub == "push":
-        for token in args:
-            if token.startswith("--force") or re.fullmatch(r"-[A-Za-z]*f[A-Za-z]*", token):
-                reasons.append("force push rewrites published history")
-                break
-            if token.startswith("+") and len(token) > 1:
-                reasons.append("a +refspec push rewrites published history")
-                break
+        reasons.extend(push_reasons(shorts, longs, operands, plain_push_allowed))
     if sub == "config":
         reasons.append(config_reason(args))
     return [reason for reason in reasons if reason]
 
 
-def command_reasons(commands: list) -> list:
+def command_reasons(commands: list, plain_push_allowed: bool) -> list:
     reasons = []
     split = [split_command(words) for words in commands]
     runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
@@ -464,7 +483,7 @@ def command_reasons(commands: list) -> list:
         for name, value in assignments:
             reasons.append(assignment_reason(name, value, program, runs_hook_runner))
         if program == "git":
-            reasons.extend(git_reasons(rest))
+            reasons.extend(git_reasons(rest, plain_push_allowed))
     return list(dict.fromkeys(reason for reason in reasons if reason))
 
 
@@ -479,6 +498,12 @@ def extract_command(payload: dict) -> str:
         if isinstance(container, dict) and isinstance(container.get("command"), str):
             return container["command"]
     return ""
+
+
+def running_in_cursor(payload: dict) -> bool:
+    """Cursor runs the Claude Code hook command too; it sets CURSOR_VERSION for every
+    hook process and sends cursor_version in every payload (cursor.com/docs/agent/hooks)."""
+    return bool(os.environ.get("CURSOR_VERSION")) or "cursor_version" in payload
 
 
 def allow(tool: str) -> int:
@@ -505,7 +530,8 @@ def main() -> int:
         commands = parse_commands(command)
     except (ParseError, RecursionError):
         commands = rough_commands(command)
-    reasons = command_reasons(commands)
+    plain_push_allowed = tool == "claude" and not running_in_cursor(payload)
+    reasons = command_reasons(commands, plain_push_allowed)
     if not reasons:
         return allow(tool)
     print(
