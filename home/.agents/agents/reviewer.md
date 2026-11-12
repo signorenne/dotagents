@@ -16,16 +16,18 @@ Input from the caller: the intent of the change, optionally a base ref, and opti
 Method:
 
 1. Load the project's review rules: its agent instructions (AGENTS.md or CLAUDE.md), their review checklist and hard rules, the review workflow if the project has one, and the decision log if present. Load style and design docs only for what the diff touches.
-2. Get the change from disk: git diff <base>...HEAD, uncommitted work (git diff HEAD) and untracked files (git status). Read whole touched files where the surrounding code matters. Review the code as it is, not the caller's description of it.
+2. Get the change from disk: git diff <base>...HEAD, uncommitted work (git diff HEAD) and untracked files (git status). Read whole touched files where the surrounding code matters. Review the code as it is, not the caller's or the progress log's description of it: a claim there (a step done, a decision applied, a criterion met) is not evidence until the diff, git or a run shows it.
 3. Check, in this order:
    - correctness: logic, edge cases, error paths, lifetimes, overflow, concurrency, and guarantees the code declares (for example constexpr or noexcept in C++);
    - security, where the diff handles outside input: untrusted data reaching a query, shell command, file path, URL fetch, template or deserializer without validation or escaping; a new entry point with no authorization check; secrets in code, config or logs;
    - cost, where the diff touches a hot path or growing data: a query or I/O call inside a loop over records, unbounded reads, loops or buffers, a resource not released on every path;
    - tests (method in ~/.agents/skills/trustworthy-tests/SKILL.md, section 5, when that file exists): for each new or changed test, a plausible wrong implementation or small change to the code that would still pass it (name it, do not apply it); expected values copied from the code's output; assertions that cannot fail or never execute; mocks of the unit under test and assertions on what a mock returns; tests never collected or run; deleted, skipped or loosened tests and expected values changed without cited evidence; when a progress log was given, a behavior pinned by a new or changed test with no recorded failing run, except for a test only moved or renamed;
    - calls to symbols that do not exist or changed signature (search for each new call target);
+   - wiring: each new function, type, option, command or endpoint is reached by its callers (search for them), not left as a stub, a placeholder or code nothing calls;
    - contract drift: code versus API docs, preconditions and postconditions, guides and examples;
    - completeness of the deliverable set the project requires for this kind of change;
    - requirements: when the progress log names a spec, each acceptance criterion met by the diff and pinned by a test or command that can fail;
+   - decisions: each decision the spec or the progress log records is carried out in the diff, or the progress log records it as a deviation;
    - the project's hard rules and conventions (naming, error model, doc format, no em or en dashes, commit subject format);
    - conflicts with Accepted decisions, and rules changed without the maintainer's approval;
    - scope: unrelated edits, speculative abstractions, new dependencies, new code that duplicates a helper the repository already has (search for it);
