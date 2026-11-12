@@ -10,9 +10,11 @@ Blocks, in every simple command of the text (also after keywords such as if, do,
 wrappers such as sudo, env, xargs, time, nice, timeout):
   - git commit|push|merge|rebase|am|pull|cherry-pick --no-verify (or a prefix git accepts
     for it), git commit -n and git am -n (skip hooks);
-  - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0, and SKIP=<ids> when the
-    command runs git or pre-commit;
-  - git config --unset core.hooksPath, git -c core.hooksPath=... (disable hooks);
+  - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0|false, LEFTHOOK=0|false,
+    OVERCOMMIT_DISABLE=1, and SKIP=<ids> when the command runs git or pre-commit;
+  - hooks disabled through core.hooksPath: git config [--]unset core.hooksPath, git config
+    core.hooksPath set to an empty path or /dev/null, git -c or --config-env
+    core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
   - git push --force / -f / --force-with-lease / +refspec (rewrite published history).
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
@@ -40,6 +42,7 @@ WORD_END = BLANKS + OPERATOR_CHARS + "<>"
 REDIRECTION = re.compile(r"&>>?|<<<|<<-?|<>|<&|>>|>&|>\||<|>")
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.DOTALL)
 FALSY = {"", "0", "false", "no", "off"}
+OFF = {"0", "false", "no", "off"}
 
 KEYWORDS = {"!", "{", "if", "then", "elif", "else", "while", "until", "do"}
 DECLARATIONS = {"export", "declare", "typeset", "local", "readonly"}
@@ -63,7 +66,7 @@ WRAPPERS = {
 }
 HOOK_RUNNERS = {"git", "pre-commit"}
 
-GIT_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--namespace", "--work-tree"}
+GIT_VALUE_OPTIONS = {"-C", "-c", "--config-env", "--git-dir", "--namespace", "--work-tree"}
 HOOK_SUBCOMMANDS = {"am", "cherry-pick", "commit", "merge", "pull", "push", "rebase"}
 # Per subcommand: (short options taking a value, short options whose optional value can
 # only be glued, long options taking the next word as value).
@@ -74,6 +77,9 @@ GIT_OPTIONS = {
                                 "--reuse-message", "--squash", "--template", "--trailer",
                                 "--unified"}),
 }
+CONFIG_VALUE_OPTIONS = {"-f", "--blob", "--comment", "--default", "--file", "--type",
+                        "--url", "--value"}
+CONFIG_ACTIONS = {"edit", "get", "list", "remove-section", "rename-section", "set", "unset"}
 
 
 class ParseError(ValueError):
@@ -347,12 +353,18 @@ def assignment_reason(name: str, value: str, program: str, runs_hook_runner: boo
     setting = value.strip().lower()
     if re.search(r"SKIP_HOOKS?$", name) and setting not in FALSY:
         return f"{name}={value} skips the repository's git hooks"
-    if name == "HUSKY" and value.strip() == "0":
-        return "HUSKY=0 skips the repository's git hooks"
+    if name in ("HUSKY", "LEFTHOOK") and setting in OFF:
+        return f"{name}={value} skips the repository's git hooks"
+    if name == "OVERCOMMIT_DISABLE" and setting not in FALSY:
+        return f"{name}={value} skips the repository's git hooks"
     if name == "SKIP" and setting not in FALSY:
         # A bare or exported SKIP= reaches the git or pre-commit run later in the text.
         if program in HOOK_RUNNERS or (not program and runs_hook_runner):
             return "SKIP= skips pre-commit hooks"
+    if re.fullmatch(r"GIT_CONFIG_KEY_\d+", name) and setting == "core.hookspath":
+        return f"{name}=core.hooksPath overrides the repository's git hooks"
+    if name == "GIT_CONFIG_PARAMETERS" and "core.hookspath" in setting:
+        return "GIT_CONFIG_PARAMETERS with core.hooksPath overrides the repository's git hooks"
     return ""
 
 
@@ -386,14 +398,41 @@ def parse_git_options(args: list, short_values: str, short_optional: str, long_v
     return shorts, longs, operands
 
 
+def config_reason(args: list) -> str:
+    options, operands = [], []
+    index = 0
+    while index < len(args):
+        word = args[index]
+        index += 1
+        if word.startswith("-") and len(word) > 1:
+            options.append(word.split("=", 1)[0])
+            if "=" not in word and word in CONFIG_VALUE_OPTIONS:
+                index += 1
+        else:
+            operands.append(word)
+    action = operands.pop(0) if operands and operands[0] in CONFIG_ACTIONS else ""
+    if not operands or operands[0].lower() != "core.hookspath":
+        return ""
+    if action == "unset" or any(abbreviates(o, "--unset-all", 4) for o in options):
+        return "unsetting core.hooksPath disables the repository's git hooks"
+    reading = action in ("get", "list") or any(o.startswith("--get") or o in ("-l", "--list")
+                                               for o in options)
+    if not reading and len(operands) > 1 and operands[1].strip() in ("", "/dev/null"):
+        return "core.hooksPath set to an empty path or /dev/null disables the repository's git hooks"
+    return ""
+
+
 def git_reasons(words: list) -> list:
     reasons = []
     index = 1
     while index < len(words) and words[index].startswith("-"):
-        if words[index] in GIT_VALUE_OPTIONS and index + 1 < len(words):
-            if words[index] == "-c" and words[index + 1].lower().startswith("core.hookspath="):
-                reasons.append("git -c core.hooksPath=... disables the repository's git hooks")
+        word = words[index]
+        name, _, value = word.partition("=")
+        if word in GIT_VALUE_OPTIONS:
+            value = words[index + 1] if index + 1 < len(words) else ""
             index += 1
+        if name in ("-c", "--config-env") and value.split("=", 1)[0].strip().lower() == "core.hookspath":
+            reasons.append(f"git {name} core.hooksPath=... disables the repository's git hooks")
         index += 1
     sub = words[index] if index < len(words) else ""
     args = words[index + 1:]
@@ -412,9 +451,7 @@ def git_reasons(words: list) -> list:
                 reasons.append("a +refspec push rewrites published history")
                 break
     if sub == "config":
-        lowered = [t.lower() for t in args]
-        if any(t.startswith("--unset") for t in lowered) and "core.hookspath" in lowered:
-            reasons.append("unsetting core.hooksPath disables the repository's git hooks")
+        reasons.append(config_reason(args))
     return [reason for reason in reasons if reason]
 
 
