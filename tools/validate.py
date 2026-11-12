@@ -463,6 +463,70 @@ def check_marketplace(errors: list) -> None:
             errors.append(f"{folder.relative_to(ROOT)}: in {count} packs of tools/build.py (PACKS), not one")
 
 
+# claude plugin eval (code.claude.com/docs/en/plugin-evals): an unknown key in a case's
+# prompt.md is an error, a case needs a grader, and these are the grader types.
+EVAL_CASE_KEYS = {"schema_version", "name", "description", "tags", "plugins", "runs", "expected_outcome", "model",
+                  "max_turns", "timeout_seconds", "allowed_tools", "append_system_prompt", "env"}
+GRADER_TYPES = {"regex", "tool_used", "tool_order", "file_exists", "llm", "baseline"}
+
+
+def simple_frontmatter(text: str) -> tuple:
+    """({key: raw value}, body) of a "---" block of key: value lines."""
+    if not text.startswith("---\n") or "\n---\n" not in text[4:] + "\n":
+        return {}, text
+    head, _, body = text[4:].partition("\n---\n")
+    meta = {}
+    for line in head.splitlines():
+        key, sep, value = line.partition(":")
+        if sep and key.strip() and not line.startswith(" "):
+            value = value.strip()
+            meta[key.strip()] = value[1:-1] if len(value) > 1 and value[0] == value[-1] and value[0] in "'\"" else value
+    return meta, body
+
+
+def check_evals(errors: list) -> None:
+    """Each eval case under packs/<pack>/evals/ loads as claude plugin eval documents it, and a
+    Skill grader names a skill of its pack: a check that runs no model."""
+    for case in sorted(ROOT.glob("packs/*/evals/*")):
+        if not case.is_dir() or case.name == "results":
+            continue
+        rel = case.relative_to(ROOT)
+        skills = {p.name for p in (case.parent.parent / "skills").iterdir()} if (case.parent.parent / "skills").is_dir() else set()
+        prompt = case / "prompt.md"
+        if not prompt.is_file():
+            errors.append(f"{rel}: no prompt.md")
+            continue
+        meta, body = simple_frontmatter(prompt.read_text(encoding="utf-8"))
+        for key in sorted(set(meta) - EVAL_CASE_KEYS):
+            errors.append(f"{rel}/prompt.md: unknown key {key!r}")
+        if not body.strip():
+            errors.append(f"{rel}/prompt.md: no prompt")
+        graders = sorted((case / "graders").glob("*.md"))
+        if not graders:
+            errors.append(f"{rel}: no grader")
+        for grader in graders:
+            g, _ = simple_frontmatter(grader.read_text(encoding="utf-8"))
+            name = grader.relative_to(ROOT)
+            if g.get("type") not in GRADER_TYPES:
+                errors.append(f"{name}: type {g.get('type')!r} is not a grader type")
+            if g.get("arm") not in (None, "with-only", "both"):
+                errors.append(f"{name}: arm {g.get('arm')!r}")
+            if g.get("type") != "tool_used" or g.get("tool") != "Skill":
+                continue
+            if "Skill" not in meta.get("allowed_tools", ""):
+                errors.append(f"{rel}/prompt.md: a Skill grader needs Skill in allowed_tools")
+            pattern = g.get("input_match", "")
+            try:
+                re.compile(pattern)
+            except re.error as error:
+                errors.append(f"{name}: input_match {error}")
+            found = re.search(r"\)\?([\w-]+)", pattern)
+            if not found or found.group(1) not in skills:
+                errors.append(f"{name}: names no skill of its pack")
+            if g.get("max") == "0" and g.get("arm") != "both":
+                errors.append(f"{name}: a must-not-fire check needs arm: both, or a two-arm run leaves it out")
+
+
 SIZE_BASELINE = ROOT / "tools" / "size-baseline.json"
 SIZE_GROWTH = 0.10  # a file may grow this share over its baseline before it fails
 
@@ -516,6 +580,7 @@ def main() -> int:
     check_overrides(errors)
     check_path_rules(errors)
     check_marketplace(errors)
+    check_evals(errors)
     check_sizes(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):

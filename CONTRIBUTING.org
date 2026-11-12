@@ -64,6 +64,12 @@ A change to a skill's pack, a subagent, a hook script or the hooks of
 which rewrites the committed =.claude-plugin/marketplace.json= and the links in
 =packs/=; validate fails until they match.
 
+The method pack's trigger cases (=packs/method/evals/=) check that build,
+design, close and decide fire on their requests and stay quiet on others,
+with free graders only. =tools/validate.py= checks their structure without a
+model; running them is a real session per case and run, so it waits for the
+maintainer's go: =claude plugin eval packs/method --runs 1=.
+
 When a gate fails because the change is wrong, fix the change: no skipped,
 deleted or loosened tests and no hook bypass without the maintainer's
 approval.

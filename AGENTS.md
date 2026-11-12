@@ -40,6 +40,7 @@ docs/                         Org docs: docs map, architecture, workflow guide, 
 - A new tool or a format change: a description in install.py (TOOL_DESCRIPTIONS), which the shared suite in tests/test_install.py (Descriptions) checks, plus tests for anything new in its format.
 - Something only the maintainer wants (an allow rule, a plugin switch, a personal line in the rules): personal/.
 - A new check: tools/validate.py, with a test in tests/test_tools.py.
+- A trigger case for a pack's skills: packs/<pack>/evals/<case>/ (prompt.md and free graders), checked by tools/validate.py; running it with claude plugin eval spends usage and is the maintainer's call.
 - A change to the guard replay or the benchmark: tools/guard_replay.py or tools/benchmark.py, standard library only, with tests in tests/test_tools.py that meet only fake claude, podman and harness programs.
 - A path rule (a skill an agent should use on matching files): home/.agents/path-rules.json, checked by tools/validate.py; install.py writes Claude Code's rule files (~/.claude/rules/dotagents-<skill>.md) from it, with a test in tests/test_install.py.
 - A check on this repository's commit messages: .githooks/commit-msg, with tests in tests/test_tools.py.

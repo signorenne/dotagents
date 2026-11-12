@@ -84,6 +84,27 @@ class Tools(unittest.TestCase):
         self.assertFalse((self.repo / "packs/craft/skills/stray").is_symlink())
         self.assertTrue((self.repo / "packs/method/skills/build").is_symlink())
 
+    def test_validate_checks_eval_cases_without_running_them(self):
+        case = self.repo / "packs/method/evals/broken"
+        (case / "graders").mkdir(parents=True)
+        (case / "prompt.md").write_text("---\nname: broken\nturns: 3\nallowed_tools: [Read]\n---\n\nDo it.\n")
+        (case / "graders/a.md").write_text("---\ntype: judge\n---\n")
+        (case / "graders/b.md").write_text("---\ntype: tool_used\ntool: Skill\n"
+                                           "input_match: '\"skill\"\\s*:\\s*\"(?:[\\w-]+:)?qt-quick\"'\n"
+                                           "min: 0\nmax: 0\n---\n")
+        empty = self.repo / "packs/method/evals/empty"
+        empty.mkdir()
+        (empty / "prompt.md").write_text("---\nname: empty\n---\n\nHi.\n")
+        lines = self.run_tool("validate.py").stdout.splitlines()
+        for line in ("FAIL packs/method/evals/broken/prompt.md: unknown key 'turns'",
+                     "FAIL packs/method/evals/broken/graders/a.md: type 'judge' is not a grader type",
+                     "FAIL packs/method/evals/broken/prompt.md: a Skill grader needs Skill in allowed_tools",
+                     "FAIL packs/method/evals/broken/graders/b.md: names no skill of its pack",
+                     "FAIL packs/method/evals/broken/graders/b.md: a must-not-fire check needs arm: both, or a "
+                     "two-arm run leaves it out",
+                     "FAIL packs/method/evals/empty: no grader"):
+            self.assertIn(line, lines)
+
     def test_validate_rejects_a_toml_end_marker_in_a_subagent(self):
         scout = self.repo / "home/.agents/agents/scout.md"
         scout.write_text(scout.read_text() + "\nA TOML end marker: '''\n")
