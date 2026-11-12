@@ -1,0 +1,27 @@
+@startuml arch_claude_ai
+!include palette.iuml
+title How do the rules and skills reach claude.ai?
+
+actor Maintainer as user
+participant "tools/build.py" as build
+collections "dist/" as dist
+participant "claude.ai" as web
+participant "Claude Code" as code
+
+user -> build : python3 tools/build.py
+build -> build : check overrides.json\n(stops if one lacks\na description)
+build -> dist : empty it
+build -> dist : claude-ai/<skill>.zip\nfor each claude.ai skill
+build -> dist : claude-ai/<skill>.zip for each\nlocal skill in overrides.json
+build -> dist : claude-ai-skills.zip\n(all of the above)
+build -> dist : project-kit.zip\n(project-setup templates)
+
+user -> web : upload each changed zip
+user -> web : paste home/.agents/AGENTS.md\ninto the instructions
+web -> code : syncs anthropic-skills:<name>
+note right of code : turned off by\nskillOverrides,\nset by install.py
+
+legend right
+  Solid arrow: a call, a write or a hand step
+endlegend
+@enduml

@@ -1,0 +1,44 @@
+@startuml arch_skills_workflow
+!include palette.iuml
+title Which skills and subagents carry a change through a repository?
+
+component "decide" as decide
+component "gates" as gates
+component "project-setup" as setup
+component "spec" as spec
+component "review" as review
+package "Subagents" {
+  component "gate-runner" as runner
+  component "scout" as scout
+  component "reviewer" as reviewer
+}
+component "session-close" as close
+component "implement" as implement
+component "trustworthy-tests" as tests
+component "systematic-debugging" as debug
+
+decide <-- setup : open points
+decide <-- spec : design choices
+
+gates --> runner
+setup --> runner : commands
+setup --> scout : survey
+spec --> scout : map
+spec --> reviewer : check spec
+review --> reviewer
+
+runner <-- implement : gates
+scout <-- implement : ground
+reviewer <-- implement : review
+decide <-- implement : user's choices
+
+spec ..> implement : spec file
+close ..> implement : handoff
+implement --> tests : test first
+implement --> debug : two failed fixes
+
+legend right
+  Solid arrow: calls in the same session
+  Dashed arrow: a file read by a fresh session
+endlegend
+@enduml
