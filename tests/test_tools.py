@@ -140,6 +140,9 @@ class Tools(unittest.TestCase):
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
 
     def test_validate_holds_each_instruction_file_to_its_size_baseline(self):
+        # From sizes recorded now, so the test does not depend on how far the repository's
+        # files have grown within their 10% since their baseline was last recorded.
+        self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
         skill = self.repo / "home/.agents/skills/build/SKILL.md"
         baseline = json.loads((self.repo / "tools/size-baseline.json").read_text())["home/.agents/skills/build/SKILL.md"]
         limit = int(baseline * 1.1)
