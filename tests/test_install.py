@@ -286,6 +286,43 @@ class Install(unittest.TestCase):
         self.assertEqual(allowed.returncode, 0, allowed)
         self.assertNotEqual(json.loads(allowed.stdout or "{}").get("permissionDecision"), "deny")
 
+    def assert_hook_group(self, group: dict, script: str, tool: str, matching, other, timeout_range):
+        """One matcher group with one command handler, as Codex and Gemini CLI document it."""
+        for name in matching:  # the matcher is a regex on the tool name
+            self.assertTrue(re.search(group["matcher"], name), (script, name))
+        for name in other:
+            self.assertFalse(re.search(group["matcher"], name), (script, name))
+        (handler,) = group["hooks"]
+        self.assertEqual(handler["type"], "command")
+        self.assertEqual(handler["command"], f'python3 "$HOME/.agents/hooks/{script}" --tool {tool}')
+        self.assertIn(handler["timeout"], timeout_range)
+
+    def test_codex_hooks_follow_the_documented_format(self):
+        # Codex hooks docs: ~/.codex/hooks.json holds a hooks object keyed by event; the
+        # matcher is a regex on the tool name (shell commands match as Bash, file edits as
+        # apply_patch, Edit or Write); timeout is in seconds.
+        self.install("--tools", "codex")
+        hooks = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]
+        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse"])
+        (pre,), (post,) = hooks["PreToolUse"], hooks["PostToolUse"]
+        self.assert_hook_group(pre, "guard_bash.py", "codex", ["Bash"], ["apply_patch", "Edit", "Write"],
+                               range(1, 601))
+        self.assert_hook_group(post, "after_edit.py", "codex", ["apply_patch", "Edit", "Write"], ["Bash"],
+                               range(1, 601))
+
+    def test_gemini_hooks_follow_the_documented_format(self):
+        # Gemini CLI hooks reference: settings.json holds a hooks object keyed by event
+        # (BeforeTool, AfterTool); the matcher is a regex on the tool name; timeout is in
+        # milliseconds. Tool names: run_shell_command, write_file, replace.
+        self.install("--tools", "gemini")
+        hooks = json.loads((self.home / ".gemini/settings.json").read_text())["hooks"]
+        self.assertEqual(sorted(hooks), ["AfterTool", "BeforeTool"])
+        (before,), (after,) = hooks["BeforeTool"], hooks["AfterTool"]
+        self.assert_hook_group(before, "guard_bash.py", "gemini", ["run_shell_command"],
+                               ["write_file", "replace", "read_file"], range(1000, 600001))
+        self.assert_hook_group(after, "after_edit.py", "gemini", ["write_file", "replace"],
+                               ["run_shell_command", "read_file"], range(1000, 600001))
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")
