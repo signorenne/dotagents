@@ -513,13 +513,10 @@ maintainer accepts it. Record a rule when reversing it
 would cost real work, or when someone is likely to propose the rejected option
 again.
 
-The method rework proposes replacing or narrowing five of these rules
-(=stop-on-plan-change=, =grouped-questions=, =progress-log=,
-=tests-attacked=, =as-built-session-model=) and adds others. Until the maintainer
-accepts them, the rules below bind. The table's guide and sensor cells already
-name the files that carry each rule on this branch (close, build, the plan
-file); the rule bodies keep their accepted wording until the proposed
-vocabulary is accepted.
+The method rework's rules were accepted by the maintainer on 12 November
+2026: they replaced =stop-on-plan-change=, =grouped-questions=,
+=progress-log= and =as-built-session-model=, narrowed =tests-attacked=, and
+added the entries from =closed-stop-list= on.
 
 Each rule has a stable anchor, its =CUSTOM_ID=, for skills and docs to cite
 (for example =DESIGN.org#no-agent-push=; an Org link adds =::= before the
@@ -537,34 +534,45 @@ passes only after running the check" (Reasoning and evidence) has the claim
 check, and "after two failed fixes, stop" (Agentic work) has the repeated
 failure hook's reminder.
 
-| Rule                        | Guide                                                                              | Sensor                                                                                                                                                            |
-|-----------------------------+------------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| =refute-first=              | global rules (Refute before you rely), close (lessons)                             | the reviewer's attack on a change's central claims                                                                                                                |
-| =stop-on-plan-change=       | global rules (Refute before you rely, Grounding)                                   | none: the model only                                                                                                                                              |
-| =grouped-questions=         | decide, global rules (Decisions)                                                   | none: the model only                                                                                                                                              |
-| =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); the progress check in Claude Code and Codex (a branch commit missing from its log)     |
-| =tests-attacked=            | implement (section 7), trustworthy-tests                                           | the reviewer's attack on each new or changed test                                                                                                                 |
-| =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                              |
-| =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
-| =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
-| =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                      | the reviewer's checklist question; the replay report in the plan file                                                                                            |
-| =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                               | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
-| =skills-from-real-runs=     | =docs/skill-authoring.org=                                                         | none: the model only                                                                                                                                              |
-| =light-scripts=             | =AGENTS.md= (Where changes go)                                                     | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
-| =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                                       | none: the model only                                                                                                                                              |
-| =tutor-name=                | this rule                                                                          | none: the model only                                                                                                                                              |
-| =as-built-session-model=    | as-built-docs                                                                      | none: the model only                                                                                                                                              |
-| =clean-architecture-layers= | clean-architecture                                                                 | in a project, the layer checks the skill adds to the gates                                                                                                        |
-| =ui-never-blocks=           | event-driven-ui                                                                    | in a project, the owning-thread assertions and platform detectors the skill turns on                                                                              |
-| =diagram-palette=           | plantuml-diagrams                                                                  | none: the model only                                                                                                                                              |
-| =as-built-for-people=       | as-built-docs                                                                      | in a project, the skill's checks 1 to 7, each seen catching a planted error, and its fact-check                                                                   |
-| =as-built-pictures=         | as-built-docs                                                                      | in a project, the skill's check 7 (a legend entry for each marker)                                                                                                |
-| =confirmed-audit-findings=  | code-audit                                                                         | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                                |
-| =no-agent-push=             | global rules (Agentic work, Git)                                                   | the guard in every tool (=tests/test_hooks.py=, with its bypass battery) and its =onFailure= block in Claude Code, Claude Code's deny rules, the Codex rules file |
-| =main-commits-here=         | =AGENTS.md= (Hard rules)                                                           | the maintainer's review before every push                                                                                                                         |
-| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, build (section 4)     | Claude Code asks before =git rebase=, =git merge=, =git update-ref= and a forced =git branch= move, rename, copy or delete, each also after =git -C <dir>=        |
-| =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                       | Claude Code's empty attribution settings; this repository's =.githooks/commit-msg= once enabled (an AI trailer, the subject format)                               |
-| =mit-license=               | =AGENTS.md= (Hard rules)                                                           | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                                       |
+| Rule                        | Guide                                                                          | Sensor                                                                                                                                                            |
+|-----------------------------+--------------------------------------------------------------------------------+-------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| =refute-first=              | global rules (Refute before you rely), close (lessons)                         | the reviewer's attack on a change's central claims                                                                                                                |
+| =closed-stop-list=          | global rules (Agentic work), build (section 5), =METHOD.org=                   | none: the model only; the rulings table in each plan shows what was decided instead                                                                               |
+| =one-batch=                 | build (section 3), decide, global rules (Decisions)                            | none: the model only                                                                                                                                              |
+| =plan-file=                 | build, close, =METHOD.org= (The plan file)                                     | the step log (commit lines without a model turn); plan_state; the reviewer (fail-first lines, log claims checked against the diff)                                |
+| =tests-attacked=            | build (sections 5 and 7), trustworthy-tests                                    | the reviewer's attack on each new or changed test; check_step --expect-fail records the failing run                                                               |
+| =lanes=                     | global rules (Agentic work), build (section 2), =METHOD.org= (Lanes)           | floor_check (a quick change that outgrew its lane); fail rule Q                                                                                                   |
+| =one-entry=                 | build, design, close                                                           | =install.py= (the retired skills removed)                                                                                                                         |
+| =single-review-pass=        | build (section 7)                                                              | fail rule R                                                                                                                                                       |
+| =inline-build=              | =METHOD.org=                                                                   | none: the model only                                                                                                                                              |
+| =delegation-tiers=          | global rules (Agentic work), the fan-out skills                                | none: the model only                                                                                                                                              |
+| =terse-register=            | global rules (Output)                                                          | none: the model only                                                                                                                                              |
+| =method-owner=              | =AGENTS.md= (Where changes go)                                                 | none: the model only                                                                                                                                              |
+| =fail-rules=                | =METHOD.org= (Measuring)                                                       | =tools/session_stats.py=; the counts when 10 changes of a lane have landed                                                                                        |
+| =learning-in-global-rules=  | global rules (Learning), tutor                                                 | none: the model only                                                                                                                                              |
+| =one-source=                | =AGENTS.md= (Where changes go)                                                 | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
+| =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                 | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
+| =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                  | the reviewer's checklist question; the replay report in the plan file                                                                                             |
+| =installer-manifest=        | =AGENTS.md= (Where changes go)                                                 | =tests/test_install.py= (Descriptions, Manifest); the install and rollback proof                                                                                  |
+| =packs-and-personal-layer=  | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (the marketplace and packs match =tools/build.py=)                                                                                            |
+| =global-rules-size=         | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (at most 9,000 characters)                                                                                                                    |
+| =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                           | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
+| =skills-from-real-runs=     | =docs/skill-authoring.org=                                                     | none: the model only                                                                                                                                              |
+| =light-scripts=             | =AGENTS.md= (Where changes go)                                                 | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
+| =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                                   | none: the model only                                                                                                                                              |
+| =tutor-name=                | this rule                                                                      | none: the model only                                                                                                                                              |
+| =measured-tiers=            | as-built-docs, code-audit, notes-from-work, =METHOD.org= (Delegation)          | the coverage and error rate each as-built-docs run records                                                                                                        |
+| =clean-architecture-layers= | clean-architecture                                                             | in a project, the layer checks the skill adds to the gates                                                                                                        |
+| =ui-never-blocks=           | event-driven-ui                                                                | in a project, the owning-thread assertions and platform detectors the skill turns on                                                                              |
+| =diagram-palette=           | plantuml-diagrams                                                              | none: the model only                                                                                                                                              |
+| =as-built-for-people=       | as-built-docs                                                                  | in a project, the skill's checks 1 to 7, each seen catching a planted error, and its fact-check                                                                   |
+| =as-built-pictures=         | as-built-docs                                                                  | in a project, the skill's check 7 (a legend entry for each marker)                                                                                                |
+| =confirmed-audit-findings=  | code-audit                                                                     | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                                |
+| =no-agent-push=             | global rules (Agentic work, Git)                                               | the guard in every tool (=tests/test_hooks.py=, with its bypass battery) and its =onFailure= block in Claude Code, Claude Code's deny rules, the Codex rules file |
+| =main-commits-here=         | =AGENTS.md= (Hard rules)                                                       | the maintainer's review before every push                                                                                                                         |
+| =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, build (section 4) | Claude Code asks before =git rebase=, =git merge=, =git update-ref= and a forced =git branch= move, rename, copy or delete, each also after =git -C <dir>=        |
+| =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                   | Claude Code's empty attribution settings; this repository's =.githooks/commit-msg= once enabled (an AI trailer, the subject format)                               |
+| =mit-license=               | =AGENTS.md= (Hard rules)                                                       | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                                       |
 
 ** Working method
 
@@ -573,67 +581,164 @@ failure hook's reminder.
 :CUSTOM_ID: refute-first
 :END:
 Every agent tries to break each claim its work depends on with the cheapest
-check that could fail, records what broke in the progress log and the
-handoff, and drafts, for each lesson a rule should have taught, a check that
-catches the mistake when one command or tool call can, otherwise a rule
-change.
+check that could fail, records what broke in the plan file (or, with no
+plan, the handoff), and drafts, for each lesson a rule should have taught, a
+check that catches the mistake when one command or tool call can, otherwise
+a rule change.
 It sits in the always-loaded global rules because problems were caught by
 external checks and independent agents, never by rereading.
 
-In: =home/.agents/AGENTS.md= (Refute before you rely), =session-close= (the
+In: =home/.agents/AGENTS.md= (Refute before you rely), =close= (the
 lessons).
 
-*** Stop only when a refuted claim changes the plan
+*** The work stops only for a closed list; every other choice is a ruling
 :PROPERTIES:
-:CUSTOM_ID: stop-on-plan-change
+:CUSTOM_ID: closed-stop-list
 :END:
-A refuted claim, or a difference between reality and memory or a document,
-stops the work for a report only when it changes the plan, a requirement or a
-decision; anything else is corrected and recorded. Routine work keeps going,
-and the user still hears first about every change to what was approved.
+During a change the agent stops only for a change to the frozen intent; a
+public API, architecture, dependency, data migration or other choice that
+is the maintainer's the plan does not hold; an irreversible, destructive or
+security-sensitive action; a test or gate that could pass only by being
+deleted or loosened; a conflict with an accepted decision; two changed
+approaches that both failed; a plan so broken that every path is a guess.
+Every other choice is a ruling, recorded in the plan with its reason, the
+alternative and what it costs if wrong, and listed at the end for the
+maintainer's review. In 13 days the agent stopped for 375 question rounds
+against 477 prompts. Replaces =stop-on-plan-change=.
 
-In: =home/.agents/AGENTS.md= (Refute before you rely, Grounding).
+In: =METHOD.org= (Questions and stops), =home/.agents/AGENTS.md=
+(Agentic work), =home/.agents/skills/build/SKILL.md=.
 
-*** Independent low-stakes questions may share a message
+*** Questions come in one batch, after an assumptions table
 :PROPERTIES:
-:CUSTOM_ID: grouped-questions
+:CUSTOM_ID: one-batch
 :END:
-decide asks one question at a time, except that up to four independent,
-low-stakes questions, each with its default, may share one message. Trivial
-setup choices do not each deserve a round; dependent questions still go one
-by one.
+Before approval the agent shows, in one message, its assumptions as a table
+(evidence, what breaks if wrong, how sure) and the open questions that are
+the maintainer's, each with options, consequences and its recommendation.
+One answer approves the plan. decide does the same: the assumptions table
+first, then independent questions together, a dependent one after the
+answer it depends on. Replaces =grouped-questions=.
 
-In: =home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md=
-(Decisions).
+In: =METHOD.org=, =home/.agents/skills/build/SKILL.md=,
+=home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md= (Decisions).
 
-*** Implementation keeps a progress log
+*** One plan file per change carries its state
 :PROPERTIES:
-:CUSTOM_ID: progress-log
+:CUSTOM_ID: plan-file
 :END:
-implement writes =.private/progress/<slug>.<ext>= as it works: the baseline
-check on the base commit, each step with its commit and check, each gate run
-with the commit it ran on, each decision with who took it, its reason and the
-alternative, each attempt that failed, and each review finding's disposition;
-an agent's decision stays pending until the user keeps or changes it. The user reviews every choice in
-one place, and a later session resumes from facts.
+A quick or full change keeps one plan file, =.private/plans/<slug>.<ext>=: a
+state header the scripts read, the intent frozen at approval, the code map,
+assumptions, steps, rulings, dead ends and review; the log beside it,
+written only by scripts and hooks, records each check, failing-first run,
+gate and commit. Any session resumes from it, and no handoff is written
+where a plan exists. Replaces =progress-log=.
 
-In: =home/.agents/skills/implement/SKILL.md= (section 5),
-=home/.agents/skills/session-close/SKILL.md=,
-=home/.agents/hooks/progress_check.py=.
+In: =METHOD.org= (The plan file), =home/.agents/skills/build/=, =close=,
+=home/.agents/hooks/step_log.py=, =home/.agents/hooks/session_refresh.py=.
 
 *** Tests are written by the implementer and attacked by the reviewer
 :PROPERTIES:
 :CUSTOM_ID: tests-attacked
 :END:
-The implementer sees each test fail for the right reason; the reviewer names a
-wrong implementation that would still pass it. An expected value changes only
-with cited evidence, and deleting, skipping or loosening a test needs the
-user's approval, except the test of a behavior an approved spec or plan
-removes.
-Every test gets an independent attack with no extra agent per step.
+The implementer sees each test fail for the right reason, and check_step
+records the failing run; the reviewer names a wrong implementation that
+would still pass each new or changed test. A test a review fix adds is
+proven by a failing run and attacked again only when the risk is high or
+the fix added a public surface. An expected value changes only with cited
+evidence, and deleting, skipping or loosening a test needs the maintainer's
+approval, except the test of a behavior an approved plan removes.
 
-In: =home/.agents/skills/implement/SKILL.md= (section 7),
+In: =home/.agents/skills/build/SKILL.md= (sections 5 and 7),
 =home/.agents/agents/reviewer.md=, =claude-ai/skills/trustworthy-tests/=.
+
+*** Every change takes a lane
+:PROPERTIES:
+:CUSTOM_ID: lanes
+:END:
+Every change in a repository takes a lane, said after investigating so the
+maintainer can override it in one word: direct (one sentence, one or two
+known files), quick (about 100 changed lines or fewer, no risk surface, no
+choice of the maintainer's: announced and not awaited, one quick review)
+or full (anything larger or any risk surface: one approval holding every
+question, the full review). A lane goes up, never down; floor_check raises
+a quick change that outgrew its lane. Revisit by fail rule Q.
+
+In: =METHOD.org= (Lanes), =home/.agents/AGENTS.md= (Agentic work),
+=home/.agents/skills/build/SKILL.md=, =floor_check.py=.
+
+*** build, design and close are the entries
+:PROPERTIES:
+:CUSTOM_ID: one-entry
+:END:
+build plans and builds one change; design exists only for work that needs
+several plans; close ends a session. They replace spec, implement and
+session-close.
+
+In: =home/.agents/skills/build/=, =design/=, =close/=.
+
+*** One review pass unless the risk is high
+:PROPERTIES:
+:CUSTOM_ID: single-review-pass
+:END:
+A second reviewer pass, limited to the fixes, happens only when the risk is
+high or a fix added a public surface; every behavior-changing fix is proven
+by a test seen failing first. Revisit by fail rule R.
+
+In: =METHOD.org= (Review and triage), =home/.agents/skills/build/SKILL.md=
+(section 7).
+
+*** Implementation runs in the main conversation
+:PROPERTIES:
+:CUSTOM_ID: inline-build
+:END:
+Handing a whole plan to one builder subagent is an experiment, adopted only
+when the numbers show shorter sessions at equal quality.
+
+In: =METHOD.org= (Resume and short contexts).
+
+*** Every delegation names its form, size, model and effort
+:PROPERTIES:
+:CUSTOM_ID: delegation-tiers
+:END:
+Every delegation names its return form, a size limit, the model and the
+effort; judgment (review, fact-checks, verdicts) stays on the strongest
+model; the session's own effort stays the maintainer's setting.
+
+In: =METHOD.org= (Delegation), =home/.agents/AGENTS.md= (Agentic work), the
+fan-out skills.
+
+*** A terse register, full sentences where someone acts
+:PROPERTIES:
+:CUSTOM_ID: terse-register
+:END:
+Chat replies and status lines use the terse register (answer first, no
+ceremony, every fact kept, at most one short line between tool calls), and
+briefs and reports between agents use fixed short forms; full sentences
+stay for questions to the maintainer, warnings, irreversible steps and
+every text someone acts on later.
+
+In: =METHOD.org= (Register), =home/.agents/AGENTS.md= (Output).
+
+*** METHOD.org owns the method
+:PROPERTIES:
+:CUSTOM_ID: method-owner
+:END:
+The global rules state the method's core in its vocabulary and the skills
+apply it without restating it.
+
+In: =METHOD.org=.
+
+*** The method is judged by rules written before the switch
+:PROPERTIES:
+:CUSTOM_ID: fail-rules
+:END:
+The quality of the method is measured on landed changes against the
+baseline of 12 November 2026, by the rules Q, R and F in METHOD.org
+(Measuring); a rule that fires sends its part back to the earlier method,
+and the result goes into this log.
+
+In: =METHOD.org= (Measuring), =tools/session_stats.py=.
 
 *** Learning lives in the global rules
 :PROPERTIES:
@@ -679,12 +784,43 @@ A change to =home/.agents/hooks/guard_bash.py= lands only after
 =tools/guard_replay.py= compared the guard of the target branch with the
 changed one over the shell commands of the maintainer's Claude Code
 transcripts, and the maintainer judged each command the change newly blocks;
-the progress log records the counts and the judgement. It is a local step,
+the plan file records the counts and the judgement. It is a local step,
 not a CI gate, because the transcripts exist only on the maintainer's
 machine.
 
 In: =tools/guard_replay.py=, =CONTRIBUTING.org= (Workflow), =AGENTS.md=
 (Review checklist).
+
+*** The installer owns only what it recorded
+:PROPERTIES:
+:CUSTOM_ID: installer-manifest
+:END:
+The installer records every file it writes with its hash; an upgrade keeps
+a file changed by hand unless forced, removes what it owned and dropped,
+and an uninstall removes only what it owns and nobody changed.
+
+In: =install.py= (the manifest), =tests/test_install.py=.
+
+*** Packs for others, a personal layer for the maintainer
+:PROPERTIES:
+:CUSTOM_ID: packs-and-personal-layer
+:END:
+Other people install the setup through the Claude Code packs or install.py;
+what is the maintainer's alone lives in the personal layer, applied after
+the shared one.
+
+In: =tools/build.py= (PACKS), =packs/=, =.claude-plugin/marketplace.json=,
+=personal/=, =install.py= (=--personal=).
+
+*** The global rules stay under 9,000 characters
+:PROPERTIES:
+:CUSTOM_ID: global-rules-size
+:END:
+Checked by tools/validate.py, because the Claude Code pack prints them from
+a session-start hook capped at 10,000 characters. Replaces the 200-line
+limit.
+
+In: =tools/validate.py=, =AGENTS.md= (Where changes go).
 
 ** Skills
 
@@ -710,7 +846,7 @@ final commit, a generated file changed at its generator, tests on the current
 build, a check script trusted only after it catches a planted case, and
 slowness measured.
 
-In: =docs/skill-authoring.org=; the five rules in =implement=,
+In: =docs/skill-authoring.org=; the five rules in =build=,
 =verifying-before-claiming-done= and =systematic-debugging=.
 
 *** Scripts in skills stay light
@@ -741,15 +877,19 @@ is turned off.
 
 In: =claude-ai/skills/tutor/=.
 
-*** as-built-docs reads code on the session's model
+*** Lower tiers only where coverage and errors are measured
 :PROPERTIES:
-:CUSTOM_ID: as-built-session-model
+:CUSTOM_ID: measured-tiers
 :END:
-Its mapping subagents run on the session's model, not a smaller one: the
-fact-check catches wrong facts but not missing ones, so a weaker reader's
-omissions would pass.
+A fan-out skill's reading and extraction workers run on a lower tier (a
+smaller model or a lower effort) only where both the fact-check error rate
+and a coverage measure (a sample of source items looked for in the output)
+hold, measured on every run; verdicts and fact-checks run on the strongest
+model. A fact-check cannot see what is missing, so coverage is measured
+apart. Replaces =as-built-session-model=.
 
-In: =home/.agents/skills/as-built-docs/SKILL.md=.
+In: =METHOD.org= (Delegation), =home/.agents/skills/as-built-docs/SKILL.md=,
+=code-audit=, =notes-from-work=.
 
 ** What the skills teach
 
