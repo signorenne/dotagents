@@ -129,6 +129,7 @@ P1 <date> by maintainer | by agent: <decision>
    Review: pending, kept, or changed (by P<n>)
 
 Refuted assumptions (assumed, check that broke it, what changed):
+Failed attempts (what was tried, the result, why it was dropped):
 Deviations from the spec or plan:
 Open questions:
 #+END_EXAMPLE
