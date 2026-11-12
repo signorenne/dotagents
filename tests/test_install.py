@@ -1194,6 +1194,23 @@ class Manifest(unittest.TestCase):
         self.run_install("--uninstall")
         self.assertFalse(settings.exists())
 
+    def test_a_value_dropped_from_the_personal_layer_is_taken_back(self):
+        layer = self.home / "layer"
+        layer.mkdir()
+        values = self.home / "layer/claude-settings.json"
+        values.write_text(json.dumps({"permissions": {"allow": ["Bash(make *)", "Bash(ninja *)"]},
+                                      "enabledPlugins": {"x@y": False}}))
+        settings = self.home / ".claude/settings.json"
+        self.run_install("--personal", str(layer))
+        values.write_text(json.dumps({"permissions": {"allow": ["Bash(make *)"]}}))
+        self.run_install()
+        data = json.loads(settings.read_text())
+        self.assertIn("Bash(make *)", data["permissions"]["allow"])
+        self.assertNotIn("Bash(ninja *)", data["permissions"]["allow"])
+        self.assertNotIn("enabledPlugins", data)
+        self.run_install("--uninstall")
+        self.assertFalse(settings.exists())
+
     def test_uninstall_keeps_what_it_cannot_read_or_is_now_a_folder(self):
         self.run_install()
         scout = self.home / ".claude/agents/scout.md"

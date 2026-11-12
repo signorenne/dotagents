@@ -433,6 +433,16 @@ def at(data, path: list):
     return data
 
 
+def holds(layer: dict, record: list) -> bool:
+    """Whether a layer's values still hold what a record says was added from it."""
+    found = at(layer, record[1])
+    if record[0] == "item":
+        return isinstance(found, list) and record[2] in found
+    if record[0] == "container":
+        return isinstance(found, (dict, list))
+    return found == record[2] and found is not None
+
+
 def take_back_all(data: dict, records: list) -> None:
     """Undo recorded additions deepest first, containers after what they hold."""
     for record in sorted(records, key=lambda r: (r[0] == "container", -len(r[1]))):
@@ -950,9 +960,11 @@ class Installer:
         changed = held != current
         from_personal = []
 
+        # The same layer: what its file no longer holds comes out; another layer or none: all of it.
+        stale = old_personal if changed else [r for r in old_personal if not holds(personal, r)]
+
         def mutate(settings: dict, added: list) -> dict:
-            if changed:  # --no-personal or another layer: what the old layer added comes out
-                take_back_all(settings, old_personal)
+            take_back_all(settings, stale)
             settings = merge_values(settings, fragment, added)
             settings = merge_values(settings, personal, from_personal)
             settings = self.with_hooks(settings, ours, added)
@@ -962,7 +974,7 @@ class Installer:
                 permissions["ask"] = [rule for rule in permissions["ask"] if rule not in denied]
             return settings
         if self.merge_json(path, mutate):
-            kept = [] if changed else [r for r in old_personal if r not in from_personal]
+            kept = [r for r in old_personal if r not in stale and r not in from_personal]
             self.merged[str(path)]["personal"] = kept + from_personal
             self.merged[str(path)]["personal_layer"] = current
             self.personal_set.add(str(path))
