@@ -95,6 +95,15 @@ class Tools(unittest.TestCase):
         empty = self.repo / "packs/method/evals/empty"
         empty.mkdir()
         (empty / "prompt.md").write_text("---\nname: empty\n---\n\nHi.\n")
+        odd = self.repo / "packs/method/evals/odd"
+        (odd / "graders").mkdir(parents=True)
+        (odd / "prompt.md").write_text("---\nname: odd\nallowed_tools:\n  - Read\n  - Skill\n---\n\n")
+        (odd / "graders/c.md").write_text("---\ntype: tool_used\ntool: Skill\narm: sometimes\n"
+                                         "input_match: '(?:[\\w-]+:)?build('\n---\n")
+        (self.repo / "packs/method/evals/bare").mkdir()
+        yaml_case = self.repo / "packs/method/evals/as-yaml"
+        yaml_case.mkdir()
+        (yaml_case / "case.yaml").write_text('schema_version: "1.1"\nname: as-yaml\n')
         lines = self.run_tool("validate.py").stdout.splitlines()
         for line in ("FAIL packs/method/evals/broken/prompt.md: unknown key 'turns'",
                      "FAIL packs/method/evals/broken/graders/a.md: type 'judge' is not a grader type",
@@ -102,8 +111,15 @@ class Tools(unittest.TestCase):
                      "FAIL packs/method/evals/broken/graders/b.md: names no skill of its pack",
                      "FAIL packs/method/evals/broken/graders/b.md: a must-not-fire check needs arm: both, or a "
                      "two-arm run leaves it out",
-                     "FAIL packs/method/evals/empty: no grader"):
+                     "FAIL packs/method/evals/empty: no grader",
+                     "FAIL packs/method/evals/odd/prompt.md: no prompt",
+                     "FAIL packs/method/evals/odd/graders/c.md: arm 'sometimes'",
+                     "FAIL packs/method/evals/bare: no prompt.md or case.yaml"):
             self.assertIn(line, lines)
+        self.assertTrue(any(line.startswith("FAIL packs/method/evals/odd/graders/c.md: input_match ")
+                            for line in lines), lines)
+        self.assertFalse(any("odd/prompt.md: a Skill grader needs Skill" in line or "as-yaml" in line
+                             for line in lines), lines)  # a block list and a case.yaml case are fine
 
     def test_validate_rejects_a_toml_end_marker_in_a_subagent(self):
         scout = self.repo / "home/.agents/agents/scout.md"

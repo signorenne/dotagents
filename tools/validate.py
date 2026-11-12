@@ -494,9 +494,14 @@ def check_evals(errors: list) -> None:
         skills = {p.name for p in (case.parent.parent / "skills").iterdir()} if (case.parent.parent / "skills").is_dir() else set()
         prompt = case / "prompt.md"
         if not prompt.is_file():
-            errors.append(f"{rel}: no prompt.md")
+            if not (case / "case.yaml").is_file():  # the other documented form, which this check does not parse
+                errors.append(f"{rel}: no prompt.md or case.yaml")
             continue
-        meta, body = simple_frontmatter(prompt.read_text(encoding="utf-8"))
+        text = prompt.read_text(encoding="utf-8")
+        meta, body = simple_frontmatter(text)
+        # allowed_tools as a flow list or a block list: the text up to the next top-level key.
+        tools = re.search(r"^allowed_tools:(.*?)(?=^\S|^---)", text, re.M | re.S)
+        meta["allowed_tools"] = tools.group(1) if tools else ""
         for key in sorted(set(meta) - EVAL_CASE_KEYS):
             errors.append(f"{rel}/prompt.md: unknown key {key!r}")
         if not body.strip():
