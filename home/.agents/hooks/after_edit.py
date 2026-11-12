@@ -6,9 +6,12 @@
 Usage in a hook config: python3 "$HOME/.agents/hooks/after_edit.py" --tool <claude|codex|gemini|copilot>
 
 1. Flags em dash (U+2014) and en dash (U+2013) characters in the text the agent just
-   wrote. Only the new text is checked, so dashes already in the file are not reported.
+   wrote: the new string of an edit, the added lines of a patch, the whole content of a
+   file write. Dashes elsewhere in an edited file are not reported; a file write reports
+   every dash in the file, since its content is the whole file.
 2. Runs clang-format in place on C and C++ files when the project has a .clang-format
-   file and a clang-format binary is available (CLANG_FORMAT, clang-format-20, clang-format).
+   file and a clang-format binary is available (CLANG_FORMAT, clang-format-20, clang-format),
+   within a total time budget under the 60 s hook timeout of every agent's config.
 
 Payload shapes understood: Claude Code and Cursor (Write/Edit with file_path, content,
 new_string), Gemini CLI (write_file/replace with file_path, content, new_string), Codex
@@ -27,6 +30,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from pathlib import Path
 
 DASHES = {"\u2014": "em dash", "\u2013": "en dash"}
@@ -35,6 +39,10 @@ CXX_SUFFIXES = {".h", ".hh", ".hpp", ".hxx", ".ipp", ".tpp", ".inl",
 MAX_REPORTED_LINES = 8
 PATCH_FILE = re.compile(r"^\*\*\* (?:Add|Update) File: (.+)$")
 PATCH_MOVE = re.compile(r"^\*\*\* Move to: (.+)$")
+# Total budget for clang-format, under the 60 s hook timeout in every agent's config.
+DEADLINE_SECONDS = 50
+CALL_TIMEOUT_SECONDS = 45
+MIN_CALL_SECONDS = 1
 
 
 def as_dict(value) -> dict:
@@ -44,19 +52,20 @@ def as_dict(value) -> dict:
         try:
             parsed = json.loads(value)
             return parsed if isinstance(parsed, dict) else {}
-        except (json.JSONDecodeError, ValueError):
+        except (ValueError, RecursionError):
             return {}
     return {}
 
 
 def parse_patch(patch: str) -> tuple[list[str], str]:
-    """Return (files, added text) from an apply_patch body."""
+    """Return (files, added text) from an apply_patch body. The format has no "+++" file
+    headers, so every line starting with "+" is an added line ("+++i;" adds "++i;")."""
     files, added = [], []
     for line in patch.splitlines():
         match = PATCH_FILE.match(line) or PATCH_MOVE.match(line)
         if match:
             files.append(match.group(1).strip())
-        elif line.startswith("+") and not line.startswith("+++"):
+        elif line.startswith("+"):
             added.append(line[1:])
     return files, "\n".join(added)
 
@@ -64,22 +73,24 @@ def parse_patch(patch: str) -> tuple[list[str], str]:
 def extract(payload: dict) -> tuple[list[Path], str]:
     """Return (edited files, new text) for any supported payload shape."""
     tool_input = as_dict(payload.get("tool_input")) or as_dict(payload.get("toolArgs"))
-    cwd = Path(payload.get("cwd") or os.getcwd())
+    cwd = payload.get("cwd")
+    cwd = Path(cwd) if isinstance(cwd, str) and cwd else Path(os.getcwd())
 
     command = tool_input.get("command")
     if isinstance(command, str) and "*** Begin Patch" in command:
         files, text = parse_patch(command)
         return [(cwd / f) if not Path(f).is_absolute() else Path(f) for f in files], text
 
-    path = (tool_input.get("file_path") or tool_input.get("path")
-            or payload.get("file_path") or "")
+    candidates = (tool_input.get("file_path"), tool_input.get("path"), payload.get("file_path"))
+    path = next((c for c in candidates if isinstance(c, str) and c), "")
     parts = []
     for key in ("content", "new_string", "file_text", "new_str"):
         if isinstance(tool_input.get(key), str):
             parts.append(tool_input[key])
     for edits in (tool_input.get("edits"), payload.get("edits")):
         if isinstance(edits, list):
-            parts.extend(e.get("new_string", "") for e in edits if isinstance(e, dict))
+            parts.extend(e["new_string"] for e in edits
+                         if isinstance(e, dict) and isinstance(e.get("new_string"), str))
     if not path:
         return [], "\n".join(parts)
     file_path = Path(path)
@@ -123,7 +134,7 @@ def clang_format_binary() -> str:
     return ""
 
 
-def run_clang_format(file_path: Path) -> tuple[str, str]:
+def run_clang_format(file_path: Path, deadline: float) -> tuple[str, str]:
     """Return (notice, error) for one file."""
     if file_path.suffix.lower() not in CXX_SUFFIXES or not file_path.is_file():
         return "", ""
@@ -132,10 +143,13 @@ def run_clang_format(file_path: Path) -> tuple[str, str]:
     binary = clang_format_binary()
     if not binary:
         return "", ""
+    left = deadline - time.monotonic()
+    if left < MIN_CALL_SECONDS:
+        return "", f"clang-format skipped on {file_path}: the hook ran out of time. Formatting not applied."
     before = file_path.read_bytes()
     try:
-        result = subprocess.run([binary, "-i", "--style=file", str(file_path)],
-                                capture_output=True, text=True, timeout=45, check=False)
+        result = subprocess.run([binary, "-i", "--style=file", str(file_path)], capture_output=True,
+                                text=True, timeout=min(CALL_TIMEOUT_SECONDS, left), check=False)
     except (OSError, subprocess.TimeoutExpired) as error:
         return "", f"clang-format did not run on {file_path}: {error}. Formatting not applied."
     if result.returncode != 0:
@@ -161,9 +175,10 @@ def main() -> int:
     parser.add_argument("--tool", default="claude",
                         choices=["claude", "codex", "gemini", "copilot", "cursor"])
     tool = parser.parse_args().tool
+    deadline = time.monotonic() + DEADLINE_SECONDS
     try:
         payload = json.load(sys.stdin)
-    except (json.JSONDecodeError, ValueError):
+    except (ValueError, RecursionError):
         return finish(tool, [])
     if not isinstance(payload, dict):
         return finish(tool, [])
@@ -175,7 +190,7 @@ def main() -> int:
         problems.append(report)
     for path in paths:
         try:
-            notice, error = run_clang_format(path)
+            notice, error = run_clang_format(path, deadline)
         except OSError:
             continue
         if notice:
