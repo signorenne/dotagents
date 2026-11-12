@@ -3,7 +3,10 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """SessionStart hook (Claude Code, matcher "compact|resume"): after a compaction or a
 resume, remind the agent that its picture of the code is a summary and print the real
-repository state, so stale function names are caught before they cause edits.
+repository state, so stale function names are caught before they cause edits. When the
+project keeps git-ignored task notes, it also lists the three most recent files under
+.private/progress/ and under .private/handoff/ (found in the working folder or a parent,
+up to the repository root) and asks the agent to re-read the progress log.
 
 Usage: python3 "$HOME/.agents/hooks/session_refresh.py"
 Plain stdout on exit 0 is added to the agent's context. Never fails the session.
@@ -12,18 +15,27 @@ Plain stdout on exit 0 is added to the agent's context. Never fails the session.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
+from pathlib import Path
 
 MAX_STATUS_LINES = 15
-# Total budget for all git calls, under the 10 s hook timeout in
+# Total budget for the notes listing and all git calls, under the 10 s hook timeout in
 # adapters/claude/settings.json: Claude Code drops all output of a hook that times out.
 DEADLINE_SECONDS = 8
 CALL_TIMEOUT_SECONDS = 5
 MIN_CALL_SECONDS = 0.5
 TIMED_OUT = "did not finish in time"
 FAILED = "failed"
+NOTE_FOLDERS = ("progress", "handoff")
+NOTES_PER_FOLDER = 3
+# The notes listing runs first, so it gets a small share of the budget and a cap on the
+# files it looks at; git gets the rest.
+NOTES_SECONDS = 1
+MAX_SCANNED_FILES = 2000
+REREAD = "Re-read the task's progress log before the next step."
 
 
 def git(*args: str, cwd: str, deadline: float) -> tuple[str, str]:
@@ -50,6 +62,46 @@ def text_field(payload: dict, key: str, default: str) -> str:
     return value if isinstance(value, str) and value else default
 
 
+def private_folder(cwd: str) -> Path | None:
+    """The .private folder in cwd or its nearest parent, not above the repository root."""
+    start = Path(cwd).absolute()
+    for directory in (start, *start.parents):
+        if (directory / ".private").is_dir():
+            return directory / ".private"
+        if (directory / ".git").exists():
+            return None
+    return None
+
+
+def task_notes(cwd: str, deadline: float) -> list[str]:
+    """The most recent files of each note folder, newest first, as "path (modified)" lines
+    relative to the project root. Errors and slowness only shorten the list."""
+    try:
+        private = private_folder(cwd)
+        if private is None:
+            return []
+        lines, scanned = [], 0
+        for name in NOTE_FOLDERS:
+            found = []
+            for folder, _, files in os.walk(private / name):
+                if scanned >= MAX_SCANNED_FILES or time.monotonic() > deadline:
+                    break
+                for file in files[:MAX_SCANNED_FILES - scanned]:
+                    scanned += 1
+                    path = Path(folder) / file
+                    try:
+                        found.append((path.stat().st_mtime, path))
+                    except OSError:
+                        continue  # a broken link or a file removed meanwhile
+            found.sort(key=lambda item: item[0], reverse=True)
+            for mtime, path in found[:NOTES_PER_FOLDER]:
+                when = time.strftime("%Y-%m-%d %H:%M", time.localtime(mtime))
+                lines.append(f"{path.relative_to(private.parent).as_posix()} ({when})")
+        return lines
+    except (OSError, ValueError, OverflowError):
+        return []
+
+
 def main() -> int:
     deadline = time.monotonic() + DEADLINE_SECONDS
     try:
@@ -60,6 +112,8 @@ def main() -> int:
         payload = {}
     cwd = text_field(payload, "cwd", ".")
     source = text_field(payload, "source", "resume or compaction")
+    # Before git, so a slow git cannot leave the notes out.
+    notes = task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))
 
     lines = [
         f"Session restarted from {source}. Everything you remember about the code is a "
@@ -97,6 +151,9 @@ def main() -> int:
             lines.append(f"Last commits not shown: git log {problem}.")
         elif recent:
             lines.append("Last commits:\n" + recent)
+    if notes:
+        lines.append("Task notes (git-ignored), most recent first:\n" + "\n".join(notes))
+        lines.append(REREAD)
     print("\n".join(lines))
     return 0
 
