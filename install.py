@@ -116,7 +116,7 @@ GEMINI_HOOKS = {
     # A lifecycle matcher is an exact string (Gemini CLI hooks reference), so one group per
     # source; the refresh answers in JSON (hookSpecificOutput.additionalContext).
     "SessionStart": [{"matcher": source, "hooks": [hook(script("session_refresh.py", "gemini"),
-                                                         name="agents-session-refresh", timeout=10000)]}
+                                                         name=f"agents-session-refresh-{source}", timeout=10000)]}
                      for source in ("startup", "resume", "clear")],
 }
 # Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts

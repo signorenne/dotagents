@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
-"""SessionStart hook (Claude Code and Codex, matcher "startup|resume|clear|compact").
+"""SessionStart hook (Claude Code and Codex, matcher "startup|resume|clear|compact"; Gemini CLI,
+Copilot CLI and Cursor, in JSON).
 
 On a task branch whose plan file exists, it prints the plan excerpt of the build skill's
 plan_state.py --excerpt (status, next step, step in progress, open rulings), marked as a
@@ -19,8 +20,10 @@ Usage: python3 "$HOME/.agents/hooks/session_refresh.py" [--tool claude|codex|gem
 Claude Code and Codex add plain stdout on exit 0 to the agent's context. Gemini CLI,
 Copilot CLI and Cursor read JSON only (their sessionStart docs): {"hookSpecificOutput":
 {"additionalContext": ...}}, {"additionalContext": ...} and {"additional_context": ...},
-and {} when there is nothing to add. Copilot CLI's "new" source counts as a start, and
-Cursor, which sends no source and no cwd, as a start in its first workspace root.
+and {} when there is nothing to add, or on any error. Copilot CLI's "new" source counts
+as a start, and Cursor, which sends no source and no cwd, as a start in its first
+workspace root. A Cursor payload (workspace_roots) gets Cursor's shape whatever --tool
+says, since Cursor may also run Claude Code's own entry, which passes no --tool.
 Never fails the session.
 """
 
@@ -190,10 +193,21 @@ def tool_name() -> str:
     return args[args.index("--tool") + 1] if "--tool" in args[:-1] else "claude"
 
 
+def read_payload() -> dict:
+    try:
+        payload = json.load(sys.stdin)
+    except (ValueError, RecursionError):
+        payload = {}
+    return payload if isinstance(payload, dict) else {}
+
+
 def main() -> int:
     tool = tool_name()
     try:
-        text = refresh(tool)
+        payload = read_payload()
+        if "workspace_roots" in payload:
+            tool = "cursor"
+        text = refresh(tool, payload)
     except Exception:  # a broken refresh never fails the session or breaks a JSON reader
         text = ""
     if tool in JSON_SHAPES:
@@ -203,14 +217,8 @@ def main() -> int:
     return 0
 
 
-def refresh(tool: str) -> str:
+def refresh(tool: str, payload: dict) -> str:
     deadline = time.monotonic() + DEADLINE_SECONDS
-    try:
-        payload = json.load(sys.stdin)
-    except (ValueError, RecursionError):
-        payload = {}
-    if not isinstance(payload, dict):
-        payload = {}
     roots = payload.get("workspace_roots")
     root = roots[0] if isinstance(roots, list) and roots and isinstance(roots[0], str) else "."
     cwd = text_field(payload, "cwd", root)

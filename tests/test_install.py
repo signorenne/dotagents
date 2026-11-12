@@ -413,6 +413,13 @@ class Install(unittest.TestCase):
                                                  "hook_event_name": "sessionStart"})
         self.assertEqual((result.returncode, json.loads(result.stdout)), (0, {}))  # no plan: nothing to add
 
+    def test_a_fresh_cursor_hooks_file_gets_its_version(self):
+        self.install("--tools", "cursor")
+        config = json.loads((self.home / ".cursor/hooks.json").read_text())
+        self.assertEqual(config["version"], 1)
+        self.assertEqual([e["command"] for e in config["hooks"]["sessionStart"]],
+                         ['python3 "$HOME/.agents/hooks/session_refresh.py" --tool cursor'])
+
     def test_copilot_hooks_follow_the_documented_native_format(self):
         # GitHub's hooks reference: camelCase events get the native payload (toolName,
         # toolArgs) and a matcher compiled as ^(?:PATTERN)$ against toolName; native
@@ -721,6 +728,7 @@ class Install(unittest.TestCase):
         # stdout must be JSON; context goes in hookSpecificOutput.additionalContext.
         starts = hooks["SessionStart"]
         self.assertEqual(sorted(group["matcher"] for group in starts), ["clear", "resume", "startup"])
+        self.assertEqual(len({group["hooks"][0]["name"] for group in starts}), 3)  # one name per handler
         for group in starts:
             (handler,) = group["hooks"]
             self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/session_refresh.py" --tool gemini')

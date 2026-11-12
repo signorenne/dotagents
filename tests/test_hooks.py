@@ -1361,6 +1361,16 @@ class SessionRefresh(unittest.TestCase):
                     self.assertEqual(off.returncode, 0)
                     json.loads(off.stdout)  # never plain text on a JSON reader's stdout
 
+    def test_a_cursor_payload_gets_cursors_shape_whatever_the_tool_flag(self):
+        # Cursor may run Claude Code's own entry, which passes no --tool.
+        repo, env = self.committed_repo()
+        write_plan(repo, "task")
+        worktree = linked_worktree(self, repo, env)
+        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")], capture_output=True, text=True,
+                                input=json.dumps({"workspace_roots": [str(worktree)], "session_id": "s"}),
+                                check=False, env=env)
+        self.assertTrue(json.loads(result.stdout)["additional_context"].startswith("Plan file excerpt"))
+
     def test_without_the_build_skill_the_refresh_still_reports_git(self):
         repo, env = self.committed_repo()
         write_plan(repo, "task")
