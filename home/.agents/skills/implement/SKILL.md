@@ -58,10 +58,17 @@ When all steps are in, delegate to gate-runner for the project's full pre-PR gat
 
 ## 9. Review
 
-Delegate to reviewer with the intent of the change, the progress log path, and the branch's base commit when it is not main. Fix blocker and major findings; when a fix changed behavior, delegate one more reviewer pass limited to the fix. When a fix landed, run the full gates again on the final commit, the HEAD after every fix: the work is done only when they pass there. Report minor findings you chose not to fix, with the reason.
+Delegate to reviewer with the intent of the change, the progress log path, and the branch's base commit when it is not main. Check each finding at its location, then give it one disposition:
+
+- Fixed, when this change caused it.
+- Contested, only with evidence the reviewer could read: a file and line, a test, a command's output, a line of the spec. That it is intentional is not evidence.
+- Taken to the user (decide skill), when the evidence lies outside the repository's files or several fixes are reasonable.
+- Deferred, only when it predates the change (the base commit has it too).
+
+A minor finding this change caused may instead stay unfixed, with its reason. Never change a finding's severity or drop one silently: log each disposition in the progress log, with the commit, the evidence, the user's answer or the reason. When a fix changed behavior, delegate one more reviewer pass limited to the fixes. When a fix landed, run the full gates again on the final commit, the HEAD after every fix: the work is done only when they pass there.
 
 ## 10. Report
 
-Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions, Verify before use), plus the commit list, the final commit's hash with its gate results, and the path of the progress log. List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place. Never push.
+Use the project's handoff format when it has one (Goal, Files touched, Decisions, Open questions, Commands run, Commands still needed, Risks, Refuted assumptions, Verify before use), plus the commit list, the final commit's hash with its gate results, and the path of the progress log. List the decisions by agent still marked Review: pending, one line each, so the user can review them in one place, and the review findings not fixed, each with its disposition. Never push.
 
 After two failed attempts at the same problem, use the systematic-debugging skill if it is available.
