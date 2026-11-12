@@ -152,6 +152,14 @@ class Install(unittest.TestCase):
                 self.assertEqual(parsed["name"], name)
                 self.assertTrue(parsed["developer_instructions"].strip())
 
+    def test_cursor_note_matches_what_was_installed(self):
+        alone = self.install("--tools", "cursor")
+        self.assertFalse((self.home / ".claude/agents").exists())
+        self.assertIn("Cursor: this run gave it no subagents and no hooks", alone)
+        self.assertNotIn("~/.claude/agents and the Claude Code hooks", alone)
+        with_claude = self.install("--tools", "cursor,claude")
+        self.assertIn("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks", with_claude)
+
     def test_replaced_files_are_backed_up(self):
         claude_md = self.home / ".claude/CLAUDE.md"
         claude_md.write_text("my old notes\n")
