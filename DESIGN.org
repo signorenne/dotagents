@@ -6,9 +6,11 @@
 This file owns dotagents' design: the public surface, how the pieces compose,
 the install model, the hooks' failure model, naming, and the rules that bind
 every change. [[file:VISION.org][VISION.org]] owns the direction. [[file:AGENTS.md][AGENTS.md]] owns where each
-change goes and the review checklist. [[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a
-skill is written. [[file:docs/architecture.org][docs/architecture.org]] draws the structure, the install flow
-and a session's runtime view.
+change goes, the hard rules and the review checklist.
+[[file:CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflow and the docs format.
+[[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written. [[file:docs/pipeline.org][docs/pipeline.org]]
+owns the stages a change goes through. [[file:docs/architecture.org][docs/architecture.org]] draws the
+structure, the install flow and a session's runtime view.
 
 North star: change a rule once, run the installer, and every agent in every
 tool, and every claude.ai chat, follows the new text.
@@ -33,14 +35,17 @@ depend on the model remembering it.
   zip.
 - /Subagents/ : =scout=, =gate-runner= and =reviewer= in
   =home/.agents/agents/=, in Claude Code format (name, description, tools,
-  model), the source of every other tool's copy.
+  model, and where set effort and color), the source of every other tool's
+  copy.
 - /Hooks/ : =guard_bash.py=, =after_edit.py= and =session_refresh.py= in
   =home/.agents/hooks/=, shared by every tool; the guard and the after-edit
   hook learn which tool called them from =--tool=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
-  build commands allowed, =git push=, =git reset --hard=, =git clean=,
-  =git rebase= and =rm -rf= asked first, =.env= files, =~/.ssh= and =~/.gnupg=
-  unreadable, commit and PR attribution empty, and the hook entries.
+  build commands allowed, =git push= denied (also as =git -C <dir> push=),
+  =git reset --hard=, =git clean=, =git rebase= and =rm -rf= asked first,
+  =.env= files, =~/.ssh= and =~/.gnupg= unreadable, commit and PR attribution
+  empty, the synced plugin =engineering@synced= turned off, and the hook
+  entries.
 
 * How they compose
 
@@ -62,50 +67,64 @@ depend on the model remembering it.
 
 ** Skills hand off to each other
 
-The repository workflow is a chain. =scoping-before-building= or
-=architecture-doc= sizes the work; =spec= writes a self-contained plan and
-settles each open choice with =decide=; a fresh session runs =implement= on
-the spec; =implement= ends with the full gates and an independent review;
-=session-close= records the state for the next session.
+The repository workflow is a chain, which [[file:docs/pipeline.org][docs/pipeline.org]] follows stage
+by stage. =scoping-before-building= or =architecture-doc= sizes the work;
+=spec= writes a self-contained plan and settles each open choice with
+=decide=; a fresh session runs =implement= on the spec, which proposes
+=isolated-work= for a change across modules, a public API change or a
+migration; =implement= ends with the full gates and an independent review;
+=session-close= records the state for the next session; on the maintainer's
+go, =isolated-work= lands the branch and removes its worktree.
 
 Off the chain: =as-built-docs= sends bugs and anomalies to =code-audit=;
 =code-audit= sends a finding the user wants fixed to =implement=, starting
 with a failing test; =decision-analysis= researches products and returns a
 project's choice to =decide=; =systematic-debugging= comes before
-=event-driven-ui= when a freeze is unexplained; =implement= and the reviewer
-apply =trustworthy-tests= to every new or changed test; =context-handoff=
-gives way to =session-close= inside a git repository.
+=event-driven-ui= when a freeze is unexplained, and in a repository leaves the
+failing test and the fix to =implement=; =parallel-agents= runs each writer
+through =isolated-work=; =implement= and the reviewer apply
+=trustworthy-tests= to every new or changed test; =context-handoff= gives way
+to =session-close= inside a git repository.
 
 ** Skills delegate to subagents
 
 - =spec=, =implement=, =project-setup=, =code-audit= and =architecture-doc= map
-  the code with =scout= before planning; =as-built-docs= reads it with
-  read-only subagents on the session's model (in Claude Code the
-  general-purpose subagent, elsewhere =scout=).
-- =gates=, =implement=, =project-setup= and =parallel-agents= run long commands
-  through =gate-runner=, so only verdicts and first errors reach the
-  conversation.
-- =review= and =implement= hand the finished change to =reviewer=.
+  the code with =scout= before planning. =as-built-docs= reads the code with
+  read-only subagents on the session's model instead (in Claude Code the
+  general-purpose subagent, elsewhere the tool's default general agent).
+- =gates=, =implement=, =project-setup=, =isolated-work= and =as-built-docs=
+  run long commands through =gate-runner=, which reports the commit it tested,
+  so only verdicts and first errors reach the conversation; =implement= and
+  =isolated-work= also give it the folder and the commit to test, and
+  =parallel-agents= gates each branch through =isolated-work=.
+- =review=, =implement= and =mechanical-changes= hand the finished change to
+  =reviewer=; =parallel-agents= runs implement's review on the merged
+  result.
 - =spec=, =architecture-doc= and =as-built-docs= verify their documents with a
-  subagent that did not write them: in Claude Code the general-purpose
-  subagent told not to edit, elsewhere =reviewer=.
+  subagent that did not write them, and =code-audit= has each finding attacked
+  by one briefed only on the claim and the code: in Claude Code the
+  general-purpose subagent told not to edit, elsewhere =reviewer=.
 - Where a tool has no subagents, the skill follows
   =~/.agents/agents/<name>.md= itself.
 
 ** Working notes
 
 Skills keep their working notes in the git-ignored =.private/= folder of each
-repository: specs in =.private/specs/=, progress logs in =.private/progress/=,
-handoffs in =.private/handoff/=, audit reports in =.private/audit/= and the
-notes of =as-built-docs= in =.private/as-built/=. A project's decisions go to
-its own decision log, never to working notes.
+repository: specs in =.private/specs/<slug>.<ext>=, progress logs in
+=.private/progress/<slug>.<ext>=, handoffs in
+=.private/handoff/<YYYY-MM-DD>-<slug>.<ext>=, audit reports in
+=.private/audit/= and the notes of =as-built-docs= in =.private/as-built/=. A
+worktree has no =.private/=, so work in one keeps its notes in the main
+checkout's. A project's decisions go to its own decision log, never to working
+notes.
 
 * Install model
 
-There is one source, =home/.agents=, installed as =~/.agents=. =install.py=
-copies it there, adds the claude.ai set to =~/.agents/skills/=, then links or
-generates each tool's files from it. Nothing is edited in a tool's own
-folder: a change is made here and the installer runs again.
+There is one source, =home/.agents=, installed as =~/.agents=
+([[#one-source][one-source]]). =install.py= copies it there, adds the claude.ai set to
+=~/.agents/skills/=, then links or generates each tool's files from it.
+Nothing is edited in a tool's own folder: a change is made here and the
+installer runs again.
 
 | Agent       | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                |
 |-------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+----------------------------------------------------------------------|
@@ -117,27 +136,37 @@ folder: a change is made here and the installer runs again.
 
 - /Generated, not copied by hand/ : each tool's subagent file is rendered from
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
-  for Copilot CLI), with tool names mapped to the tool's own, and a skill
-  wanted on claude.ai is an override entry, never a second folder.
+  for Copilot CLI), with tool names mapped to the tool's own; the Codex copy
+  carries the reasoning effort, and the Gemini CLI copy a turn and a time limit
+  (=max_turns=, =timeout_mins=) above Gemini CLI's defaults. A skill wanted on
+  claude.ai is an override entry, never a second folder.
 - /Checked before it starts/ : the installer validates the subagents and the
   JSON sources first and installs nothing when one is broken.
 - /Backups/ : every file the installer replaces is moved to
   =~/.agents-backup/<timestamp>/= first; =--dry-run= prints every change and
-  touches nothing.
+  touches nothing. A =~/.claude/CLAUDE.md= without the import of
+  =~/.agents/AGENTS.md= is replaced by one with it, and the old file is in the
+  backup.
 - /Idempotent/ : a file whose bytes already match is left alone, so a second
   run changes nothing.
 - /Merged settings/ : the Claude Code adapter, Codex's and Gemini CLI's hook
   entries are merged into the tool's settings file: earlier copies of this
-  repository's hook entries are removed and the current ones appended, and the
-  rest of the file is kept. A file that does not parse is left alone with a
+  repository's hook entries are removed and the current ones appended, a rule
+  the adapter denies is removed from =ask= (where an older install put it),
+  and the rest of the file is kept. The adapter also turns off the synced
+  plugin =engineering@synced=. A file that does not parse is left alone with a
   note to merge it by hand.
 - /skillOverrides/ : claude.ai syncs its copy of each uploaded skill into
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
   to the local one. The installer sets each of those to =off= in
   =~/.claude/settings.json=; a value set by hand wins.
-- /Leftovers/ : the installer never removes what the repository dropped.
-  =--audit= lists what in the agents' folders does not come from here, and
-  broken links, and changes nothing.
+- /Leftovers/ : a file dropped from a skill folder that still exists goes to
+  the backup, as do the legacy items of older versions (their =learn= and
+  =handoff= skill copies and the hook copies in =~/.claude/hooks=). A whole
+  skill, subagent, hook script or settings entry the repository dropped stays
+  installed. =--audit= lists what in the agents' folders does not come from
+  here, and broken links, and changes nothing; settings entries are removed by
+  hand.
 
 Claude Code is tested end to end. The other tools' files follow their official
 documentation, and =tests/test_install.py= checks each generated hook file
@@ -152,13 +181,18 @@ against it (events, matchers, tool names, timeouts).
 | =session_refresh.py= | at session start after a compaction or a resume | Claude Code                             | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
-variables, a disabled =core.hooksPath=), pushes that rewrite or delete
-published history (=--force= and its variants, =+refspec=, =--delete=,
-=:ref=, =--mirror=, =--prune=), =gh pr merge --admin=, and every push outside
-Claude Code. The after-edit hook flags em and en dashes in the text just
-written and runs clang-format on C and C++ files when the project has a
-=.clang-format=. The session refresh reminds the agent that its picture of the
-code is a summary and prints the real branch, changes and last commits.
+variables, a disabled =core.hooksPath=) and every push and publish, in every
+tool: =git push=, =git subtree push=, =gh pr create=, =gh pr merge=,
+=gh release create= and =gh repo sync= ([[#no-agent-push][no-agent-push]]). A push that also
+rewrites or deletes published history (=--force= and its variants,
+=+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and =gh pr merge --admin=
+are named as such. The after-edit hook flags em and en dashes in the text just
+written and runs clang-format, when the project has a =.clang-format=, on the
+lines of a C or C++ file that the edit changed (a newly written file whole).
+The session refresh reminds the agent that its picture of the code is a
+summary, prints the real branch, changes and last commits, lists the newest
+files of =.private/progress/= and =.private/handoff/=, and asks the agent to
+re-read the progress log.
 
 The hooks share one failure model:
 
@@ -174,33 +208,25 @@ The hooks share one failure model:
   additional context in each tool's documented format.
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
-  (8 s of git calls in the session refresh, clang-format under 60 s).
-- /The push rule/ : force pushes and deletions are blocked in every tool. A
-  plain push is blocked outside Claude Code, Cursor included (recognised by
-  =CURSOR_VERSION= or the =cursor_version= payload field); in Claude Code the
-  adapter asks before every =git push=.
+  (8 s for the notes listing and the git calls of the session refresh,
+  clang-format under 60 s).
+- /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
+  and in Claude Code the adapter also denies =git push=, so the permission
+  prompt never offers it.
 - /Not a security boundary/ : the guard splits the command as a shell does and
   falls back to a rough split when it does not parse, so a parse error never
   lets a forbidden command through; commands passed as one string (=bash -c=,
-  =env -S=, =flock -c=, =git submodule foreach=), =eval=, aliases and scripts
-  are not inspected.
+  =env -S=, =flock -c=, =git submodule foreach=), =eval=, aliases, scripts and
+  =gh api= are not inspected.
 
 * Documentation and skill design
 
 Skills follow [[file:docs/skill-authoring.org][docs/skill-authoring.org]]: concise and complete, a description
 that says what and when, one default instead of a menu, progressive
-disclosure, and a test in a real session. The mechanical rules are in
-[[file:AGENTS.md][AGENTS.md]] under Hard rules and =tools/validate.py= enforces them: only the
-fields name, description and license; the name equal to the folder; a
-description of at most 1024 characters (200 for the claude.ai set and the
-overrides); a =LICENSE.txt= in every skill folder; no inline backticks in
-skill prose; no em or en dash in any tracked file; the global rules under 200
-lines.
-
-Prose docs are Org. Markdown stays where a tool reads the file: =AGENTS.md=,
-the bridges, the global rules, every skill file, and =claude-ai/README.md=,
-which =tools/build.py= ships in the claude.ai bundle. Every doc opens with
-what it owns and is registered in [[file:docs/README.org][docs/README.org]].
+disclosure, and a test in a real session when the maintainer asks for one. The
+mechanical rules are the Hard rules of [[file:AGENTS.md][AGENTS.md]]; the docstring of
+=tools/validate.py= lists every check it enforces. The docs format is
+[[file:CONTRIBUTING.org][CONTRIBUTING.org]]'s, and every doc is registered in [[file:docs/README.org][docs/README.org]].
 
 * Naming
 
@@ -229,115 +255,291 @@ under Proposed rules in [[file:docs/roadmap.org][docs/roadmap.org]]. Record a ru
 would cost real work, or when someone is likely to propose the rejected option
 again.
 
+Each rule has a stable anchor, its =CUSTOM_ID=, for skills and docs to cite
+(for example =DESIGN.org#no-agent-push=; an Org link adds =::= before the
+=#=), and an "In:" line naming the files that carry it out. A changed rule
+keeps its anchor.
+
 ** Working method
 
-- /Refute before you rely is the core method./ Every agent tries to break each
-  claim its work depends on with the cheapest check that could fail, records
-  what broke in the progress log and the handoff, and drafts a rule change for
-  each lesson a rule should have taught. It sits in the always-loaded global
-  rules because problems were caught by external checks and independent
-  agents, never by rereading.
-- /Stop only when a refuted claim changes the plan./ A refuted claim, or a
-  difference between reality and memory or a document, stops the work for a
-  report only when it changes the plan, a requirement or a decision; anything
-  else is corrected and recorded. Routine work keeps going, and the user still
-  hears first about every change to what was approved.
-- /Independent low-stakes questions may share a message./ decide asks one
-  question at a time, except that up to four independent, low-stakes
-  questions, each with its default, may share one message. Trivial setup
-  choices do not each deserve a round; dependent questions still go one by one.
-- /Implementation keeps a progress log./ implement writes
-  =.private/progress/<slug>= as it works: each step with its commit and check,
-  each decision with who took it, its reason and the alternative; an agent's
-  decision stays pending until the user keeps or changes it. The user reviews
-  every choice in one place, and a later session resumes from facts.
-- /Tests are written by the implementer and attacked by the reviewer./ The
-  implementer sees each test fail for the right reason; the reviewer names a
-  wrong implementation that would still pass it. An expected value changes only
-  with cited evidence, and deleting, skipping or loosening a test needs the
-  user's approval, except the test of a behavior an approved spec removes.
-  Every test gets an independent attack with no extra agent per step.
-- /Learning lives in the global rules./ The Learning section stays in the
-  always-loaded global rules, at about 600 tokens per session, so no context
-  lacks it; the tutor skill adds depth on top.
+*** Refute before you rely is the core method
+:PROPERTIES:
+:CUSTOM_ID: refute-first
+:END:
+Every agent tries to break each claim its work depends on with the cheapest
+check that could fail, records what broke in the progress log and the
+handoff, and drafts a rule change for each lesson a rule should have taught.
+It sits in the always-loaded global rules because problems were caught by
+external checks and independent agents, never by rereading.
+
+In: =home/.agents/AGENTS.md= (Refute before you rely), =session-close= (the
+lessons).
+
+*** Stop only when a refuted claim changes the plan
+:PROPERTIES:
+:CUSTOM_ID: stop-on-plan-change
+:END:
+A refuted claim, or a difference between reality and memory or a document,
+stops the work for a report only when it changes the plan, a requirement or a
+decision; anything else is corrected and recorded. Routine work keeps going,
+and the user still hears first about every change to what was approved.
+
+In: =home/.agents/AGENTS.md= (Refute before you rely, Grounding).
+
+*** Independent low-stakes questions may share a message
+:PROPERTIES:
+:CUSTOM_ID: grouped-questions
+:END:
+decide asks one question at a time, except that up to four independent,
+low-stakes questions, each with its default, may share one message. Trivial
+setup choices do not each deserve a round; dependent questions still go one
+by one.
+
+In: =home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md=
+(Decisions).
+
+*** Implementation keeps a progress log
+:PROPERTIES:
+:CUSTOM_ID: progress-log
+:END:
+implement writes =.private/progress/<slug>.<ext>= as it works: each step with
+its commit and check, each gate run with the commit it ran on, each decision
+with who took it, its reason and the alternative; an agent's decision stays
+pending until the user keeps or changes it. The user reviews every choice in
+one place, and a later session resumes from facts.
+
+In: =home/.agents/skills/implement/SKILL.md= (section 5),
+=home/.agents/skills/session-close/SKILL.md=.
+
+*** Tests are written by the implementer and attacked by the reviewer
+:PROPERTIES:
+:CUSTOM_ID: tests-attacked
+:END:
+The implementer sees each test fail for the right reason; the reviewer names a
+wrong implementation that would still pass it. An expected value changes only
+with cited evidence, and deleting, skipping or loosening a test needs the
+user's approval, except the test of a behavior an approved spec removes.
+Every test gets an independent attack with no extra agent per step.
+
+In: =home/.agents/skills/implement/SKILL.md= (section 7),
+=home/.agents/agents/reviewer.md=, =claude-ai/skills/trustworthy-tests/=.
+
+*** Learning lives in the global rules
+:PROPERTIES:
+:CUSTOM_ID: learning-in-global-rules
+:END:
+The Learning section stays in the always-loaded global rules, at about 600
+tokens per session, so no context lacks it; the tutor skill adds depth on
+top.
+
+In: =home/.agents/AGENTS.md= (Learning), =claude-ai/skills/tutor/=.
+
+** Source and install
+
+*** One source of truth in =~/.agents=, generated copies per tool
+:PROPERTIES:
+:CUSTOM_ID: one-source
+:END:
+Instructions, skills, subagents and hooks have one source (=home/.agents=,
+installed as =~/.agents=); =install.py= links or generates each tool's files
+from it, and nothing is edited in a tool's own folder. Five agents read
+different file names and formats, and hand-kept copies drift. Revisit if the
+tools converge on one standard location for instructions, skills and
+subagents.
+
+In: =install.py=, =home/.agents/=.
+
+*** Skills load locally from this repository
+:PROPERTIES:
+:CUSTOM_ID: skills-load-locally
+:END:
+The installer gives every local agent every skill, the claude.ai set
+included, and turns off Claude Code's synced copies; changes reach claude.ai
+by uploading the built zip. One version is edited and tested locally, and
+Claude Code would otherwise list both copies.
+
+In: =install.py= (=skillOverrides=), =tools/build.py=.
 
 ** Skills
 
-- /Skills load locally from this repository./ The installer gives every local
-  agent every skill, the claude.ai set included, and turns off Claude Code's
-  synced copies; changes reach claude.ai by uploading the built zip. One
-  version is edited and tested locally, and Claude Code would otherwise list
-  both copies.
-- /Skills are concise and complete./ A skill holds every step and rule a model
-  would otherwise get wrong, each stated once; adapting a third-party skill
-  changes only what conflicts with the maintainer's rules. Once a skill loads,
-  every token competes with the conversation, and vague guidance fails too.
-- /New skills come from real runs, checked against primary sources./ The
-  sources refuted several case-study claims (an SVG =sourceSize= multiplied by
-  the pixel ratio counts it twice; a diff threshold of 40 let real shifts
-  through). The runs added five rules to the workflow skills: full gates on the
-  final commit, a generated file changed at its generator, tests on the current
-  build, a check script trusted only after it catches a planted case, and
-  slowness measured.
-- /Scripts in skills stay light./ A script a skill runs uses the standard
-  library plus at most one common package, and its tests run in CI without
-  that package, so the skill works wherever it is installed.
-- /Qt facts live in qt-quick./ The Qt facts and the Qt way to apply MVVM live
-  in qt-quick, so clean-architecture stays language-neutral and reusable
-  outside Qt.
-- /The adapted learn skill is named tutor./ claude.ai keeps the name learn
-  reserved for its built-in skill even when it is turned off.
-- /as-built-docs reads code on the session's model./ Its mapping subagents run
-  on the session's model, not a smaller one: the fact-check catches wrong
-  facts but not missing ones, so a weaker reader's omissions would pass.
+*** Skills are concise and complete
+:PROPERTIES:
+:CUSTOM_ID: concise-skills
+:END:
+A skill holds every step and rule a model would otherwise get wrong, each
+stated once; adapting a third-party skill changes only what conflicts with
+the maintainer's rules. Once a skill loads, every token competes with the
+conversation, and vague guidance fails too.
+
+In: =docs/skill-authoring.org=, =AGENTS.md= (Hard rules).
+
+*** New skills come from real runs, checked against primary sources
+:PROPERTIES:
+:CUSTOM_ID: skills-from-real-runs
+:END:
+The sources refuted several case-study claims (an SVG =sourceSize= multiplied
+by the pixel ratio counts it twice; a diff threshold of 40 let real shifts
+through). The runs added five rules to the workflow skills: full gates on the
+final commit, a generated file changed at its generator, tests on the current
+build, a check script trusted only after it catches a planted case, and
+slowness measured.
+
+In: =docs/skill-authoring.org=; the five rules in =implement=,
+=verifying-before-claiming-done= and =systematic-debugging=.
+
+*** Scripts in skills stay light
+:PROPERTIES:
+:CUSTOM_ID: light-scripts
+:END:
+A script a skill runs uses the standard library plus at most one common
+package, and its tests run in CI without that package, so the skill works
+wherever it is installed.
+
+In: =tests/test_skill_scripts.py=, =.github/workflows/ci.yml=.
+
+*** Qt facts live in qt-quick
+:PROPERTIES:
+:CUSTOM_ID: qt-facts-in-qt-quick
+:END:
+The Qt facts and the Qt way to apply MVVM live in qt-quick, so
+clean-architecture stays language-neutral and reusable outside Qt.
+
+In: =home/.agents/skills/qt-quick/=, =home/.agents/skills/clean-architecture/=.
+
+*** The adapted learn skill is named tutor
+:PROPERTIES:
+:CUSTOM_ID: tutor-name
+:END:
+claude.ai keeps the name learn reserved for its built-in skill even when it
+is turned off.
+
+In: =claude-ai/skills/tutor/=.
+
+*** as-built-docs reads code on the session's model
+:PROPERTIES:
+:CUSTOM_ID: as-built-session-model
+:END:
+Its mapping subagents run on the session's model, not a smaller one: the
+fact-check catches wrong facts but not missing ones, so a weaker reader's
+omissions would pass.
+
+In: =home/.agents/skills/as-built-docs/SKILL.md=.
 
 ** What the skills teach
 
-- /Every application gets every clean-architecture layer./ Domain, use cases,
-  infrastructure, presentation and a composition root, with dependencies
-  pointing inward and repository interfaces in the domain; a use case returns
-  its result, and one that would only forward a call is left out only as a
-  decision the project records. One structure in every project, as Martin,
-  Evans, Fowler and Cockburn describe it, at the cost of heavier small apps.
-- /UI threads never block; work moves through events./ event-driven-ui moves
-  file writes, I/O and heavy work to long-lived workers whose results come
-  back as events, and keeps one loop with asynchronous APIs when every handler
-  fits the frame budget. It matches Chromium's, Android's, Apple's and Qt's
-  threading guidance, and a separate skill loads when a UI freezes.
-- /Diagrams use the nexenne palette in day and night./ Every PlantUML diagram
-  includes the skill's =palette.iuml= and no other styling, the skill names
-  neither the palette's origin nor any project, and groups are packages, not
-  stereotypes. One file serves both themes, and a light fill without its text
-  colour was unreadable in the dark preview.
-- /As-built docs are written for people and synced, not rewritten./ Three
-  documents, each opening with its own vocabulary and the big picture, under a
-  word budget, with titled UML diagrams, lookup facts in an appendix, bugs left
-  to code-audit and readability enforced by checks that fail; a rerun syncs
-  from the recorded commit. Earlier generated docs were tedious through
-  density.
-- /As-built docs show the UI with rendered, annotated pictures./ Pictures come
-  only from the real app driven to each state, each with a recipe and a
-  numbered legend that a check matches against its markers; when the app
-  cannot run, the user is asked and nothing is sketched. A description of an
-  app includes what the user sees, and rendered pictures stay true to the
-  code.
-- /Code audits report only confirmed findings and ask about the rest./
-  code-audit writes a local report of findings confirmed by a check that could
-  fail, each with severity, confidence, =file:line= and evidence, keeps every
-  doubt as a question for the user, and fixes nothing. False positives make
-  people ignore a report.
+*** Every application gets every clean-architecture layer
+:PROPERTIES:
+:CUSTOM_ID: clean-architecture-layers
+:END:
+Domain, use cases, infrastructure, presentation and a composition root, with
+dependencies pointing inward and repository interfaces in the domain; a use
+case returns its result, and one that would only forward a call is left out
+only as a decision the project records. One structure in every project, as
+Martin, Evans, Fowler and Cockburn describe it, at the cost of heavier small
+apps.
 
-** Git and licence
+In: =home/.agents/skills/clean-architecture/SKILL.md=.
 
-- /Agents outside Claude Code never push./ The guard blocks every push in
-  Codex, Gemini CLI, Copilot CLI and Cursor, and force pushes and deletions in
-  every tool. Outside Claude Code nothing asks before a push, so the maintainer
-  pushes there.
-- /No AI attribution in commits./ Commits and pull requests carry no
-  =Co-Authored-By= or other AI trailer; the human committer owns every line
-  ([[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]]).
-- /MIT licence held by Nicolò Plebani (nexenne)./ Original work is MIT,
-  Copyright (c) 2026 Nicolò Plebani (nexenne), with a =LICENSE.txt= in every
-  skill; adapted third-party work keeps its licence and credits the changes.
-  It is the maintainer's standard licence, compatible with reuse across his
-  projects.
+*** UI threads never block; work moves through events
+:PROPERTIES:
+:CUSTOM_ID: ui-never-blocks
+:END:
+event-driven-ui moves file writes, I/O and heavy work to long-lived workers
+whose results come back as events, and keeps one loop with asynchronous APIs
+when every handler fits the frame budget. It matches Chromium's, Android's,
+Apple's and Qt's threading guidance, and a separate skill loads when a UI
+freezes.
+
+In: =home/.agents/skills/event-driven-ui/SKILL.md=.
+
+*** Diagrams use the nexenne palette in day and night
+:PROPERTIES:
+:CUSTOM_ID: diagram-palette
+:END:
+Every PlantUML diagram includes the skill's =palette.iuml= and no other
+styling, the skill names neither the palette's origin nor any project, and
+groups are packages, not stereotypes. One file serves both themes, and a
+light fill without its text colour was unreadable in the dark preview.
+
+In: =home/.agents/skills/plantuml-diagrams/=.
+
+*** As-built docs are written for people and synced, not rewritten
+:PROPERTIES:
+:CUSTOM_ID: as-built-for-people
+:END:
+Three documents, each opening with its own vocabulary and the big picture,
+under a word budget, with titled UML diagrams, lookup facts in an appendix,
+bugs left to code-audit and readability enforced by checks that fail; a rerun
+syncs from the recorded commit. Earlier generated docs were tedious through
+density.
+
+In: =home/.agents/skills/as-built-docs/=.
+
+*** As-built docs show the UI with rendered, annotated pictures
+:PROPERTIES:
+:CUSTOM_ID: as-built-pictures
+:END:
+Pictures come only from the real app driven to each state, each with a recipe
+and a numbered legend that a check matches against its markers; when the app
+cannot run, the user is asked and nothing is sketched. A description of an
+app includes what the user sees, and rendered pictures stay true to the code.
+
+In: =home/.agents/skills/as-built-docs/=.
+
+*** Code audits report only confirmed findings and ask about the rest
+:PROPERTIES:
+:CUSTOM_ID: confirmed-audit-findings
+:END:
+code-audit writes a local report of findings confirmed by a check that could
+fail, each with severity, confidence, =file:line= and evidence, keeps every
+doubt as a question for the user, and fixes nothing. False positives make
+people ignore a report.
+
+In: =home/.agents/skills/code-audit/SKILL.md=.
+
+** Git and license
+
+*** No agent pushes or publishes
+:PROPERTIES:
+:CUSTOM_ID: no-agent-push
+:END:
+No agent pushes or publishes, in any tool; the guard and the Claude Code
+settings enforce it. Agents commit to local branches; the maintainer reviews
+every change before it leaves the machine, and pushes.
+
+In: =home/.agents/hooks/guard_bash.py=, =adapters/claude/settings.json= (deny),
+=home/.agents/AGENTS.md= (Agentic work, Git).
+
+*** Parallel and risky work is isolated in worktrees
+:PROPERTIES:
+:CUSTOM_ID: isolated-worktrees
+:END:
+Writing agents that run in parallel, and a complex or risky change, each work
+in their own git worktree and branch outside the main checkout. A branch lands
+on the maintainer's go by rebase and fast-forward, for a linear history, and
+then its worktree and branch are removed. The main checkout and the target
+branch move only when reviewed work lands, and nothing is left behind.
+
+In: =home/.agents/AGENTS.md= (Agentic work),
+=home/.agents/skills/isolated-work/SKILL.md=.
+
+*** No AI attribution in commits
+:PROPERTIES:
+:CUSTOM_ID: no-ai-attribution
+:END:
+Commits and pull requests carry no =Co-Authored-By= or other AI trailer; the
+human committer owns every line ([[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]]).
+
+In: =adapters/claude/settings.json= (attribution), =AGENTS.md= (Hard rules),
+=home/.agents/AGENTS.md= (Git).
+
+*** MIT license held by Nicolò Plebani (nexenne)
+:PROPERTIES:
+:CUSTOM_ID: mit-license
+:END:
+Every skill folder has a =LICENSE.txt=. New work is MIT, Copyright (c) 2026
+Nicolò Plebani (nexenne). Adapted third-party work keeps its license and
+records the changes (see =claude-ai/skills/tutor/NOTICE.txt=). It is the
+maintainer's standard license, compatible with reuse across his projects.
+
+In: =AGENTS.md= (Hard rules), =tools/validate.py= (the =LICENSE.txt= check).
