@@ -761,7 +761,8 @@ class SessionRefresh(unittest.TestCase):
         self.assertNotIn("gone.org", result.stdout)
 
     def test_wrong_types_never_fail(self):
-        for payload in ([1], {"cwd": 5}, {"cwd": [], "source": 5}, {"source": {"a": 1}}, DEEP_JSON):
+        for payload in ([1], {"cwd": 5}, {"cwd": [], "source": 5}, {"source": {"a": 1}}, DEEP_JSON,
+                        {"cwd": "bad\u0000path"}):
             with self.subTest(payload=str(payload)[:40]):
                 result = self.refresh_with(payload)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))

@@ -49,7 +49,7 @@ def git(*args: str, cwd: str, deadline: float) -> tuple[str, str]:
                                 timeout=min(CALL_TIMEOUT_SECONDS, left), check=False)
     except subprocess.TimeoutExpired:
         return "", TIMED_OUT
-    except OSError:
+    except (OSError, ValueError):  # ValueError: a folder name the system rejects, such as one with NUL
         return "", FAILED
     if result.returncode != 0:
         return "", FAILED
