@@ -10,7 +10,8 @@ Checks:
   name in lowercase kebab case and equal to the folder name, description within the
   limit (1024 characters locally, 200 for the claude.ai set), a LICENSE.txt next to it,
   no inline backticks outside fenced blocks;
-- subagents carry name, description, tools and model, and the name matches the file;
+- subagents carry name, description, tools and model, the name matches the file, and
+  the body has no ''' (the Codex copy holds it in a TOML literal string);
 - no em dash or en dash in any text file;
 - no unfilled <FILL: ...> marker outside the project templates;
 - the global instructions stay under 200 lines;
@@ -85,7 +86,7 @@ def check_skill(folder: Path, limit: int, errors: list[str]) -> None:
 def check_agent(path: Path, errors: list[str]) -> None:
     rel = path.relative_to(ROOT)
     try:
-        fields, _ = frontmatter(path)
+        fields, body = frontmatter(path)
     except (ValueError, json.JSONDecodeError) as error:
         errors.append(f"{rel}: {error}")
         return
@@ -94,6 +95,8 @@ def check_agent(path: Path, errors: list[str]) -> None:
         errors.append(f"{rel}: missing fields {sorted(missing)}")
     if fields.get("name") != path.stem:
         errors.append(f"{rel}: name differs from file name")
+    if "'''" in body:
+        errors.append(f"{rel}: body contains ''', which ends the TOML literal string of the Codex copy")
 
 
 def text_files():

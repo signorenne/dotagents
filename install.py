@@ -141,7 +141,7 @@ def copilot_agent(meta: dict, body: str) -> str:
 
 def codex_agent(meta: dict, body: str) -> str:
     if "'''" in body:
-        raise ValueError(f"{meta['name']}: body contains ''' and cannot be a TOML literal string")
+        raise ValueError("body contains ''' and cannot be a TOML literal string")
     lines = [f"name = {json.dumps(meta['name'])}",
              f"description = {json.dumps(meta['description'], ensure_ascii=False)}",
              f"sandbox_mode = {json.dumps(CODEX_SANDBOX.get(meta['name'], 'workspace-write'))}"]
@@ -151,6 +151,29 @@ def codex_agent(meta: dict, body: str) -> str:
     lines.append(body.rstrip("\n"))
     lines.append("'''")
     return "\n".join(lines) + "\n"
+
+
+def check_source() -> list:
+    """Problems in the repository that would stop an install partway, found before it starts."""
+    problems = []
+    for path in sorted((SRC / "agents").glob("*.md")):
+        try:
+            meta, body = parse_agent(path.read_text(encoding="utf-8"))
+            for render in (codex_agent, gemini_agent, copilot_agent):
+                render(meta, body)
+        except KeyError as error:
+            problems.append(f"{path.relative_to(PACK)}: missing field {error}")
+        except ValueError as error:
+            problems.append(f"{path.relative_to(PACK)}: {error}")
+    for path, key in ((CLAUDE_FRAGMENT, "hooks"), (UPLOADED_EXTRA, "skills")):
+        try:
+            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {key: {}}
+        except ValueError as error:
+            problems.append(f"{path.relative_to(PACK)}: {error}")
+            continue
+        if not (isinstance(data, dict) and isinstance(data.get(key), dict)):
+            problems.append(f"{path.relative_to(PACK)}: no {key} object")
+    return problems
 
 
 def real_path(path: Path):
@@ -500,6 +523,13 @@ def main() -> int:
     unknown = [t for t in tools if t not in TOOLS]
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
+
+    problems = check_source()
+    if problems:
+        print("Nothing installed: fix the repository first (python3 tools/validate.py checks it).",
+              file=sys.stderr)
+        print("\n".join(f"  {problem}" for problem in problems), file=sys.stderr)
+        return 1
 
     installer = Installer(home, args.dry_run, tools)
     if args.audit:
