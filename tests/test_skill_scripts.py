@@ -15,10 +15,16 @@ from unittest import mock
 ROOT = Path(__file__).resolve().parent.parent
 SCRIPT = ROOT / "home/.agents/skills/precise-ui-changes/scripts/nothing_moved.py"
 
-spec = importlib.util.spec_from_file_location("nothing_moved", SCRIPT)
-nothing_moved = importlib.util.module_from_spec(spec)
-sys.modules[spec.name] = nothing_moved  # dataclasses look their module up here
-spec.loader.exec_module(nothing_moved)
+def load(name, path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = module  # dataclasses look their module up here
+    spec.loader.exec_module(module)
+    return module
+
+
+nothing_moved = load("nothing_moved", SCRIPT)
+annotate = load("annotate", ROOT / "home/.agents/skills/as-built-docs/scripts/annotate.py")
 
 try:
     from PIL import Image
@@ -213,6 +219,69 @@ class Images(CommandCase):
         status, out = self.run_main("noise", str(self.before / "a.png"), str(self.after / "a.png"))
         self.assertEqual(status, 0, out)
         self.assertIn("largest channel difference 3, on 2 of 400 pixels", out)
+
+
+class AnnotatePlace(unittest.TestCase):
+    def test_points_and_boxes_are_parsed_strictly(self):
+        self.assertEqual(annotate.parse_point("3,4"), (3, 4))
+        for text in ("3", "3,4,5", "-1,2", "a,b"):
+            with self.subTest(text=text), self.assertRaises(ValueError):
+                annotate.parse_point(text)
+        self.assertEqual(annotate.parse_box("1,2,3,4"), (1, 2, 3, 4))
+        with self.assertRaises(ValueError):
+            annotate.parse_box("4,2,3,5")
+
+    def test_markers_are_numbered_in_order_and_moved_by_the_crop(self):
+        placed = annotate.place([(15, 25), (30, 40)], (100, 100), (10, 20, 50, 60))
+        self.assertEqual(placed, [(1, 5, 5), (2, 20, 20)])
+
+    def test_a_marker_outside_the_crop_is_refused(self):
+        with self.assertRaises(annotate.UsageError):
+            annotate.place([(5, 25)], (100, 100), (10, 20, 50, 60))
+        with self.assertRaises(annotate.UsageError):
+            annotate.place([(100, 5)], (100, 100), None)
+
+    def test_a_crop_larger_than_the_picture_is_refused(self):
+        with self.assertRaises(annotate.UsageError):
+            annotate.place([(5, 5)], (100, 100), (0, 0, 120, 50))
+
+    def test_unreadable_input_is_a_usage_error(self):
+        with contextlib.redirect_stderr(io.StringIO()), contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(annotate.main(["/nonexistent/in.png", "/nonexistent/out.png", "--mark", "1,1"]), 2)
+
+
+@unittest.skipIf(Image is None, "Pillow is not installed")
+class AnnotateDraw(unittest.TestCase):
+    def setUp(self):
+        self.root = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.root)
+        self.source = self.root / "in.png"
+        Image.new("RGB", (200, 120), (40, 40, 40)).save(self.source)
+        self.target = self.root / "out.png"
+
+    def run_main(self, *argv):
+        with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+            return annotate.main([str(self.source), str(self.target), *argv])
+
+    def test_markers_are_drawn_where_asked_and_nowhere_else(self):
+        self.assertEqual(self.run_main("--mark", "30,30", "--mark", "150,80"), 0)
+        with Image.open(self.target) as out:
+            out = out.convert("RGB")
+            ring = (30 + 13, 30)  # on the marker, away from its number
+            self.assertNotEqual(out.getpixel(ring), (40, 40, 40))
+            self.assertNotEqual(out.getpixel((150 + 13, 80)), (40, 40, 40))
+            self.assertEqual(out.getpixel((100, 5)), (40, 40, 40))
+
+    def test_crop_keeps_only_the_rectangle(self):
+        self.assertEqual(self.run_main("--mark", "60,50", "--crop", "50,40,150,100"), 0)
+        with Image.open(self.target) as out:
+            self.assertEqual(out.size, (100, 60))
+            self.assertNotEqual(out.convert("RGB").getpixel((10 + 13, 10)), (40, 40, 40))
+
+    def test_bad_markers_and_radius_are_usage_errors(self):
+        self.assertEqual(self.run_main("--mark", "500,5"), 2)
+        self.assertEqual(self.run_main("--mark", "5,5", "--radius", "2"), 2)
+        self.assertFalse(self.target.exists())
 
 
 if __name__ == "__main__":
