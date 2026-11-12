@@ -219,3 +219,15 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The maintainer's rule and fdc-next's design, which match Chromium's threading guide, Android's and Apple's main-thread rules, Qt's threading documentation, the single writer principle and the LMAX Disruptor. A separate skill loads when a UI freezes, not only for architecture questions. It brings more threads to reason about and event flows that are harder to follow in the code, hence the rule on when one loop is enough.
 - Rejected: a section in clean-architecture (would not load for a frozen UI); a thread per task (switching and memory costs); locks shared between threads as the default (deadlocks and contention).
 - Revisit if: in a project whose handlers all fit the frame budget the threads add only complexity, or the skill misfires in real sessions.
+
+## D-0019: Agents outside Claude Code never push
+
+- Status: Accepted
+- Proposed by: agent (a review found force, delete and mirror pushes passing the bash guard), maintainer (block every push outside Claude Code)
+- Decided by: maintainer
+- Date: 2026-11-12
+- Rule in: home/.agents/hooks/guard_bash.py, adapters/claude/settings.json (ask before git push)
+- Decision: The bash guard blocks every git push when it runs for a tool other than Claude Code, Cursor included (recognised by the CURSOR_VERSION variable or the cursor_version payload field, since Cursor runs the Claude Code hook). In Claude Code a plain push stays possible after the permission prompt; force pushes, deletions (--delete, :ref), --mirror and --prune are blocked for every tool.
+- Why: The global rules say never push, force or rewrite published history, and outside Claude Code nothing asks before a push. The cost: an agent in Codex, Gemini CLI, Copilot or Cursor cannot push even when asked, so the maintainer pushes; a Claude Code session started from Cursor's terminal may inherit CURSOR_VERSION and lose plain pushes too.
+- Rejected: blocking only destructive pushes (a plain push with no prompt outside Claude Code); no change (remote deletions passed).
+- Revisit if: another tool gets a reliable ask-before-push mechanism, or pushes the guard does not inspect (git subtree push, gh pr create) need covering.
