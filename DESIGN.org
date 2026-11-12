@@ -159,14 +159,14 @@ format and timeout unit, extra steps, notes), and one engine installs them
 all; =tests/test_install.py= (Descriptions) checks every description with
 one suite.
 
-| Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                                          |
-|-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+----------------------------------------------------------------------------------------------------------------|
-| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PostToolUseFailure, PreCompact, Stop, and SessionStart on every source         |
-| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop and SessionStart (approve in Codex)                                           |
-| Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=, with SessionStart on startup, resume, clear                                         |
-| Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                                                  |
-| Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=, with sessionStart                                                       |
-| Cursor          | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code); =~/.cursor/hooks.json= with sessionStart                       |
+| Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                                  |
+|-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+--------------------------------------------------------------------------------------------------------|
+| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PostToolUseFailure, PreCompact, Stop, and SessionStart on every source |
+| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json=, with Stop and SessionStart (approve in Codex)                                   |
+| Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=, with SessionStart on startup, resume, clear                                 |
+| Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                                          |
+| Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=, with sessionStart                                               |
+| Cursor          | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code); =~/.cursor/hooks.json= with sessionStart               |
 
 - /Generated, not copied by hand/ : each tool's subagent file is rendered from
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
@@ -262,16 +262,16 @@ against it (events, matchers, tool names, timeouts).
 
 * Hooks and their failure model
 
-| Hook                  | Runs                                            | Tools                                  | Timeout |
-|-----------------------+-------------------------------------------------+----------------------------------------+---------|
-| =guard_bash.py=       | before a shell command                          | all six (Cursor through Claude Code's) | 10 s    |
-| =after_edit.py=       | after a file edit or write                      | all six (Cursor through Claude Code's) | 60 s    |
-| =session_refresh.py=  | at session start: new, clear, compact, resume   | Claude Code, Codex; at a start, JSON: Gemini CLI, Copilot CLI, Cursor | 10 s    |
-| =compact_brief.py=    | before a compaction                             | Claude Code                            | 10 s    |
-| =step_log.py=         | before the agent ends its turn                  | Claude Code, Codex                     | 10 s    |
-| =context_nudge.py=    | after a shell command                           | Claude Code                            | 10 s    |
-| =claim_check.py=      | before the agent ends its turn                  | Claude Code                            | 10 s    |
-| =repeated_failure.py= | after a shell command fails                     | Claude Code                            | 10 s    |
+| Hook                  | Runs                                          | Tools                                                                 | Timeout |
+|-----------------------+-----------------------------------------------+-----------------------------------------------------------------------+---------|
+| =guard_bash.py=       | before a shell command                        | all six (Cursor through Claude Code's)                                | 10 s    |
+| =after_edit.py=       | after a file edit or write                    | all six (Cursor through Claude Code's)                                | 60 s    |
+| =session_refresh.py=  | at session start: new, clear, compact, resume | Claude Code, Codex; at a start, JSON: Gemini CLI, Copilot CLI, Cursor | 10 s    |
+| =compact_brief.py=    | before a compaction                           | Claude Code                                                           | 10 s    |
+| =step_log.py=         | before the agent ends its turn                | Claude Code, Codex                                                    | 10 s    |
+| =context_nudge.py=    | after a shell command                         | Claude Code                                                           | 10 s    |
+| =claim_check.py=      | before the agent ends its turn                | Claude Code                                                           | 10 s    |
+| =repeated_failure.py= | after a shell command fails                   | Claude Code                                                           | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
