@@ -42,7 +42,7 @@ Stop at the first failure:
 3. every reference resolves: includes, imports, build file entries;
 4. the build with no new warnings compared with the baseline, in every configuration, platform and build option the project supports: a build proves only what it compiled;
 5. the affected tests, then the full gates;
-6. an independent review of the rule and the tooling output, then of the anomalies the checks reported, rather than of every site.
+6. an independent review given the rulebook, the matcher's known-cases file and the outputs of the checks above: it reviews the rule and the tooling output, then the anomalies the checks reported, then a sample of sites rather than every one.
 
 Checks 1 to 3 run without a build and catch most mistakes cheaply, but they never replace it.
 
