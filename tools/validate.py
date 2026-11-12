@@ -11,7 +11,8 @@ Checks:
   name in lowercase kebab case, equal to the folder name, without the reserved words
   anthropic and claude and not synced, description within the limit (1024 characters
   locally, 200 for the claude.ai set) and without angle brackets, a LICENSE.txt next to
-  it, no inline backticks outside fenced blocks;
+  it, no inline backticks outside fenced blocks, and a body of at most 20,000 bytes
+  (about the 5,000 tokens of a skill that Claude Code keeps after compaction);
 - each override in claude-ai/overrides.json names a local skill and has a description
   of 1 to 200 characters without angle brackets;
 - subagents carry name, description, tools and model, the name matches the file, and
@@ -41,6 +42,9 @@ NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
 RESERVED_WORDS = ("anthropic", "claude")
 RESERVED_NAMES = {"synced", "anthropic-skills"}
 CLAUDE_AI_LIMIT = 200
+# After compaction Claude Code keeps the first 5,000 tokens of each invoked skill:
+# 20,000 bytes is that budget at about 4 bytes per token.
+SKILL_BODY_LIMIT = 20000
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
 DASHES = ("\u2014", "\u2013")
@@ -107,6 +111,9 @@ def check_skill(folder: Path, limit: int, errors: list[str]) -> None:
         errors.append(f"{rel}: LICENSE.txt missing")
     if inline_backticks(body):
         errors.append(f"{rel}: inline backticks outside fenced blocks")
+    size = len(body.encode("utf-8"))
+    if size > SKILL_BODY_LIMIT:
+        errors.append(f"{rel}: body of {size} bytes (limit {SKILL_BODY_LIMIT})")
 
 
 def check_agent(path: Path, errors: list[str]) -> None:

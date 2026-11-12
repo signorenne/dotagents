@@ -42,7 +42,8 @@ behind this guide is in [[file:../DESIGN.org::#concise-skills][DESIGN.org, under
    a real run showed the need. Keep =SKILL.md= under about 5,000 tokens [5]:
    after compaction Claude Code keeps only the first 5,000 tokens of each
    loaded skill, so put the most important instructions near the top and
-   write them as standing instructions [4]. A reference file over 100 lines
+   write them as standing instructions [4]. =tools/validate.py= fails a body
+   over 20,000 bytes, about 5,000 tokens. A reference file over 100 lines
    starts with a table of contents [1].
 8. Consistent terms (one word per concept), no time-sensitive statements, and
    an example only where it shows the expected output better than a rule
