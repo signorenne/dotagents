@@ -78,10 +78,14 @@ add the skill, the subagents and where a fresh session starts.
   more than one file, changes a public API or meets the maintainer's choice.
   For a change across modules, a public API change, or a migration of data or
   many files, the plan proposes [[file:../home/.agents/skills/isolated-work/SKILL.md][isolated-work]], approved with the plan.
+  Before the first step, and on resume, it runs the narrowest documented
+  check on the base commit (on HEAD when resuming) and records the result as
+  the baseline: a failure there predates the steps to come, so it is
+  reported, never fixed silently.
 - /Produces/ : the branch =<type>/<slug>=, one commit per step, each behavior
   change with a test seen failing first; the progress log, with the approved
-  plan, every step with its commit and check, every decision with who took it,
-  and every refuted assumption.
+  plan, the baseline, every step with its commit and check, every decision
+  with who took it, and every refuted assumption.
 - /Lives in/ : the commits on a local branch. With isolation the branch lives
   in its own worktree, =../<repository>-<slug>=, created from the tip of the
   branch it will land on. The progress log is
@@ -195,6 +199,7 @@ progress log. In the other tools, ask for that re-read.
 
 | Failure                           | Response                                                                   | Recorded in                    |
 |-----------------------------------+----------------------------------------------------------------------------+--------------------------------|
+| The baseline check fails          | report it, since it predates the steps to come; never fix it silently      | progress log, as the baseline  |
 | A gate FAILs                      | fix the code, never the gate or the test; gate the new commit              | progress log, with the commit  |
 | A gate is INCOMPLETE or SKIP      | not passed, so not done; listed with its reason and its log                | handoff: commands still needed |
 | A review blocker or major finding | fix it; reviewer again on a fix that changed behavior; full gates again    | progress log                   |
