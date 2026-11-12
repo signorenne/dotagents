@@ -39,7 +39,8 @@ What it gives every session, in chat or in a repository:
   compaction or a resume, they print the plan file's state (and, after a
   compaction or a resume, the real git state), and when the agent ends its
   turn they record the branch's commits in the plan's log without a model
-  turn. In Claude Code they also tell the compaction summary what resuming
+  turn. Gemini CLI, Copilot CLI and Cursor get the plan's state at session
+  start too. In Claude Code they also tell the compaction summary what resuming
   needs, suggest clearing a large context after a step's commit, remind the
   agent to change approach when a shell command fails the same way three
   times, and send it back once if its final message says the tests pass

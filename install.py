@@ -113,6 +113,11 @@ GEMINI_HOOKS = {
                     "hooks": [hook(script("guard_bash.py", "gemini"), name="agents-guard", timeout=10000)]}],
     "AfterTool": [{"matcher": "write_file|replace",
                    "hooks": [hook(script("after_edit.py", "gemini"), name="agents-after-edit", timeout=60000)]}],
+    # A lifecycle matcher is an exact string (Gemini CLI hooks reference), so one group per
+    # source; the refresh answers in JSON (hookSpecificOutput.additionalContext).
+    "SessionStart": [{"matcher": source, "hooks": [hook(script("session_refresh.py", "gemini"),
+                                                         name="agents-session-refresh", timeout=10000)]}
+                     for source in ("startup", "resume", "clear")],
 }
 # Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts
 # with its pattern, without prompting. They hold even while Codex skips the hooks, which
@@ -208,8 +213,13 @@ COPILOT_HOOKS = {
                         "bash": script("guard_bash.py", "copilot")}],
         "postToolUse": [{"type": "command", "matcher": "edit|create|str_replace_editor|apply_patch",
                          "timeoutSec": 60, "bash": script("after_edit.py", "copilot")}],
+        # No matcher on sessionStart; only additionalContext is read (hooks configuration).
+        "sessionStart": [{"type": "command", "timeoutSec": 10, "bash": script("session_refresh.py", "copilot")}],
     },
 }
+# Cursor's own hooks file (~/.cursor/hooks.json, version 1): sessionStart takes no matcher,
+# sends workspace_roots instead of cwd and reads additional_context; timeout in seconds.
+CURSOR_HOOKS = {"sessionStart": [{"command": script("session_refresh.py", "cursor"), "timeout": 10}]}
 
 
 def parse_agent(text: str) -> tuple[dict, str]:
@@ -513,6 +523,8 @@ TOOL_DESCRIPTIONS = {
     "cursor": {
         "label": "Cursor", "base": ".cursor", "detect": [".cursor"], "programs": ["cursor-agent", "cursor"],
         "skills": {"how": "reads"},
+        "hooks": {"how": "settings", "file": "hooks.json", "events": CURSOR_HOOKS, "unit": "s",
+                  "also": "cursor_version"},
         "steps": ["cursor_note"],
     },
 }
@@ -987,6 +999,11 @@ class Installer:
         self.write(base / "rules" / "dotagents.rules", codex_rules())
 
     @staticmethod
+    def cursor_version(config: dict, added: list) -> dict:
+        """Cursor's hooks file needs its schema version."""
+        return merge_values(config, {"version": 1}, added)
+
+    @staticmethod
     def gemini_context(settings: dict, added: list) -> dict:
         """Gemini CLI reads AGENTS.md as well as GEMINI.md (context.fileName)."""
         if "context" not in settings:
@@ -1012,12 +1029,13 @@ class Installer:
     def step_cursor_note(self, base: Path) -> None:
         if "claude" in self.tools:
             reads = ("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself "
-                     "(Settings > Agents > Third-Party Imports, on by default).")
+                     "(Settings > Agents > Third-Party Imports, on by default); its own ~/.cursor/hooks.json "
+                     "gets the session refresh.")
         else:
-            reads = ("Cursor: this run gave it no subagents and no hooks, because Cursor reads them "
-                     "from Claude Code's ~/.claude/agents and ~/.claude/settings.json, which only "
-                     "--tools claude writes (run install.py --tools claude,cursor to add them). "
-                     "It reads ~/.agents/skills by itself.")
+            reads = ("Cursor: this run gave it no subagents and no hooks but the session refresh in "
+                     "~/.cursor/hooks.json, because Cursor reads the rest from Claude Code's ~/.claude/agents "
+                     "and ~/.claude/settings.json, which only --tools claude writes (run install.py --tools "
+                     "claude,cursor to add them). It reads ~/.agents/skills by itself.")
         self.notes.append(reads + " It has no global instructions file: paste ~/.agents/AGENTS.md into "
                           "Settings > Rules > User Rules.")
 

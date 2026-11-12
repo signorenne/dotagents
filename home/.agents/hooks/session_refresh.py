@@ -15,8 +15,13 @@ files of .private/plans/ and files of .private/handoff/ (found in the working fo
 a parent, up to the repository root, or in a linked worktree in the main checkout), with
 absolute paths.
 
-Usage: python3 "$HOME/.agents/hooks/session_refresh.py"
-Plain stdout on exit 0 is added to the agent's context. Never fails the session.
+Usage: python3 "$HOME/.agents/hooks/session_refresh.py" [--tool claude|codex|gemini|copilot|cursor]
+Claude Code and Codex add plain stdout on exit 0 to the agent's context. Gemini CLI,
+Copilot CLI and Cursor read JSON only (their sessionStart docs): {"hookSpecificOutput":
+{"additionalContext": ...}}, {"additionalContext": ...} and {"additional_context": ...},
+and {} when there is nothing to add. Copilot CLI's "new" source counts as a start, and
+Cursor, which sends no source and no cwd, as a start in its first workspace root.
+Never fails the session.
 """
 
 from __future__ import annotations
@@ -173,7 +178,32 @@ def plan_excerpt(cwd: str, deadline: float) -> str:
     return result.stdout.strip() if result.returncode == 0 else ""
 
 
+JSON_SHAPES = {
+    "gemini": lambda text: {"hookSpecificOutput": {"additionalContext": text}},
+    "copilot": lambda text: {"additionalContext": text},
+    "cursor": lambda text: {"additional_context": text},
+}
+
+
+def tool_name() -> str:
+    args = sys.argv[1:]
+    return args[args.index("--tool") + 1] if "--tool" in args[:-1] else "claude"
+
+
 def main() -> int:
+    tool = tool_name()
+    try:
+        text = refresh(tool)
+    except Exception:  # a broken refresh never fails the session or breaks a JSON reader
+        text = ""
+    if tool in JSON_SHAPES:
+        print(json.dumps(JSON_SHAPES[tool](text) if text else {}))
+    elif text:
+        print(text)
+    return 0
+
+
+def refresh(tool: str) -> str:
     deadline = time.monotonic() + DEADLINE_SECONDS
     try:
         payload = json.load(sys.stdin)
@@ -181,13 +211,13 @@ def main() -> int:
         payload = {}
     if not isinstance(payload, dict):
         payload = {}
-    cwd = text_field(payload, "cwd", ".")
-    source = text_field(payload, "source", "resume or compaction")
+    roots = payload.get("workspace_roots")
+    root = roots[0] if isinstance(roots, list) and roots and isinstance(roots[0], str) else "."
+    cwd = text_field(payload, "cwd", root)
+    source = text_field(payload, "source", "startup" if tool == "cursor" else "resume or compaction")
     excerpt = plan_excerpt(cwd, deadline)
-    if source in ("startup", "clear"):
-        if excerpt:
-            print(excerpt)
-        return 0
+    if source in ("startup", "clear", "new"):
+        return excerpt
     # Before git, so a slow git cannot leave the notes out.
     notes = [] if excerpt else task_notes(cwd, min(deadline, time.monotonic() + NOTES_SECONDS))
 
@@ -245,8 +275,7 @@ def main() -> int:
     elif notes:
         lines.append("Task notes (git-ignored), most recent first:\n" + "\n".join(notes))
         lines.append(REREAD)
-    print("\n".join(lines))
-    return 0
+    return "\n".join(lines)
 
 
 if __name__ == "__main__":

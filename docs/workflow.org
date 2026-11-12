@@ -95,8 +95,11 @@ were not run.
   compaction or a resume, the session refresh prints the plan's header, the
   step in progress and the open rulings (after a compaction or a resume also
   the real branch, changes and last commits, and a reminder that the agent's
-  memory of the code is a summary). The other tools have no such hook: ask
-  the agent to run the build skill, which starts from plan_state.py.
+  memory of the code is a summary). Gemini CLI, Copilot CLI and Cursor get
+  the same refresh as JSON (Gemini CLI on a start, a resume or a clear;
+  Copilot CLI and Cursor at a session's start). Antigravity CLI has no such
+  hook here: ask the agent to run the build skill, which starts from
+  plan_state.py.
 - Plan files and their logs, designs and handoffs live in =.private/= inside
   each repository (git-ignored); decisions live in the project's decision log.
 - build keeps =.private/plans/<slug>.<ext>= current as it works; the rulings

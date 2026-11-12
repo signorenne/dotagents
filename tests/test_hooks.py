@@ -1339,6 +1339,28 @@ class SessionRefresh(unittest.TestCase):
         result = self.refresh_with({"cwd": str(repo), "source": "startup"}, env)
         self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
 
+    def test_json_tools_get_their_own_shape_and_only_json(self):
+        # Gemini CLI, Copilot CLI and Cursor read JSON only (their sessionStart docs).
+        repo, env = self.committed_repo()
+        write_plan(repo, "task")
+        worktree = linked_worktree(self, repo, env)
+        cases = {"gemini": ({"cwd": str(worktree), "source": "startup"},
+                            lambda out: out["hookSpecificOutput"]["additionalContext"]),
+                 "copilot": ({"cwd": str(worktree), "source": "new"}, lambda out: out["additionalContext"]),
+                 "cursor": ({"workspace_roots": [str(worktree)]}, lambda out: out["additional_context"])}
+        for tool, (payload, context) in cases.items():
+            with self.subTest(tool=tool):
+                result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py"), "--tool", tool],
+                                        input=json.dumps(payload), capture_output=True, text=True,
+                                        check=False, env=env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertTrue(context(json.loads(result.stdout)).startswith("Plan file excerpt: a map"))
+                for bad in ("not json", "", "[1]"):
+                    off = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py"), "--tool", tool],
+                                         input=bad, capture_output=True, text=True, check=False, env=env)
+                    self.assertEqual(off.returncode, 0)
+                    json.loads(off.stdout)  # never plain text on a JSON reader's stdout
+
     def test_without_the_build_skill_the_refresh_still_reports_git(self):
         repo, env = self.committed_repo()
         write_plan(repo, "task")

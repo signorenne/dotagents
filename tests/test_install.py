@@ -396,6 +396,23 @@ class Install(unittest.TestCase):
         return subprocess.run(["sh", "-c", command], input=json.dumps(payload), env=env,
                               capture_output=True, text=True, check=False)
 
+    def test_cursor_gets_the_session_refresh_in_its_own_hooks_file(self):
+        # Cursor hooks docs: ~/.cursor/hooks.json with version 1; sessionStart entries take a
+        # command and a timeout in seconds, no matcher; stdin has workspace_roots, no cwd;
+        # stdout {"additional_context": ...}. A user's own entry stays.
+        mine = {"command": "./hooks/mine.sh"}
+        (self.home / ".cursor/hooks.json").write_text(json.dumps({"version": 1, "hooks": {"sessionStart": [mine]}}))
+        self.install("--tools", "cursor")
+        config = json.loads((self.home / ".cursor/hooks.json").read_text())
+        self.assertEqual(config["version"], 1)
+        self.assertEqual(config["hooks"]["sessionStart"][0], mine)
+        ours = config["hooks"]["sessionStart"][1]
+        self.assertEqual(ours, {"command": 'python3 "$HOME/.agents/hooks/session_refresh.py" --tool cursor',
+                                "timeout": 10})
+        result = self.run_hook(ours["command"], {"workspace_roots": [str(self.home)], "session_id": "s",
+                                                 "hook_event_name": "sessionStart"})
+        self.assertEqual((result.returncode, json.loads(result.stdout)), (0, {}))  # no plan: nothing to add
+
     def test_copilot_hooks_follow_the_documented_native_format(self):
         # GitHub's hooks reference: camelCase events get the native payload (toolName,
         # toolArgs) and a matcher compiled as ^(?:PATTERN)$ against toolName; native
@@ -404,7 +421,14 @@ class Install(unittest.TestCase):
         self.install("--tools", "copilot")
         config = json.loads((self.home / ".copilot/hooks/agents-global.json").read_text())
         self.assertEqual(config["version"], 1)
-        self.assertEqual(sorted(config["hooks"]), ["postToolUse", "preToolUse"])
+        self.assertEqual(sorted(config["hooks"]), ["postToolUse", "preToolUse", "sessionStart"])
+        (start,) = config["hooks"]["sessionStart"]  # no matcher; only additionalContext is read
+        self.assertEqual((start["type"], start["bash"]),
+                         ("command", 'python3 "$HOME/.agents/hooks/session_refresh.py" --tool copilot'))
+        self.assertNotIn("matcher", start)
+        result = self.run_hook(start["bash"], {"timestamp": 1704614400000, "cwd": "/tmp", "source": "resume"})
+        self.assertIn("Session restarted from resume", json.loads(result.stdout)["additionalContext"])
+        self.assertEqual(json.loads(self.run_hook(start["bash"], {"cwd": "/tmp", "source": "new"}).stdout), {})
         (pre,), (post,) = config["hooks"]["preToolUse"], config["hooks"]["postToolUse"]
         for entry, script, matching, other in (
                 (pre, "guard_bash.py", ["bash"], ["powershell", "edit", "create", "view", "Bash"]),
@@ -687,12 +711,25 @@ class Install(unittest.TestCase):
         # milliseconds. Tool names: run_shell_command, write_file, replace.
         self.install("--tools", "gemini")
         hooks = json.loads((self.home / ".gemini/settings.json").read_text())["hooks"]
-        self.assertEqual(sorted(hooks), ["AfterTool", "BeforeTool"])
+        self.assertEqual(sorted(hooks), ["AfterTool", "BeforeTool", "SessionStart"])
         (before,), (after,) = hooks["BeforeTool"], hooks["AfterTool"]
         self.assert_hook_group(before, "guard_bash.py", "gemini", ["run_shell_command"],
                                ["write_file", "replace", "read_file"], range(1000, 600001))
         self.assert_hook_group(after, "after_edit.py", "gemini", ["write_file", "replace"],
                                ["run_shell_command", "read_file"], range(1000, 600001))
+        # SessionStart: a lifecycle matcher is an exact source (startup, resume, clear), and
+        # stdout must be JSON; context goes in hookSpecificOutput.additionalContext.
+        starts = hooks["SessionStart"]
+        self.assertEqual(sorted(group["matcher"] for group in starts), ["clear", "resume", "startup"])
+        for group in starts:
+            (handler,) = group["hooks"]
+            self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/session_refresh.py" --tool gemini')
+            self.assertIn(handler["timeout"], range(1000, 600001))
+        result = self.run_hook(starts[0]["hooks"][0]["command"], {"cwd": str(self.home), "source": "resume",
+                                                                  "hook_event_name": "SessionStart"})
+        self.assertEqual(result.returncode, 0, result)
+        self.assertIn("Session restarted from resume",
+                      json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"])
 
     def test_antigravity_hooks_follow_the_documented_format(self):
         # Antigravity hooks docs (antigravity.google/docs/hooks?tab=cli): the CLI reads global

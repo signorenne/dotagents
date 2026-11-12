@@ -73,8 +73,9 @@ once before it reaches any tool.
    is the agent's ruling, recorded for the user's review.
 5. Every agent gets the same rules. One tool's files differ from another's in
    format only, or where a tool lacks a feature, and then the difference is
-   stated: only Claude Code and Codex get the session refresh, because only
-   they have a session start hook that fires after a compaction.
+   stated: only Claude Code and Codex get the session refresh after a
+   compaction, because only they have a session start hook that fires then;
+   Gemini CLI, Copilot CLI and Cursor get it at a session's start.
 6. Verified, not assumed. Nothing is called working, passing or done before a
    check ran. =tests/test_install.py= checks each generated hook file against
    the tool's documentation, and a behavior change is tested in a real session

@@ -505,13 +505,16 @@ Where each tool runs them:
   =Write=, =SessionStart= for =startup=, =resume=, =clear= and =compact=,
   whose plain stdout Codex adds as developer context, and =Stop=.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
-  =write_file= and =replace=.
+  =write_file= and =replace=, =SessionStart= for =startup=, =resume= and
+  =clear= (the refresh answers in JSON).
 - Antigravity CLI: =PreToolUse= for =run_command=, =PostToolUse= for
   =write_to_file=, =replace_file_content= and =multi_replace_file_content=,
   from =~/.gemini/config/hooks.json=.
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
-  =str_replace_editor= and =apply_patch=.
-- Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=;
+  =str_replace_editor= and =apply_patch=, =sessionStart= (JSON).
+- Cursor: =sessionStart= in its own =~/.cursor/hooks.json= (JSON, from the
+  first workspace root), and the Claude Code hook commands, read from
+  =~/.claude/settings.json=;
   its stop input has no =stop_hook_active=, so there the claim check lets
   every stop through (the step log never blocks).
 
