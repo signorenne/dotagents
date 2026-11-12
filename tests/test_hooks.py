@@ -156,6 +156,38 @@ class GuardBash(unittest.TestCase):
             "timeout 60 git push -f",
         ])
 
+    def test_other_ways_to_skip_hooks(self):
+        self.assert_blocked([
+            "LEFTHOOK=0 git commit -m x",
+            "LEFTHOOK=false git commit -m x",
+            "OVERCOMMIT_DISABLE=1 git commit -m x",
+            "HUSKY=false git commit -m x",
+            "git config unset core.hooksPath",
+            "git config unset --all core.hooksPath",
+            "git config --unset-all core.hooksPath",
+            "git config --unset core.hookspath",
+            "git config core.hooksPath /dev/null",
+            "git config --local core.hooksPath /dev/null",
+            "git config --global core.hooksPath ''",
+            "git config --system core.hooksPath /dev/null",
+            "git config set core.hooksPath /dev/null",
+            "git config set --global core.hooksPath ''",
+            "git config --file .git/config core.hooksPath /dev/null",
+            "git --config-env=core.hooksPath=X commit -m x",
+            "git --config-env core.hooksPath=X commit -m x",
+            "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=core.hooksPath GIT_CONFIG_VALUE_0=/dev/null git commit -m x",
+            "GIT_CONFIG_PARAMETERS=\"'core.hooksPath'='/dev/null'\" git commit -m x",
+        ])
+        self.assert_allowed([
+            "git config --get core.hooksPath",
+            "git config core.hooksPath",
+            "git config get core.hooksPath",
+            "git config set core.hooksPath .githooks",
+            "LEFTHOOK=1 git commit -m x",
+            "HUSKY=1 git commit -m x",
+            "GIT_CONFIG_COUNT=1 GIT_CONFIG_KEY_0=user.name GIT_CONFIG_VALUE_0=x git commit -m x",
+        ])
+
     def test_no_verify_prefixes_on_hook_subcommands(self):
         self.assert_blocked([
             "git commit --no-verif -m x",
