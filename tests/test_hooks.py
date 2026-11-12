@@ -130,6 +130,32 @@ class GuardBash(unittest.TestCase):
             "ls # it's fine",
         ])
 
+    def test_git_after_keywords_and_wrappers(self):
+        self.assert_blocked([
+            "for r in a; do git push -f; done",
+            "if true; then git push -f; fi",
+            "while true; do git commit -n -m x; done",
+            "{ git push -f; }",
+            "! git push -f",
+            "sudo git push -f",
+            "sudo -u me git push -f",
+            "sudo HUSKY=0 git commit -m x",
+            "command git push -f",
+            "time git push -f",
+            "time -p git push -f",
+            "nice git push -f",
+            "nice -n 5 git push -f",
+            "env -i git push -f",
+            "env -u FOO git push -f",
+            "env - HUSKY=0 git commit -m x",
+            "/usr/bin/env HUSKY=0 git commit -m x",
+            "xargs git push -f",
+            "echo b | xargs -I {} git push -f origin {}",
+            "exec git push -f",
+            "nohup git push -f",
+            "timeout 60 git push -f",
+        ])
+
     def test_heredoc_body_is_not_a_command(self):
         self.assert_allowed([
             "cat > notes.md <<'X'\nNever run: true && git push -f\nX",
