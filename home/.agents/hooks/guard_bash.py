@@ -8,8 +8,10 @@ Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <clau
 
 Blocks, in every simple command of the text (also after keywords such as if, do, ! and
 wrappers such as sudo, env, xargs, time, nice, timeout):
-  - git ... --no-verify, and git commit -n (skip hooks);
-  - *_SKIP_HOOK(S)=<non-zero>, HUSKY=0, SKIP=<ids> assignments (hook skip switches);
+  - git commit|push|merge|rebase|am|pull|cherry-pick --no-verify (or a prefix git accepts
+    for it), git commit -n and git am -n (skip hooks);
+  - hook skip switches: *_SKIP_HOOK(S)=<non-zero>, HUSKY=0, and SKIP=<ids> when the
+    command runs git or pre-commit;
   - git config --unset core.hooksPath, git -c core.hooksPath=... (disable hooks);
   - git push --force / -f / --force-with-lease / +refspec (rewrite published history).
 
@@ -37,6 +39,7 @@ OPERATOR_CHARS = ";&|()\n"
 WORD_END = BLANKS + OPERATOR_CHARS + "<>"
 REDIRECTION = re.compile(r"&>>?|<<<|<<-?|<>|<&|>>|>&|>\||<|>")
 ASSIGNMENT = re.compile(r"^([A-Za-z_][A-Za-z0-9_]*)=(.*)$", re.DOTALL)
+FALSY = {"", "0", "false", "no", "off"}
 
 KEYWORDS = {"!", "{", "if", "then", "elif", "else", "while", "until", "do"}
 DECLARATIONS = {"export", "declare", "typeset", "local", "readonly"}
@@ -60,10 +63,17 @@ WRAPPERS = {
 }
 HOOK_RUNNERS = {"git", "pre-commit"}
 
-COMMIT_VALUE_OPTIONS = {"-m", "-F", "-c", "-C", "-t", "--message", "--file",
-                        "--author", "--date", "--template", "--reuse-message",
-                        "--reedit-message", "--fixup", "--squash", "--trailer"}
-GIT_GLOBAL_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--work-tree", "--namespace"}
+GIT_VALUE_OPTIONS = {"-C", "-c", "--git-dir", "--namespace", "--work-tree"}
+HOOK_SUBCOMMANDS = {"am", "cherry-pick", "commit", "merge", "pull", "push", "rebase"}
+# Per subcommand: (short options taking a value, short options whose optional value can
+# only be glued, long options taking the next word as value).
+GIT_OPTIONS = {
+    "am": ("Cp", "S", set()),
+    "commit": ("CcFmtU", "Su", {"--author", "--cleanup", "--date", "--file", "--fixup",
+                                "--message", "--pathspec-from-file", "--reedit-message",
+                                "--reuse-message", "--squash", "--template", "--trailer",
+                                "--unified"}),
+}
 
 
 class ParseError(ValueError):
@@ -327,51 +337,72 @@ def program_of(words: list) -> str:
     return os.path.basename(words[0]) if words else ""
 
 
-def assignment_reason(name: str, value: str) -> str:
-    falsy = value.strip().lower() in {"", "0", "false", "no", "off"}
-    if re.search(r"SKIP_HOOKS?$", name) and not falsy:
+def abbreviates(name: str, option: str, shortest: int) -> bool:
+    """True when name is option or a prefix of it at least shortest characters long
+    (git accepts any unique prefix of a long option)."""
+    return len(name) >= shortest and option.startswith(name)
+
+
+def assignment_reason(name: str, value: str, program: str, runs_hook_runner: bool) -> str:
+    setting = value.strip().lower()
+    if re.search(r"SKIP_HOOKS?$", name) and setting not in FALSY:
         return f"{name}={value} skips the repository's git hooks"
     if name == "HUSKY" and value.strip() == "0":
         return "HUSKY=0 skips the repository's git hooks"
-    if name == "SKIP" and not falsy:
-        return "SKIP= skips pre-commit hooks"
+    if name == "SKIP" and setting not in FALSY:
+        # A bare or exported SKIP= reaches the git or pre-commit run later in the text.
+        if program in HOOK_RUNNERS or (not program and runs_hook_runner):
+            return "SKIP= skips pre-commit hooks"
     return ""
 
 
-def git_reasons(tokens: list) -> list:
+def parse_git_options(args: list, short_values: str, short_optional: str, long_values) -> tuple:
+    """Return (short option letters, long option names, operands) of a git subcommand."""
+    shorts, longs, operands = set(), [], []
+    index = 0
+    while index < len(args):
+        word = args[index]
+        index += 1
+        if word == "--":
+            operands.extend(args[index:])
+            break
+        if word.startswith("--"):
+            name = word.split("=", 1)[0]
+            longs.append(name)
+            if "=" not in word and name in long_values:
+                index += 1
+        elif word.startswith("-") and len(word) > 1:
+            # A cluster such as -anm: scan left to right up to the first option with a value.
+            for position, letter in enumerate(word[1:], start=2):
+                if letter in short_values:
+                    if position == len(word):
+                        index += 1
+                    break
+                if letter in short_optional:
+                    break
+                shorts.add(letter)
+        else:
+            operands.append(word)
+    return shorts, longs, operands
+
+
+def git_reasons(words: list) -> list:
     reasons = []
-    index, sub = 1, ""
-    while index < len(tokens):
-        token = tokens[index]
-        if token in GIT_GLOBAL_VALUE_OPTIONS and index + 1 < len(tokens):
-            value = tokens[index + 1]
-            if token == "-c" and value.lower().startswith("core.hookspath="):
+    index = 1
+    while index < len(words) and words[index].startswith("-"):
+        if words[index] in GIT_VALUE_OPTIONS and index + 1 < len(words):
+            if words[index] == "-c" and words[index + 1].lower().startswith("core.hookspath="):
                 reasons.append("git -c core.hooksPath=... disables the repository's git hooks")
-            index += 2
-            continue
-        if token.startswith("-"):
             index += 1
-            continue
-        sub = token
-        break
-    args = tokens[index + 1:]
-
-    if "--no-verify" in args:
-        reasons.append(f"git {sub} --no-verify skips the repository's git hooks")
-
-    if sub == "commit":
-        skip_next = False
-        for token in args:
-            if skip_next:
-                skip_next = False
-                continue
-            if token in COMMIT_VALUE_OPTIONS:
-                skip_next = True
-                continue
-            if re.fullmatch(r"-[A-Za-z]*n[A-Za-z]*", token):
-                reasons.append("git commit -n skips the repository's git hooks")
-                break
-
+        index += 1
+    sub = words[index] if index < len(words) else ""
+    args = words[index + 1:]
+    shorts, longs, _ = parse_git_options(args, *GIT_OPTIONS.get(sub, ("", "", ())))
+    if sub in HOOK_SUBCOMMANDS:
+        if any(abbreviates(name, "--no-verify", len("--no-v")) for name in longs):
+            reasons.append(f"git {sub} --no-verify skips the repository's git hooks")
+        if sub in ("am", "commit") and "n" in shorts:
+            reasons.append(f"git {sub} -n skips the repository's git hooks")
     if sub == "push":
         for token in args:
             if token.startswith("--force") or re.fullmatch(r"-[A-Za-z]*f[A-Za-z]*", token):
@@ -380,21 +411,22 @@ def git_reasons(tokens: list) -> list:
             if token.startswith("+") and len(token) > 1:
                 reasons.append("a +refspec push rewrites published history")
                 break
-
     if sub == "config":
         lowered = [t.lower() for t in args]
         if any(t.startswith("--unset") for t in lowered) and "core.hookspath" in lowered:
             reasons.append("unsetting core.hooksPath disables the repository's git hooks")
-    return reasons
+    return [reason for reason in reasons if reason]
 
 
 def command_reasons(commands: list) -> list:
     reasons = []
-    for words in commands:
-        assignments, rest = split_command(words)
+    split = [split_command(words) for words in commands]
+    runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
+    for assignments, rest in split:
+        program = program_of(rest)
         for name, value in assignments:
-            reasons.append(assignment_reason(name, value))
-        if program_of(rest) == "git":
+            reasons.append(assignment_reason(name, value, program, runs_hook_runner))
+        if program == "git":
             reasons.extend(git_reasons(rest))
     return list(dict.fromkeys(reason for reason in reasons if reason))
 

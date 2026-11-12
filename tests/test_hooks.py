@@ -156,6 +156,31 @@ class GuardBash(unittest.TestCase):
             "timeout 60 git push -f",
         ])
 
+    def test_no_verify_prefixes_on_hook_subcommands(self):
+        self.assert_blocked([
+            "git commit --no-verif -m x",
+            "git commit --no-veri -m x",
+            "git am --no-v a.patch",
+            "git am -n a.patch",
+            "git push --no-veri origin x",
+            "git merge --no-verify x",
+            "git rebase --no-verify main",
+            "git pull --no-verify",
+            "git cherry-pick --no-verify x",
+        ])
+        # Option values and subcommands that run no hooks are not flags to block.
+        self.assert_allowed([
+            "git grep -- --no-verify",
+            "git grep -e --no-verify",
+            "git log --grep=--no-verify",
+            "git commit -minit",
+            "git commit -uno -m x",
+            "git commit -sm x",
+            "git commit --amend --no-edit",
+            "SKIP=1 pytest",
+            "SKIP=slow make test",
+        ])
+
     def test_heredoc_body_is_not_a_command(self):
         self.assert_allowed([
             "cat > notes.md <<'X'\nNever run: true && git push -f\nX",
