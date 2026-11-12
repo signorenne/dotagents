@@ -3,3 +3,6 @@
 
 # Personal per-project agent settings.
 .claude/settings.local.json
+
+# Worktrees that Claude Code creates for its agents.
+.claude/worktrees/
