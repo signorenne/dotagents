@@ -21,6 +21,7 @@ Every file this script replaces is moved to ~/.agents-backup/<timestamp>/ first.
 import argparse
 import json
 import os
+import re
 import shutil
 import sys
 import time
@@ -33,8 +34,12 @@ CLAUDE_FRAGMENT = PACK / "adapters" / "claude" / "settings.json"
 UPLOADED_EXTRA = PACK / "claude-ai" / "overrides.json"
 SYNCED_PREFIX = "anthropic-skills:"
 TOOLS = ("claude", "codex", "gemini", "copilot", "cursor")
-HOOK_MARK = "/.agents/hooks/"
-OLD_HOOK_MARKS = ("/.claude/hooks/guard_bash.py", "/.claude/hooks/after_edit.py")
+# Hook scripts this repository installs, and those an older version kept in ~/.claude/hooks.
+OUR_HOOK_SCRIPTS = sorted(p.name for p in (SRC / "hooks").glob("*.py"))
+OLD_HOOK_SCRIPTS = ("guard_bash.py", "after_edit.py")
+OUR_HOOK = re.compile(r"(?:{})(?![\w.-])".format("|".join(
+    [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS]
+    + [re.escape(f"/.claude/hooks/{name}") for name in OLD_HOOK_SCRIPTS])))
 OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
 CLAUDE_MD = (
     "@~/.agents/AGENTS.md\n\n"
@@ -148,27 +153,41 @@ def real_path(path: Path):
         return None
 
 
-def is_ours(command: str) -> bool:
-    return HOOK_MARK in command or any(mark in command for mark in OLD_HOOK_MARKS)
+class CannotMerge(ValueError):
+    """A settings file holds a value that our entries cannot be merged into."""
 
 
-def merge_event_hooks(existing: dict, ours: dict) -> dict:
-    """Remove earlier copies of our hook entries, then append the current ones."""
+def is_ours(hook) -> bool:
+    return isinstance(hook, dict) and isinstance(hook.get("command"), str) \
+        and bool(OUR_HOOK.search(hook["command"]))
+
+
+def merge_event_hooks(existing, ours: dict) -> dict:
+    """Remove earlier copies of our hook entries, then append the current ones.
+
+    Everything else is kept unchanged; a value that cannot take our entries raises
+    CannotMerge, so the caller leaves the file alone.
+    """
+    existing = existing or {}
+    if not isinstance(existing, dict):
+        raise CannotMerge("its hooks value is not an object")
     result = {}
-    for event, entries in (existing or {}).items():
+    for event, entries in existing.items():
+        if not isinstance(entries, list):
+            if event in ours:
+                raise CannotMerge(f"its {event} hooks are not a list")
+            result[event] = entries
+            continue
         kept = []
-        for entry in entries if isinstance(entries, list) else []:
-            if not isinstance(entry, dict):
-                kept.append(entry)
-                continue
-            inner = entry.get("hooks")
+        for entry in entries:
+            inner = entry.get("hooks") if isinstance(entry, dict) else None
             if isinstance(inner, list):
-                filtered = [h for h in inner if not is_ours(str(h.get("command", "")))]
-                if filtered:
+                filtered = [h for h in inner if not is_ours(h)]
+                if filtered or not inner:  # drop an entry only when it held only ours
                     kept.append({**entry, "hooks": filtered})
-            elif not is_ours(str(entry.get("command", "")) + str(entry.get("bash", ""))):
+            elif not is_ours(entry):
                 kept.append(entry)
-        if kept:
+        if kept or not entries:
             result[event] = kept
     for event, entries in ours.items():
         result.setdefault(event, []).extend(json.loads(json.dumps(entries)))
@@ -245,18 +264,25 @@ class Installer:
             path.symlink_to(target)
         self.say("linked", f"{path} -> {target}")
 
-    def merge_json(self, path: Path, mutate) -> None:
+    def merge_json(self, path: Path, mutate) -> bool:
+        """Merge our values into a JSON object file; False when it was left alone."""
+        old = {}
         if path.exists():
             try:
                 old = json.loads(path.read_text(encoding="utf-8"))
-            except json.JSONDecodeError as error:
+            except ValueError as error:
                 self.notes.append(f"Could not parse {path} ({error}); merge it by hand.")
-                return
-        else:
-            old = {}
-        new = mutate(json.loads(json.dumps(old)))
+                return False
+        try:
+            if not isinstance(old, dict):
+                raise CannotMerge("it is not a JSON object")
+            new = mutate(json.loads(json.dumps(old)))
+        except CannotMerge as error:
+            self.notes.append(f"Could not merge {path}: {error}; merge it by hand.")
+            return False
         if new != old:
             self.write(path, json.dumps(new, indent=2, ensure_ascii=False) + "\n")
+        return True
 
     # Shared source --------------------------------------------------------
 
@@ -323,7 +349,7 @@ class Installer:
                 self.link(skills / name, self.agents_home / "skills" / name)
         for path, meta, body in self.subagents():
             self.write(base / "agents" / path.name, path.read_text(encoding="utf-8"))
-        for old_hook in ("guard_bash.py", "after_edit.py"):
+        for old_hook in OLD_HOOK_SCRIPTS:
             if (base / "hooks" / old_hook).is_file():
                 self.backup(base / "hooks" / old_hook)
         fragment = json.loads(CLAUDE_FRAGMENT.read_text(encoding="utf-8"))
@@ -359,8 +385,13 @@ class Installer:
         def mutate(settings: dict) -> dict:
             settings["hooks"] = merge_event_hooks(settings.get("hooks"), GEMINI_HOOKS)
             context = settings.setdefault("context", {})
+            if not isinstance(context, dict):
+                raise CannotMerge("its context value is not an object")
             names = context.get("fileName", ["GEMINI.md"])
-            names = [names] if isinstance(names, str) else list(names)
+            names = [names] if isinstance(names, str) else names
+            if not isinstance(names, list):
+                raise CannotMerge("its context.fileName is neither a name nor a list")
+            names = list(names)
             for name in ("AGENTS.md", "GEMINI.md"):
                 if name not in names:
                     names.insert(0 if name == "AGENTS.md" else len(names), name)
