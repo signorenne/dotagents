@@ -185,9 +185,10 @@ def merge_values(base, extra):
 
 
 class Installer:
-    def __init__(self, home: Path, dry_run: bool):
+    def __init__(self, home: Path, dry_run: bool, tools=()):
         self.home = home
         self.dry = dry_run
+        self.tools = tuple(tools)
         self.backup_root = home / ".agents-backup" / time.strftime("%Y%m%d-%H%M%S")
         self.agents_home = home / ".agents"
         self.changes = 0
@@ -403,9 +404,16 @@ class Installer:
         return 0
 
     def install_cursor(self) -> None:
+        if "claude" in self.tools:
+            reads = ("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself "
+                     "(Settings > Agents > Third-Party Imports, on by default).")
+        else:
+            reads = ("Cursor: this run gave it no subagents and no hooks: Cursor reads them from Claude Code's "
+                     "~/.claude/agents and ~/.claude/settings.json, which only --tools claude writes "
+                     "(run install.py --tools claude,cursor to add them). It reads ~/.agents/skills by itself.")
         self.notes.append(
-            "Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself. "
-            "It has no global instructions file: paste ~/.agents/AGENTS.md into Settings > Rules > User Rules.")
+            reads + " It has no global instructions file: paste ~/.agents/AGENTS.md into "
+            "Settings > Rules > User Rules.")
 
 
 def detect(home: Path) -> list[str]:
@@ -437,7 +445,7 @@ def main() -> int:
     if unknown:
         parser.error(f"unknown tools: {', '.join(unknown)}")
 
-    installer = Installer(home, args.dry_run)
+    installer = Installer(home, args.dry_run, tools)
     if args.audit:
         return installer.audit()
     print(f"Agents: {', '.join(tools) or 'none detected (installing ~/.agents only)'}")
