@@ -1,6 +1,6 @@
 ---
 name: prompt-optimizer
-description: "Rewrites prompts and AI instructions to be specific, checkable and free of filler, keeping examples and real constraints. Use when writing or debugging a prompt, system prompt, agent or skill."
+description: "Rewrites prompts and AI instructions to be specific, checkable and free of filler. Use when writing or debugging a prompt, system prompt, agent or skill; a repo's AGENTS.md goes to project-setup."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -10,7 +10,7 @@ A prompt is a specification, and the failure mode is not length but ambiguity. M
 
 This applies to anything that is itself an instruction for an AI model: prompts, system prompts, custom instructions, agent or subagent instructions, skills, templates, and "why does it keep doing Y instead of Z", even when the user only pastes text and says "make this better".
 
-When the user asks for one specific change to an existing prompt, make only that change (minimal-editing); the full rewrite is for requests to improve or debug the prompt as a whole. A repository's AGENTS.md checked against what the repository actually does goes to project-setup where available.
+When the user asks for one specific change to an existing prompt, make only that change (minimal-editing); the full rewrite is for requests to improve or debug the prompt as a whole. Improving or auditing a repository's AGENTS.md, CLAUDE.md or GEMINI.md goes to project-setup where available.
 
 Optimize the total tokens and turns needed to reach a good result, not the length of the first message. A prompt fifty words longer that avoids two rounds of correction is the shorter prompt.
 
@@ -29,7 +29,7 @@ Optimize the total tokens and turns needed to reach a good result, not the lengt
 - Motivational filler ("this is very important", "take a deep breath", "you are the world's best..."). Flattery and stakes inflation do not improve output.
 - Role-play framing the task already implies.
 - Blanket instructions to think deeply, be thorough, or use every available tool.
-- Threats, all-caps insistence, stacked emphasis. State a rule once and say why: reasons generalize to cases the rule did not anticipate; bare rules do not.
+- Threats, all-caps insistence, stacked emphasis. State a rule once, with a reason only where the rule is not obvious: a reason generalizes to cases the rule did not anticipate.
 - Instructions implied by the task ("write in complete sentences" on an essay prompt).
 - Defensive handling for edge cases that will not occur.
 
@@ -45,7 +45,7 @@ The highest-value edit is usually replacing a vague instruction with a checkable
 | "Use good sources" | "Cite primary sources; no content farms." |
 | "Think about the audience" | "Audience: our CFO, non-technical." |
 
-If a constraint cannot be made checkable, it is decoration.
+Make a constraint as concrete as the task allows; when it stays a judgement (tone, voice, a design heuristic), keep it with one example.
 
 ## Structure
 
@@ -69,23 +69,11 @@ A system prompt holds standing rules that apply to every request, with no task i
 
 When the user says "it keeps doing X", find the instruction that permits X, not a new instruction forbidding it. Prompts fail more often from a vague clause the model resolved badly than from a missing rule; adding "DO NOT do X" on top of the clause that invited X gives a longer prompt with the same behavior. When you can run the prompt, run the old and new versions on the input that showed X and compare; otherwise say the fix is untested and give that input.
 
-## Red flags
-
-- Adding a rule instead of fixing the clause that caused the problem.
-- Making it shorter while making it more ambiguous.
-- Keeping emphasis you cannot justify ("it says IMPORTANT, better leave it").
-- Stripping examples to save tokens.
-- Restructuring a three-line prompt into five labeled sections.
-
 ## Rationalizations
 
 | Excuse | Reality |
 |---|---|
-| "Emphasis makes it comply" | Emphasis competes with emphasis. Specificity works; volume does not. |
 | "More instructions, more control" | More instructions, more conflicts the model resolves for you. |
-| "Shorter is always better" | Shorter and vaguer costs more in correction turns. |
-| "The role-play framing sets the tone" | The task sets the tone. A role helps only when it adds domain context the task lacks; a generic "world-class expert" adds nothing. |
-| "Better safe than sorry on edge cases" | Unreachable branches dilute the reachable ones. |
 
 ## Output
 

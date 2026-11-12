@@ -16,7 +16,7 @@ Claims of completion are claims about evidence. Say what you observed, not what 
 2. Did I check the thing the user asked for, or an adjacent thing that was easier to check?
 3. Did every part get done? Multi-part requests lose parts. Re-read the original request, not your summary of it, and tick off each piece.
 4. What did I not verify? There is always something. Name it.
-5. Did I test the current build? A program, server or app started before the last change or merge still runs the old code: compare its build time or embedded commit with the latest commit, and restart it rather than trusting a hot reload. When a fix seems not to work, check this first.
+5. Did I test the current build? A program, server or app started before the last change or merge still runs the old code: compare its build time or embedded commit with the latest commit, and restart it rather than trusting a hot reload. When a fix seems not to work, check this first. When the user runs the program (in chat, for example), ask them to confirm they rebuilt and restarted it before diagnosing further.
 6. Would this survive the user trying it right now?
 
 ## The honest vocabulary
@@ -32,22 +32,8 @@ Never let "should work" and "works" collapse into the same sentence. If you did 
 
 ## Red flags
 
-- "That should do it", with nothing executed.
-- Summarizing what you wrote as if it were what you achieved.
-- Reporting the parts that went well and quietly dropping the part that did not.
-- Claiming completion for a multi-step request when you completed the first step well.
-- Declaring done because the session has run long.
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The change is obviously correct" | Obvious changes fail on typos, environment and assumptions. Checking is cheap. |
-| "I don't have the environment to test" | Then say that. Unverified is a fine status; unmarked unverified is not. |
-| "The user can just try it" | They will; the question is whether they know they have to. |
-| "Naming what I didn't check undermines the work" | It is the difference between a report and a guess. |
-| "I did most of it" | Most is not done. Say which parts. |
-| "They're in a hurry" | A false all-clear costs more time than an honest caveat. |
+- Declaring done because the session has run long or the user is in a hurry: a false all-clear costs more time than an honest caveat.
+- "The change is obviously correct": obvious changes fail on typos, environment and assumptions, and checking is cheap.
 
 ## Output
 

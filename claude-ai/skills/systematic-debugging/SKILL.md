@@ -1,6 +1,6 @@
 ---
 name: systematic-debugging
-description: "Diagnoses failures from evidence before any fix: reproduces, compares with a working case, tests one hypothesis. Use for errors, failing tests or CI, crashes, hangs, slowness or wrong output."
+description: "Diagnoses failures from evidence before any fix: reproduces, compares with a working case, tests one hypothesis. Use for bugs, errors, failing tests or CI, crashes, hangs, slowness or wrong output."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -32,7 +32,7 @@ Name a single cause and the evidence for it in one sentence ("the cache returns 
 
 - In a project with tests, first add a test that reproduces the failure and watch it fail for this reason (trustworthy-tests).
 - Change as little as the cause needs. Show that the original failure is gone by the same means that showed it, then look for the same pattern elsewhere.
-- A fix that does not work sends you back to step 1 with what it taught you; do not stack a second fix on it. After two failed fixes, stop and restate the evidence and your assumptions. When each fix moves the problem somewhere else, the design is wrong rather than a line: say so.
+- A fix that does not work sends you back to step 1 with what it taught you; do not stack a second fix on it. When each fix moves the problem somewhere else, the design is wrong rather than a line: say so.
 
 ## Slowness
 
@@ -45,7 +45,7 @@ Slowness is a failure like any other: a plausible cause is a hypothesis until a 
 
 ## Signs you are guessing
 
-Go back to step 1 when you catch yourself planning to investigate after the fix, changing something to see what happens, changing several things in one run, fixing a cause you cannot explain, working from a skim of a reference, or listing fixes before tracing where the bad value comes from. The user is saying the same when they ask whether something is really happening or say the work is going in circles.
+Go back to step 1 when the user asks whether something is really happening or says the work is going in circles: they are telling you that you are guessing.
 
 ## Fixes that hide the bug
 

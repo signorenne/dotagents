@@ -65,26 +65,7 @@ Say which findings you confirmed by running something and which you inferred fro
 
 ## Red flags
 
-- "The test passes" about a test you never saw fail.
-- An expected value obtained by running the code under test.
-- Editing the test until the suite goes green.
-- A mock configured to return X, then an assertion that the result is X.
-- skip, xfail, only, a commented-out test or a deleted test in the diff.
-- Snapshots regenerated with an update flag (for example jest -u) and accepted unread.
-- The runner reports the same number of tests as before you added some.
-- Coverage rises while no assertion checks the new lines.
-
-## Rationalizations
-
-| Excuse | Reality |
-|---|---|
-| "The code is obviously right, the test just confirms it" | Then seeing the test fail on a broken version costs a minute and proves the test works. |
-| "I'll take the expected value from the output" | That tests the code against itself; its bugs become the specification. |
-| "The test was wrong, so I relaxed it" | Wrong according to what evidence? Cite it, or ask. |
-| "Mocking everything makes it fast and isolated" | It also makes it test the mocks. Mock the boundary, not the logic. |
-| "It's flaky, a retry fixes it" | A flaky test is hiding a race, an order dependence or a hidden input. |
-| "Coverage is at 100%" | Coverage counts lines executed, not behaviors checked. |
-| "The suite is green" | Green means something only if the new tests ran and were seen failing first. |
+- Coverage that rises, or reaches 100%, while no assertion checks the new lines: coverage counts lines executed, not behaviors checked.
 
 ## Output
 
