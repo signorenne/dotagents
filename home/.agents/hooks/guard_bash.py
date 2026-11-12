@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """Shell-command guard shared by every coding agent: block commands that bypass git
-gates or rewrite or delete published history.
+gates, rewrite or delete published history, or push and publish.
 
 Usage in a hook config: python3 "$HOME/.agents/hooks/guard_bash.py" --tool <claude|codex|gemini|copilot|cursor>
 
@@ -15,13 +15,12 @@ wrappers such as sudo, env, xargs, time, nice, timeout):
   - hooks disabled through core.hooksPath: git config [--]unset core.hooksPath, git config
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
-  - git push that rewrites or deletes published history: --force, -f, --force-with-lease,
-    --force-if-includes, +refspec, --delete, -d, :ref, --mirror, --prune;
-  - every git push when the agent is not Claude Code, since Claude Code asks the user
-    before a push and the others do not. Cursor runs the Claude Code hook command as
-    well; it is told apart by its documented CURSOR_VERSION variable or the
-    cursor_version payload field;
-  - gh pr merge --admin (merges without the required checks).
+  - every git push, git subtree push, gh pr create (or gh pr new) and gh pr merge, in
+    every agent: the maintainer reviews everything before it leaves the machine, so
+    pushing and publishing are the maintainer's. A push that also rewrites or deletes
+    published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
+    --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
+    required checks) are named as such.
 
 The text is split as a shell does: quotes, escapes, comments, newlines, the operators
 ; & | ( ), redirections, command substitutions, arithmetic ($((...)), ((...)), whose <<
@@ -95,6 +94,18 @@ GIT_OPTIONS = {
     "push": ("o", "", {"--exec", "--push-option", "--receive-pack", "--repo"}),
 }
 FORCE_OPTIONS = ("--force", "--force-with-lease", "--force-if-includes")
+# git subtree: (short options taking a value, long options taking the next word as value).
+SUBTREE_OPTIONS = ("Pbm", ("--annotate", "--branch", "--message", "--onto", "--prefix"))
+PUSH_REASON = "git push publishes commits to a remote"
+SUBTREE_PUSH_REASON = "git subtree push publishes commits to a remote"
+PR_CREATE_REASON = "gh pr create publishes a branch as a pull request"
+PR_MERGE_REASON = "gh pr merge merges into a published branch"
+PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON}
+PUBLISH_ADVICE = ("Pushing and publishing are the maintainer's: they review every change before "
+                  "it leaves this machine. Do not push or publish another way; stop and tell the "
+                  "user the work is ready for their review.")
+GATE_ADVICE = ("Gates and published history are the maintainer's call. Fix the failing check, "
+               "or stop and ask the user to run this command themselves.")
 CONFIG_VALUE_OPTIONS = {"-f", "--blob", "--comment", "--default", "--file", "--type",
                         "--url", "--value"}
 CONFIG_ACTIONS = {"edit", "get", "list", "remove-section", "rename-section", "set", "unset"}
@@ -459,10 +470,8 @@ def parse_git_options(args: list, short_values: str, short_optional: str, long_v
     return shorts, longs, operands
 
 
-def push_reasons(shorts: set, longs: list, operands: list, plain_push_allowed: bool) -> list:
-    reasons = []
-    if not plain_push_allowed:
-        reasons.append("git push runs only in Claude Code, which asks the user before each push")
+def push_reasons(shorts: set, longs: list, operands: list) -> list:
+    reasons = [PUSH_REASON]
     if "f" in shorts or any(abbreviates(n, o, 3) for n in longs for o in FORCE_OPTIONS):
         reasons.append("force push rewrites published history")
     if any(o.startswith("+") and len(o) > 1 for o in operands):
@@ -502,7 +511,7 @@ def config_reason(args: list) -> str:
     return ""
 
 
-def git_reasons(words: list, plain_push_allowed: bool) -> list:
+def git_reasons(words: list) -> list:
     reasons = []
     index = 1
     while index < len(words) and words[index].startswith("-"):
@@ -523,7 +532,11 @@ def git_reasons(words: list, plain_push_allowed: bool) -> list:
         if sub in ("am", "commit") and "n" in shorts:
             reasons.append(f"git {sub} -n skips the repository's git hooks")
     if sub == "push":
-        reasons.extend(push_reasons(shorts, longs, operands, plain_push_allowed))
+        reasons.extend(push_reasons(shorts, longs, operands))
+    if sub == "subtree":
+        command = skip_options(args, 0, *SUBTREE_OPTIONS)
+        if command < len(args) and args[command] == "push":
+            reasons.append(SUBTREE_PUSH_REASON)
     if sub == "config":
         reasons.append(config_reason(args))
     return [reason for reason in reasons if reason]
@@ -538,28 +551,37 @@ def gh_reasons(words: list) -> list:
             index += 1  # gh takes the repository flag before or after the subcommand
         elif not word.startswith("-"):
             operands.append(word)
+    if operands[:2] in (["pr", "create"], ["pr", "new"]):
+        return [PR_CREATE_REASON]
     if operands[:2] != ["pr", "merge"]:
         return []
+    reasons = [PR_MERGE_REASON]
     for word in words[1:]:
         name, _, value = word.partition("=")
         if name == "--admin" and value.lower() not in ("false", "0"):
-            return ["gh pr merge --admin merges without the required checks and reviews"]
-    return []
+            reasons.append("gh pr merge --admin merges without the required checks and reviews")
+            break
+    return reasons
 
 
-def command_reasons(commands: list, plain_push_allowed: bool) -> list:
-    reasons = []
+def command_reasons(commands: list) -> dict:
+    """Return {reason: True when only commands that push or publish gave it}."""
+    reasons = {}
     split = [split_command(words) for words in commands]
     runs_hook_runner = any(program_of(rest) in HOOK_RUNNERS for _, rest in split)
     for assignments, rest in split:
         program = program_of(rest)
-        for name, value in assignments:
-            reasons.append(assignment_reason(name, value, program, runs_hook_runner))
+        found = [assignment_reason(name, value, program, runs_hook_runner)
+                 for name, value in assignments]
         if program == "git":
-            reasons.extend(git_reasons(rest, plain_push_allowed))
+            found.extend(git_reasons(rest))
         elif program == "gh":
-            reasons.extend(gh_reasons(rest))
-    return list(dict.fromkeys(reason for reason in reasons if reason))
+            found.extend(gh_reasons(rest))
+        publishes = any(reason in PUBLISH_REASONS for reason in found)
+        for reason in found:
+            if reason:
+                reasons[reason] = reasons.get(reason, True) and publishes
+    return reasons
 
 
 def extract_command(payload: dict) -> str:
@@ -573,12 +595,6 @@ def extract_command(payload: dict) -> str:
         if isinstance(container, dict) and isinstance(container.get("command"), str):
             return container["command"]
     return ""
-
-
-def running_in_cursor(payload: dict) -> bool:
-    """Cursor runs the Claude Code hook command too; it sets CURSOR_VERSION for every
-    hook process and sends cursor_version in every payload (cursor.com/docs/agent/hooks)."""
-    return bool(os.environ.get("CURSOR_VERSION")) or "cursor_version" in payload
 
 
 def allow(tool: str) -> int:
@@ -605,13 +621,15 @@ def main() -> int:
         commands = parse_commands(command)
     except (ParseError, RecursionError):
         commands = rough_commands(command)
-    plain_push_allowed = tool == "claude" and not running_in_cursor(payload)
-    reasons = command_reasons(commands, plain_push_allowed)
+    reasons = command_reasons(commands)
     if not reasons:
         return allow(tool)
-    message = ("Blocked: " + "; ".join(reasons) + ". "
-               "Gates and published history are the maintainer's call. Fix the failing "
-               "check, or stop and ask the user to run this command themselves.")
+    advice = []
+    if any(reasons.values()):
+        advice.append(PUBLISH_ADVICE)
+    if not all(reasons.values()):
+        advice.append(GATE_ADVICE)
+    message = "Blocked: " + "; ".join(reasons) + ". " + " ".join(advice)
     print(message, file=sys.stderr)
     if tool == "copilot":
         print(json.dumps({"permissionDecision": "deny", "permissionDecisionReason": message}))

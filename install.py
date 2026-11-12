@@ -401,10 +401,15 @@ class Installer:
         # name instead of replacing it; turn the synced copy off so the repository
         # copy is the only one. A value already set by hand wins (merge_values).
         fragment["skillOverrides"] = {SYNCED_PREFIX + name: "off" for name in self.uploaded_skills()}
+        denied = fragment.get("permissions", {}).get("deny", [])
 
         def mutate(settings: dict) -> dict:
             settings = merge_values(settings, fragment)
             settings["hooks"] = merge_event_hooks(settings.get("hooks"), ours)
+            # A rule this repository now denies leaves ask, where an older install put it.
+            permissions = settings.get("permissions")
+            if isinstance(permissions, dict) and isinstance(permissions.get("ask"), list):
+                permissions["ask"] = [rule for rule in permissions["ask"] if rule not in denied]
             return settings
         if self.merge_json(base / "settings.json", mutate):
             self.notes.append(

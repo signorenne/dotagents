@@ -210,6 +210,26 @@ class Install(unittest.TestCase):
         again = json.loads(settings.read_text())
         self.assertEqual(len(again["hooks"]["PreToolUse"]), 1, "hook entries must not duplicate")
 
+    def test_claude_settings_deny_every_push(self):
+        # The maintainer reviews everything before it leaves the machine, so a push is denied,
+        # not asked. Claude Code evaluates deny, then ask, then allow; a trailing " *" also
+        # matches the bare command only when it is the rule's only wildcard, hence the bare
+        # git -C form (code.claude.com/docs/en/permissions).
+        settings = self.home / ".claude/settings.json"
+        pushes = ["Bash(git push *)", "Bash(git -C * push *)", "Bash(git -C * push)"]
+        older_install = {"permissions": {"ask": ["Bash(git push *)", "Bash(npm publish *)"]}}
+        for before in (None, older_install):
+            with self.subTest(before=before):
+                if before:
+                    settings.write_text(json.dumps(before))
+                self.install("--tools", "claude")
+                permissions = json.loads(settings.read_text())["permissions"]
+                for rule in pushes:
+                    self.assertIn(rule, permissions["deny"])
+                    self.assertNotIn(rule, permissions["ask"])
+                if before:
+                    self.assertIn("Bash(npm publish *)", permissions["ask"])
+
     def test_settings_that_cannot_be_merged_are_left_unchanged(self):
         claude = self.home / ".claude/settings.json"
         claude.write_text(json.dumps({"model": "opus", "hooks": ["an entry"]}))

@@ -73,8 +73,6 @@ class GuardBash(unittest.TestCase):
         "git commit -m 'feat(cli): add -n flag'",
         'git commit -m "docs(x): explain --no-verify"',
         "git commit -m x",
-        "git push origin feat/x",
-        "git push -u origin feat/x",
         "NEXENNE_SKIP_HOOK=0 git commit -m x",
         "grep -rn no-verify docs",
         "git log --oneline -n 5",
@@ -188,25 +186,55 @@ class GuardBash(unittest.TestCase):
             "git push --force-if-includes",
             "git push --forc origin main",
         ])
-        self.assert_allowed([
-            "git push origin HEAD:refs/heads/feat/x",
-            "git push -o ci.skip origin feat/x",
-            "git push --follow-tags origin feat/x",
-            "git push --dry-run origin feat/x",
-        ])
+        # These options neither force nor delete: the push is blocked only as a push.
+        for command in ("git push origin HEAD:refs/heads/feat/x", "git push -o ci.skip origin feat/x",
+                        "git push --follow-tags origin feat/x", "git push --dry-run origin feat/x"):
+            with self.subTest(command=command):
+                result = run("guard_bash.py", bash(command))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("git push publishes", result.stderr)
+                for history in ("rewrites", "destroys", "deletes remote refs", "overwrites"):
+                    self.assertNotIn(history, result.stderr)
 
-    def test_plain_push_only_in_claude_code(self):
-        pushes = ["git push", "git push origin feat/x", "git push -u origin feat/x",
-                  "cd a && git push origin x"]
-        self.assert_allowed(pushes)
-        for tool in ("codex", "gemini", "copilot", "cursor"):
-            self.assert_blocked(pushes, tool)
+    # Every form of push the parser sees: plain, after git's global options, wrappers,
+    # keywords, substitutions, quoting and the rough split of unparsable text.
+    PUSHES = [
+        "git push", "git push origin feat/x", "git push -u origin feat/x", "git push --dry-run",
+        "cd a && git push origin x", "git -C repo push", "git -C repo push origin x",
+        "git --git-dir .git push", "git --git-dir=.git push", "git --work-tree . --git-dir .git push",
+        "git -c push.default=current push", "git --no-pager push", "/usr/bin/git push", "git.exe push",
+        "env git push", "env GIT_TRACE=1 git push", "GIT_TRACE=1 git push", "command git push",
+        "sudo git push", "nohup git push", "timeout 60 git push", "xargs git push", "time git push",
+        "if true; then git push; fi", "for r in a; do git push; done", "! git push", "{ git push; }",
+        "(git push)", "echo $(git push)", "echo `git push`", "git 'push' origin", "git pu\\sh",
+        "git push origin x # it's fine",
+        "git subtree push --prefix=lib origin main", "git subtree push -P lib origin main",
+        "git subtree -P lib push origin main", "git -C repo subtree push --prefix lib origin x",
+        "gh pr create --fill", "gh pr new --fill", "gh -R o/r pr create --title x", "gh pr -R o/r create",
+        "gh pr merge 12 --squash", "gh pr merge --auto --squash 12", "gh -R o/r pr merge 1",
+    ]
+
+    def test_every_push_is_blocked_in_every_tool(self):
+        # The maintainer reviews everything before it leaves the machine, so no agent pushes
+        # or publishes, Claude Code included.
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(self.PUSHES, tool)
+        for command in ("git push", "gh pr create --fill", "git subtree push -P lib origin main"):
+            with self.subTest(command=command):
+                self.assertIn("Pushing and publishing are the maintainer's",
+                              run("guard_bash.py", bash(command)).stderr)
         # Cursor runs the Claude Code hook command with --tool claude.
-        self.assert_blocked(pushes, env={"CURSOR_VERSION": "1.7.2"})
-        for command in pushes:
-            with self.subTest(command=command, payload="cursor_version"):
-                payload = {**bash(command), "cursor_version": "1.7.2"}
-                self.assertEqual(run("guard_bash.py", payload).returncode, 2)
+        self.assert_blocked(["git push"], env={"CURSOR_VERSION": "1.7.2"})
+        payload = {**bash("git push"), "cursor_version": "1.7.2"}
+        self.assertEqual(run("guard_bash.py", payload).returncode, 2)
+
+    def test_commands_that_do_not_publish_are_allowed(self):
+        self.assert_allowed([
+            "git fetch origin", "git pull origin main", "git remote -v", "git log --grep push",
+            "echo git push", "grep -rn 'git push' docs", "git subtree split -P lib -b split",
+            "git subtree add --prefix push origin main", "git subtree pull --prefix=lib origin main",
+            "gh pr view 12", "gh pr list", "gh pr checkout 12", "gh pr diff 12",
+        ])
 
     def test_other_ways_to_skip_hooks(self):
         self.assert_blocked([
@@ -258,7 +286,9 @@ class GuardBash(unittest.TestCase):
 
     def test_admin_merge_skips_required_checks(self):
         self.assert_blocked(["gh pr merge 12 --admin --squash", "gh pr merge --admin"])
-        self.assert_allowed(["gh pr merge 12 --squash --auto", "gh pr view 12"])
+        self.assertIn("--admin merges without the required checks",
+                      run("guard_bash.py", bash("gh pr merge --admin")).stderr)
+        self.assert_allowed(["gh pr view 12"])
 
     def test_no_verify_prefixes_on_hook_subcommands(self):
         self.assert_blocked([
