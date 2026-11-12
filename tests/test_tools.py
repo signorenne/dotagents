@@ -140,20 +140,40 @@ class Tools(unittest.TestCase):
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
 
     def test_validate_holds_each_instruction_file_to_its_size_baseline(self):
-        # From sizes recorded now, so the test does not depend on how far the repository's
-        # files have grown within their 10% since their baseline was last recorded.
+        # Fixed baselines of 10k bytes, so 11k bytes is exactly 10% more whatever the real
+        # files' length; a skill, the global rules and a subagent; padding partly in a
+        # two-byte letter, so the limit counts bytes, not characters.
+        sizes = self.repo / "tools/size-baseline.json"
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
-        skill = self.repo / "home/.agents/skills/build/SKILL.md"
-        baseline = json.loads((self.repo / "tools/size-baseline.json").read_text())["home/.agents/skills/build/SKILL.md"]
-        limit = int(baseline * 1.1)
-        skill.write_bytes(skill.read_bytes() + b"x" * (limit - baseline))
-        self.assertEqual(self.run_tool("validate.py").returncode, 0)  # 10% more is allowed
-        skill.write_bytes(skill.read_bytes() + b"x")
+        baseline = json.loads(sizes.read_text())
+        limits = {}
+        for name in ("home/.agents/skills/build/SKILL.md", "home/.agents/AGENTS.md", "home/.agents/agents/scout.md"):
+            path = self.repo / name
+            size = len(path.read_bytes())
+            k = -(-size // 11)
+            baseline[name], limits[name] = 10 * k, 11 * k
+            pad = 11 * k - size
+            path.write_bytes(path.read_bytes() + b"x" * (pad % 2) + "è".encode() * (pad // 2))
+        sizes.write_text(json.dumps(baseline))
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 0, result.stdout)  # exactly 10% more is allowed
+        for name in limits:
+            path = self.repo / name
+            path.write_bytes(path.read_bytes() + "è".encode())  # one letter, two bytes over
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertIn(f"FAIL home/.agents/skills/build/SKILL.md: {limit + 1} bytes, more than 10% over its baseline "
-                      f"of {baseline}; cut it, or record the new size with --write-sizes in the same commit",
-                      result.stdout.splitlines())
+        for name, limit in limits.items():
+            self.assertIn(f"FAIL {name}: {limit + 2} bytes, more than 10% over its baseline of {baseline[name]}; "
+                          "cut it, or record the new size with --write-sizes in the same commit",
+                          result.stdout.splitlines())
+        del baseline["home/.agents/skills/design/SKILL.md"]
+        baseline["home/.agents/skills/gone/SKILL.md"] = 100
+        sizes.write_text(json.dumps(baseline))
+        lines = self.run_tool("validate.py").stdout.splitlines()
+        self.assertIn("FAIL home/.agents/skills/design/SKILL.md: no size baseline; run python3 tools/validate.py "
+                      "--write-sizes", lines)
+        self.assertIn("FAIL tools/size-baseline.json: home/.agents/skills/gone/SKILL.md no longer exists; run "
+                      "python3 tools/validate.py --write-sizes", lines)
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
         self.assertEqual(self.run_tool("validate.py").returncode, 0)
 
