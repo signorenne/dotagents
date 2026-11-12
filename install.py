@@ -166,9 +166,11 @@ def check_source() -> list:
         except ValueError as error:
             problems.append(f"{path.relative_to(PACK)}: {error}")
     for path, key in ((CLAUDE_FRAGMENT, "hooks"), (UPLOADED_EXTRA, "skills")):
+        if path == UPLOADED_EXTRA and not path.is_file():
+            continue  # optional: no local skill is uploaded to claude.ai
         try:
-            data = json.loads(path.read_text(encoding="utf-8")) if path.is_file() else {key: {}}
-        except ValueError as error:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError) as error:
             problems.append(f"{path.relative_to(PACK)}: {error}")
             continue
         if not (isinstance(data, dict) and isinstance(data.get(key), dict)):
@@ -482,9 +484,10 @@ class Installer:
             reads = ("Cursor: it reads ~/.agents/skills, ~/.claude/agents and the Claude Code hooks by itself "
                      "(Settings > Agents > Third-Party Imports, on by default).")
         else:
-            reads = ("Cursor: this run gave it no subagents and no hooks: Cursor reads them from Claude Code's "
-                     "~/.claude/agents and ~/.claude/settings.json, which only --tools claude writes "
-                     "(run install.py --tools claude,cursor to add them). It reads ~/.agents/skills by itself.")
+            reads = ("Cursor: this run gave it no subagents and no hooks, because Cursor reads them "
+                     "from Claude Code's ~/.claude/agents and ~/.claude/settings.json, which only "
+                     "--tools claude writes (run install.py --tools claude,cursor to add them). "
+                     "It reads ~/.agents/skills by itself.")
         self.notes.append(
             reads + " It has no global instructions file: paste ~/.agents/AGENTS.md into "
             "Settings > Rules > User Rules.")
