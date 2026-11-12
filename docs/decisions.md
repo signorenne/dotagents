@@ -231,3 +231,27 @@ a new entry, and the old one becomes "Superseded by D-NNNN".
 - Why: The global rules say never push, force or rewrite published history, and outside Claude Code nothing asks before a push. The cost: an agent in Codex, Gemini CLI, Copilot or Cursor cannot push even when asked, so the maintainer pushes; a Claude Code session started from Cursor's terminal may inherit CURSOR_VERSION and lose plain pushes too.
 - Rejected: blocking only destructive pushes (a plain push with no prompt outside Claude Code); no change (remote deletions passed).
 - Revisit if: another tool gets a reliable ask-before-push mechanism, or pushes the guard does not inspect (git subtree push, gh pr create) need covering.
+
+## D-0020: As-built docs are written for people and synced, not rewritten
+
+- Status: Accepted
+- Proposed by: maintainer (three simple documents, a vocabulary first, rich UML, no bugs in the docs, sync on rerun), agent (the writing rules, budgets and checks from the analysis of the ASM, ATC and fdc docs and from the sources)
+- Decided by: maintainer
+- Date: 2026-11-12
+- Rule in: home/.agents/skills/as-built-docs/SKILL.md, plantuml-diagrams (class members)
+- Decision: as-built-docs writes a knowledge base for technical non-developers, a test guide and a developer guide. Each opens with its own vocabulary and the big picture within 300 words, follows plain writing rules and a word budget, and carries titled UML diagrams, with class diagrams showing each class's key members. The facts agents and maintainers look up (external values to code, keys, identifiers, the file index) go to a tables-only appendix of the developer guide. Bugs, suspicions, unused code and anomalies stay out of the docs and go to code-audit. A rerun syncs the docs from the recorded commit, appendix included, instead of writing them again. Readability is enforced by checks that fail.
+- Why: The generated ASM and ATC docs were tedious through density, not sentence length: half the knowledge base lines were table rows or numbers, the developer guides carried 11 to 13 identifiers per 100 words, the overview came late, terms preceded their definitions, and rules were restated up to 12 times. Sources: Diataxis, the Google, Microsoft and GOV.UK style guides, Mayer's pre-training principle for a short vocabulary first, C4 and Fowler on class diagrams that tell the story. The cost: some detail now lives only in the code or the appendix.
+- Rejected: a fourth document for agents (one more file to keep in sync; agents get a pointer to the appendix); one shared glossary (readers jump between documents); readability as guidance only (it erodes on every update).
+- Revisit if: readers still find the docs hard, or the budgets cut content testers or developers need.
+
+## D-0021: Code audits report only confirmed findings and ask about the rest
+
+- Status: Accepted
+- Proposed by: maintainer (a separate skill for code smells, bugs and problems, with a section for what is not understood), agent (the report structure, severity and confidence, confirmation by an independent check)
+- Decided by: maintainer
+- Date: 2026-11-12
+- Rule in: home/.agents/skills/code-audit/SKILL.md
+- Decision: code-audit writes a local report (.private/audit/) on a repository or area: scope and method; findings grouped as security, likely bugs and maintainability, each with severity, confidence, file:line, evidence from a check that could fail, what would prove it wrong and a recommendation; questions for the user for everything uncertain, with no severity; and what was not checked. It fixes and commits nothing.
+- Why: False positives make people ignore a report (Google keeps its checks under 10% effective false positives; Coverity saw users stop above 30%), so only independently confirmed findings are reported and doubts become questions, as SARIF's review and open kinds and SonarQube's hotspots do. The cost: some real problems wait in Questions until the user answers.
+- Rejected: extending review (it checks one change before a commit); a committed report (findings are working notes until the owner acts).
+- Revisit if: the questions pile up unanswered, or confirmed findings turn out wrong.
