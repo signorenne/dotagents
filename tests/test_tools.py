@@ -27,6 +27,13 @@ class Tools(unittest.TestCase):
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 0, result.stdout)
 
+    def test_validate_rejects_a_toml_end_marker_in_a_subagent(self):
+        scout = self.repo / "home/.agents/agents/scout.md"
+        scout.write_text(scout.read_text() + "\nA TOML end marker: '''\n")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("FAIL home/.agents/agents/scout.md: body contains '''", result.stdout)
+
     def test_validate_catches_broken_skills_and_dashes(self):
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"
         text = skill.read_text()
