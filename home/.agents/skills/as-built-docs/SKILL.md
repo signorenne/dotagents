@@ -1,6 +1,6 @@
 ---
 name: as-built-docs
-description: "Writes as-built documentation of an existing repository or app from its code, as files in the repository, for people to read: a knowledge base of how it works for technical non-developers, a manual test guide and a developer guide, each opening with its own vocabulary and the big picture, with UML diagrams (class diagrams with their key members) and a reference appendix for agents, every statement traced to code and fact-checked, and synced instead of rewritten when the code changes. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding or architecture docs of existing code), or to update such docs after the code changed. Not for finding bugs or code smells (code-audit) or planning a new system (architecture-doc)."
+description: "Writes as-built documentation of an existing repository or app from its code, as files in the repository, for people to read: a knowledge base of how it works for technical non-developers, a manual test guide and a developer guide, each opening with its own vocabulary and the big picture, with UML diagrams (class diagrams with their key members), annotated pictures of the screens and a reference appendix for agents, every statement traced to code and fact-checked, and synced instead of rewritten when the code changes. Use when the user asks to document a repository or app (knowledge base, test guide, developer guide, onboarding or architecture docs of existing code), or to update such docs after the code changed. Not for finding bugs or code smells (code-audit) or planning a new system (architecture-doc)."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -31,7 +31,8 @@ Take them from the request, the repository and its existing docs; ask only what 
 Note, with file:line:
 
 - features, states, what is saved and restored, startup, timers, limits, defaults;
-- every surface actually registered (screens, commands, endpoints, jobs; compiled is not registered), with its controls, labels and help texts;
+- every surface actually registered (screens, commands, endpoints, jobs; compiled is not registered), with its controls, labels and help texts, and each screen's states;
+- the UI structure: screens, views and components, and the view model or class behind each;
 - every external value read or written, its direction (from the code, not the name) and its contract entry;
 - the structure: layers or modules and their dependencies, the main classes of each with their key public members and relationships, and the main flows end to end;
 - library behavior the docs rely on, read in the source revision that matches the shipped binary;
@@ -39,7 +40,7 @@ Note, with file:line:
 
 ## 3. Stop and show the outline
 
-The outline of each document with the purpose of each section, the vocabulary terms of each, the diagram list, premises of the request the code contradicts, and the questions that change the docs, each with a recommended answer (asked as the decide skill groups questions). Wait for the go.
+The outline of each document with the purpose of each section, the vocabulary terms of each, the diagram list, the pictures (screen and state, and whether the app can run and be driven here), premises of the request the code contradicts, and the questions that change the docs, each with a recommended answer (asked as the decide skill groups questions). Wait for the go.
 
 ## 4. How to write
 
@@ -61,13 +62,21 @@ Accuracy:
 
 ## 5. The documents
 
-- Knowledge base, for technical non-developers, with no code identifiers except external names and log messages, about 2,500 to 3,500 words: vocabulary; the big picture with a context diagram; the core model (the mechanism the rest depends on) with its diagram; where the app appears and what the screen shows; one section per function (what it does, when it is available, what you see, which external values change, one example); automatic behaviors (what is saved and restored, safety rules, language and units); reference lookups (external values with one computed contract example per mechanism, values per state); troubleshooting (symptom, cause, action).
-- Test guide, for testers, about 400 to 600 words before the test cases: vocabulary; how testing works (a bench diagram and the few rules every test relies on); setup (equipment, named starting states and how to reach each); an index of tests by function; test cases in knowledge base order, each with one sentence of purpose, its starting state and a table of step, action, expected screen, expected external value; what to record when a step fails. Every function and automatic behavior has a test, and tests check the current behavior.
-- Developer guide, for developers, about 3,000 to 4,000 words before the appendix: vocabulary of code concepts; architecture at a glance (the data flow in numbered steps, a component diagram by layer, the few design decisions with their reasons); code structure (a layer or package diagram and a short folder table); one class diagram per layer or area, each with a paragraph on its responsibilities; behavior (the core state diagram and one sequence per main flow, each with the rules it keeps); persistence; recipes for common changes and the design constraints behind them; build, run and release. Appendix A, Reference, tables only, for maintainers and agents: external values to code (code constant, external name, contract id, direction), persistence keys, identifiers, configuration keys, and the file index (file, sections that describe it). The identifiers the prose leaves out live here.
+- Knowledge base, for technical non-developers, with no code identifiers except external names and log messages, about 2,500 to 3,500 words: vocabulary; the big picture with a context diagram; the core model (the mechanism the rest depends on) with its diagram; where the app appears; the screens, one picture each with numbered markers and a legend (element, what it shows, what you can do with it); one section per function (what it does, when it is available, what you see, which external values change, one example, and before and after pictures when it changes the screen); automatic behaviors (what is saved and restored, safety rules, language and units); reference lookups (external values with one computed contract example per mechanism, values per state); troubleshooting (symptom, cause, action).
+- Test guide, for testers, about 400 to 600 words before the test cases: vocabulary; how testing works (a bench diagram and the few rules every test relies on); setup (equipment, named starting states with a picture of each, and how to reach each); an index of tests by function; test cases in knowledge base order, each with one sentence of purpose, its starting state and a table of step, action, expected screen, expected external value, with a cropped picture of the expected screen where its look is what the step tests; what to record when a step fails. Every function and automatic behavior has a test, and tests check the current behavior.
+- Developer guide, for developers, about 3,000 to 4,000 words before the appendix: vocabulary of code concepts; architecture at a glance (the data flow in numbered steps, a component diagram by layer, the few design decisions with their reasons); code structure (a layer or package diagram and a short folder table); UI structure (a component diagram of screens, views and components with the view model or class behind each, and the annotated picture of each screen naming the component behind each element); one class diagram per layer or area, each with a paragraph on its responsibilities; behavior (the core state diagram and one sequence per main flow, each with the rules it keeps); persistence; recipes for common changes and the design constraints behind them; build, run and release. Appendix A, Reference, tables only, for maintainers and agents: external values to code (code constant, external name, contract id, direction), persistence keys, identifiers, configuration keys, and the file index (file, sections that describe it). The identifiers the prose leaves out live here.
 
-## 6. Diagrams
+## 6. Diagrams and pictures
 
 PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and opens the section it explains. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
+
+Pictures of the UI come from the real app, never from a drawing of how it might look:
+
+- Run the app and drive it to each screen and state with the input it really gets: clicks, touches and keys, and the signals or messages it receives (through the project's simulator or test harness). Then grab the window or the framebuffer: through the project's screenshot or scenario tests when it has them, otherwise with the platform's tools (for example grim on Wayland, import from ImageMagick on X11, a framebuffer dump on a device).
+- Make each picture repeatable, as section 1 of the precise-ui-changes skill says (fixed data and clock, settled animations, device pixels), and save its recipe in the notes (how to start the app, the input sequence, the grab command, the crop and markers), so an update renders it again.
+- When the app cannot run or be driven here, list the screens and states you need and ask the user for the pictures; write those sections once they arrive.
+- Pictures are PNG files in the docs' images folder with the kb_, tg_ or dev_ prefix, cropped to what the section explains.
+- Mark each element the text explains with the bundled script: in Claude Code python3 ${CLAUDE_SKILL_DIR}/scripts/annotate.py, elsewhere python3 ~/.agents/skills/as-built-docs/scripts/annotate.py (it needs Pillow: ask before installing it). Place each marker at the edge of its element, not over text the reader needs; the legend under the picture uses the same numbers.
 
 ## 7. Verify
 
@@ -78,21 +87,22 @@ Run each check as a one-off command saved in the notes (the update runs them aga
 3. every relative link, image and anchor resolves, and a link text with a section number points to that section;
 4. no placeholders, TODOs or characters the project forbids, and no code identifiers in the knowledge base or test guide except external names and log messages;
 5. readability: the big picture within the first 300 words of each document; at most about 5 code identifiers per 100 words of prose outside the appendix; at most one cross-reference per paragraph; no sentence over 35 words; every section opens with prose; each document within its word budget;
-6. every diagram renders (exit code 0 and nothing on stderr) and has a title, and every class in a class diagram shows members.
+6. every diagram renders (exit code 0 and nothing on stderr) and has a title, and every class in a class diagram shows members;
+7. every picture exists, has its recipe in the notes or is marked as provided by the user, and has a legend with as many entries as it has markers.
 
-Then the fact-check: one subagent per document that did not write it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the document, not the branch diff), given the document, the code and the specs but not your notes. It returns wrong or unsupported claims with file:line, and the passages where a reader without your notes gets lost. Re-check each finding at the source before fixing it, then run checks 1 to 6 again.
+Then the fact-check: one subagent per document that did not write it (in Claude Code the general-purpose subagent told not to edit; elsewhere the reviewer, told to review the document, not the branch diff), given the document, the code and the specs but not your notes. It returns wrong or unsupported claims with file:line, and the passages where a reader without your notes gets lost. Re-check each finding at the source before fixing it, then run checks 1 to 7 again.
 
 ## 8. Report
 
-Files changed, decisions taken, what was verified and what was not, and the list for the audit (suspicious behavior, unused code, contract anomalies, each with file:line), to be checked with the code-audit skill. Offer one line for the project's AGENTS.md that points agents to the developer guide and its appendix. Commit only when asked.
+Files changed, decisions taken, what was verified and what was not, the pictures still missing (for the user to provide), and the list for the audit (suspicious behavior, unused code, contract anomalies, each with file:line), to be checked with the code-audit skill. Offer one line for the project's AGENTS.md that points agents to the developer guide and its appendix. Commit only when asked.
 
 ## 9. Update
 
 Sync the docs to the code; never write them again from scratch.
 
 1. Read the recorded commit from the headers and run git diff --stat <recorded commit>..HEAD.
-2. Find the affected sections through the appendix's file index. Map only the changed areas again, and run the appendix's extraction commands from the notes again.
-3. Rewrite only the affected sections, vocabulary entries, diagrams and appendix rows, and update the commit in the headers.
-4. Run checks 1 to 6 on all the docs, and the fact-check on the changed sections.
+2. Find the affected sections through the appendix's file index. Map only the changed areas again, run the appendix's extraction commands from the notes again, and render again the pictures of the screens that changed.
+3. Rewrite only the affected sections, vocabulary entries, diagrams, pictures and appendix rows, and update the commit in the headers.
+4. Run checks 1 to 7 on all the docs, and the fact-check on the changed sections.
 
 Docs in an earlier layout of this skill are migrated once to this structure, keeping what is still true: show the new outline first (section 3), and move behaviors to confirm, unused code and anomalies to the list for the audit. For docs without a recorded commit, ask whether to migrate them or to keep their structure.
