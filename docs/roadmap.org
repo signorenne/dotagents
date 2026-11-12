@@ -36,6 +36,10 @@ As of 12 November 2026:
   Pillow) and on macOS (Python 3.12).
 - [X] claude.ai: the global rules are pasted and the skill zips uploaded by
   hand, from =dist/claude-ai/=.
+- [X] No agent pushes or publishes: the guard blocks every =git push=,
+  =git subtree push=, =gh pr create=, =gh pr merge=, =gh release create= and
+  =gh repo sync= in every tool (=tests/test_hooks.py=), and the Claude Code
+  settings deny =git push=.
 
 * Open
 
@@ -44,12 +48,18 @@ As of 12 November 2026:
 - [ ] Cursor's shell tool may be named =Shell= rather than =Bash=, so the
   guard's =Bash= matcher may not fire there. Untested.
 - [ ] An empty hook reply may block in Cursor. Untested.
-- [ ] The guard does not inspect =git subtree push= or =gh pr create=.
+- [ ] The guard does not inspect =gh api=, which can create pull requests,
+  releases and refs through GitHub's REST API; there the push rule rests on
+  the agent.
 - [ ] The field names inside Copilot's =toolArgs= for edits are undocumented;
   =after_edit.py= reads =path=, =file_text= and =new_str=, as its tests do.
 - [ ] Hook time budgets assume each tool's default timeouts: the session
-  refresh keeps its git calls under 8 s and the after-edit hook bounds
-  clang-format under 60 s. Untested outside Claude Code.
+  refresh keeps its notes listing and its git calls under 8 s and the
+  after-edit hook bounds clang-format under 60 s. Untested outside Claude
+  Code.
+- [ ] Codex may run a session start hook: its binary (0.167.0) names the
+  =SessionStart= and =PostCompact= events, so =session_refresh.py= could reach
+  Codex after a compaction too. Untested.
 
 ** Tools and platforms
 
@@ -67,11 +77,8 @@ As of 12 November 2026:
 - [ ] The subagent copies the installer writes for Codex, Gemini CLI and
   Copilot drop the =model= field, so =scout= and =gate-runner= run on the
   session's model there; only Claude Code honours the cheaper models.
-- [ ] Only Claude Code has a session start hook, so the reminder after
-  compaction (=session_refresh.py=) reaches no other tool; =docs/workflow.org=
-  and =README.org= do not say so.
 - [ ] =adapters/claude/settings.json= turns off the synced plugin
-  =engineering@synced=; no doc explains why.
+  =engineering@synced=; DESIGN.org records it, but no doc explains why.
 - [ ] Both hooks accept =--tool cursor= and =after_edit.py= reads Cursor's
   own edit payload, but no installed configuration uses them: Cursor runs
   the Claude Code commands with =--tool claude=.
@@ -86,10 +93,5 @@ As of 12 November 2026:
 
 * Proposed rules
 
-- [ ] One source of truth in =~/.agents=, generated copies per tool.
-  Instructions, skills, subagents and hooks have one source (=home/.agents=,
-  installed as =~/.agents=); =install.py= links or generates each tool's files
-  from it, and nothing is edited in a tool's own folder. Why: five agents read
-  different file names and formats, and hand-kept copies drift. Proposed by an
-  agent; revisit if the tools converge on one standard location for
-  instructions, skills and subagents.
+None open. The last one, one source of truth in =~/.agents=, is accepted and
+lives in [[file:../DESIGN.org::#one-source][DESIGN.org]].

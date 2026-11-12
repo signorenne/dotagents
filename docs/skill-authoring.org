@@ -6,7 +6,7 @@
 This file owns how skills in this repository are written and checked. The
 mechanical rules (frontmatter fields, license, characters) are in
 [[file:../AGENTS.md][AGENTS.md]] under Hard rules and are enforced by =tools/validate.py=; the rule
-behind this guide is in [[file:../DESIGN.org][DESIGN.org]], under Rules that bind.
+behind this guide is in [[file:../DESIGN.org::#concise-skills][DESIGN.org, under Rules that bind]].
 
 * Principles
 
@@ -58,14 +58,14 @@ behind this guide is in [[file:../DESIGN.org][DESIGN.org]], under Rules that bin
   another skill.
 - Every step and rule earns its place: would a capable model get this wrong
   without it?
-- Nothing stated twice, nothing the global instructions
-  (=home/.agents/AGENTS.md=) already say, nothing contradicting them or a rule
-  in [[file:../DESIGN.org][DESIGN.org]].
+- Nothing stated twice, nothing the global rules (=home/.agents/AGENTS.md=)
+  already say, nothing contradicting them or a rule in [[file:../DESIGN.org][DESIGN.org]].
 - Every skill, subagent, file, command and flag it names exists and works.
 - =python3 tools/validate.py=, =python3 -m unittest discover -s tests= and
   =python3 tools/build.py= pass.
-- Tested in a real session (below) when the maintainer asks for it; otherwise
-  the commit or PR says it was not.
+- Tested in a real session (below) when the maintainer asks for it; the
+  progress log or the pull request says whether it was
+  ([[file:../CONTRIBUTING.org][CONTRIBUTING.org]], Workflow).
 
 * Testing a skill
 
