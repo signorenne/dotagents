@@ -11,10 +11,10 @@ Goal: a diagram the reader understands in one look: it answers one question, has
 ## Before drawing
 
 - Write the question the diagram answers and use it as the title ("How an order reaches the warehouse"). One question per diagram; when the answer needs more than about 12 boxes or mixes two kinds of relationship (calls and data flow), split it.
-- Pick the type that fits the question: a sequence diagram for a flow over time (it has no layout to go wrong, so prefer it for every "how does X reach Y"), a state diagram for modes and transitions, an activity diagram for steps and decisions, a component diagram for structure and context, a class diagram for relationships only (no members).
+- Pick the type that fits the question: a sequence diagram for a flow over time (it has no layout to go wrong, so prefer it for every "how does X reach Y"), a state diagram for modes and transitions, an activity diagram for steps and decisions, a component diagram for structure and context, a class diagram for the main classes of one layer or area, with their key members and relationships.
 - For C4 views (context, container, component), use component diagrams (actor, component, database, package, cloud), not the C4 library: its own styles override the palette.
 - One dense diagram usually hides two: who is connected to whom (a structure view) and what happens in what order (one sequence view per main flow). Draw them separately rather than labeling every edge of the structure view with the flow.
-- Box text: the name the reader knows (the document's glossary), at most two short lines; details belong in the text around the diagram. Edge labels: one to four words.
+- Box text: the name the reader knows (the document's glossary), at most two short lines; details belong in the text around the diagram. A class shows its key members instead: public properties, signals and main operations, about 5, with no getters, setters or private members. Edge labels: one to four words.
 - Fewer edges: one plain line (--) instead of two opposite arrows, one labeled edge instead of parallel edges between the same pair, and no edge the question does not need.
 
 ## Make it look designed
