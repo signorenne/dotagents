@@ -393,7 +393,8 @@ In: =home/.agents/skills/implement/SKILL.md= (section 5),
 The implementer sees each test fail for the right reason; the reviewer names a
 wrong implementation that would still pass it. An expected value changes only
 with cited evidence, and deleting, skipping or loosening a test needs the
-user's approval, except the test of a behavior an approved spec removes.
+user's approval, except the test of a behavior an approved spec or plan
+removes.
 Every test gets an independent attack with no extra agent per step.
 
 In: =home/.agents/skills/implement/SKILL.md= (section 7),
