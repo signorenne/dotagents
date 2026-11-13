@@ -247,6 +247,19 @@ themselves, with what each leaves and where, are in [[file:pipeline.org][docs/pi
 
 [[file:diagrams/arch_skills_workflow.svg]]
 
+What each edge carries:
+
+| From          | To                            | What passes                                           |
+|---------------+-------------------------------+-------------------------------------------------------|
+| project-setup | decide                        | the open points the repository does not answer        |
+| spec          | decide                        | each design choice                                    |
+| spec          | implement, in a fresh session | the spec file                                         |
+| implement     | decide                        | the user's choices                                    |
+| implement     | trustworthy-tests             | each test, written first                              |
+| implement     | systematic-debugging          | a problem after two failed fixes                      |
+| session-close | implement, in a fresh session | the handoff                                           |
+| implement     | isolated-work                 | the worktree to create; on the user's go, the landing |
+
 1. Set up: project-setup runs once per repository. scout surveys it, decide
    settles what the repository does not answer, and gate-runner runs each
    validation command once.
