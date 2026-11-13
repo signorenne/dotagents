@@ -83,7 +83,8 @@ What =python3 install.py= does, in order, and what each tool receives.
    and removing from =ask= every rule the adapter denies.
 5. Codex: link =~/.codex/AGENTS.md=; write =agents/<name>.toml= (a read-only
    sandbox for scout, =workspace-write= for the others, the reasoning effort
-   when the source sets one); merge the guard and the after-edit hook into
+   when the source sets one); merge the guard, the after-edit hook and the
+   session refresh (=SessionStart= after =compact= or =resume=) into
    =~/.codex/hooks.json=, which Codex asks the user to trust.
 6. Gemini CLI: link =~/.gemini/GEMINI.md=; write =agents/<name>.md= with Gemini
    tool names and a turn and time limit (=max_turns= 100 for each subagent;
@@ -164,11 +165,11 @@ demand.
    the start. The body of a =SKILL.md= loads when a request matches its
    description or the user names it; files next to it (templates, scripts,
    the palette) load only when a step reads them.
-4. Compaction brief and session refresh. In Claude Code only, before a
-   compaction the tool runs the compaction brief, which tells the summary what
-   resuming the task needs; after a compaction or a resume it runs the session
-   refresh, which adds a stale-memory reminder, the real git state and the
-   newest task notes to the context.
+4. Compaction brief and session refresh. In Claude Code, before a compaction
+   the tool runs the compaction brief, which tells the summary what resuming
+   the task needs. In Claude Code and Codex, after a compaction or a resume the
+   tool runs the session refresh, which adds a stale-memory reminder, the real
+   git state and the newest task notes to the context.
 5. Subagents. A skill step delegates to a subagent, which starts in a fresh
    context with its own file as instructions and its own tool list, and
    returns a compact result instead of the files or logs it read. Without
@@ -307,7 +308,8 @@ Where each tool runs them:
   (manual and automatic), and the session refresh on =SessionStart= after
   =compact= or =resume=.
 - Codex: =PreToolUse= for =Bash=, =PostToolUse= for =apply_patch=, =Edit= and
-  =Write=.
+  =Write=, and =SessionStart= after =compact= or =resume=, whose plain stdout
+  Codex adds as developer context.
 - Gemini CLI: =BeforeTool= for =run_shell_command=, =AfterTool= for
   =write_file= and =replace=.
 - Copilot CLI: =preToolUse= for =bash=, =postToolUse= for =edit=, =create=,
@@ -315,7 +317,8 @@ Where each tool runs them:
 - Cursor: the Claude Code hook commands, read from =~/.claude/settings.json=.
 
 Every tool gives the guard 10 s and the after-edit hook 60 s; the session
-refresh and the compaction brief, in Claude Code only, get 10 s. Every hook
+refresh (Claude Code and Codex) and the compaction brief (Claude Code) get
+10 s. Every hook
 exits 0 on a payload it cannot read, so a broken payload never stops the work,
 and prints nothing but JSON on Gemini CLI's stdout.
 

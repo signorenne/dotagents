@@ -343,12 +343,33 @@ class Install(unittest.TestCase):
         # apply_patch, Edit or Write); timeout is in seconds.
         self.install("--tools", "codex")
         hooks = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]
-        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse"])
+        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse", "SessionStart"])
         (pre,), (post,) = hooks["PreToolUse"], hooks["PostToolUse"]
         self.assert_hook_group(pre, "guard_bash.py", "codex", ["Bash"], ["apply_patch", "Edit", "Write"],
                                range(1, 601))
         self.assert_hook_group(post, "after_edit.py", "codex", ["apply_patch", "Edit", "Write"], ["Bash"],
                                range(1, 601))
+
+    def test_codex_refreshes_the_session_after_a_compaction_or_a_resume(self):
+        # Codex hooks docs: the SessionStart matcher filters the source (startup, resume, clear,
+        # compact, fork); after a compaction the hook runs before the next model request, and
+        # plain text on stdout is added as developer context. Input: session_id,
+        # transcript_path, cwd, hook_event_name, model, source.
+        self.install("--tools", "codex")
+        (start,) = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]["SessionStart"]
+        for source in ("compact", "resume"):
+            self.assertTrue(re.search(start["matcher"], source), source)
+        for source in ("startup", "clear", "fork"):
+            self.assertFalse(re.search(start["matcher"], source), source)
+        (handler,) = start["hooks"]
+        self.assertEqual(handler["type"], "command")
+        self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/session_refresh.py"')
+        self.assertIn(handler["timeout"], range(1, 601))
+        payload = {"session_id": "s", "transcript_path": None, "cwd": str(self.home),
+                   "hook_event_name": "SessionStart", "model": "m", "source": "compact"}
+        result = self.run_hook(handler["command"], payload)
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        self.assertTrue(result.stdout.startswith("Session restarted from compact."), result.stdout)
 
     def test_gemini_hooks_follow_the_documented_format(self):
         # Gemini CLI hooks reference: settings.json holds a hooks object keyed by event

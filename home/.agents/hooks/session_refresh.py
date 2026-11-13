@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
-"""SessionStart hook (Claude Code, matcher "compact|resume"): after a compaction or a
-resume, remind the agent that its picture of the code is a summary and print the real
-repository state, so stale function names are caught before they cause edits. After a
-compaction it also asks the agent to invoke its workflow skill again. When the
-project keeps git-ignored task notes, it also lists the three most recent files under
-.private/progress/ and under .private/handoff/ (found in the working folder or a parent,
-up to the repository root) and asks the agent to re-read the progress log.
+"""SessionStart hook (Claude Code and Codex, matcher "compact|resume"): after a
+compaction or a resume, remind the agent that its picture of the code is a summary and
+print the real repository state, so stale function names are caught before they cause
+edits. After a compaction it also asks the agent to invoke its workflow skill again.
+When the project keeps git-ignored task notes, it also lists the three most recent
+files under .private/progress/ and under .private/handoff/ (found in the working folder
+or a parent, up to the repository root) and asks the agent to re-read the progress log.
 
 Usage: python3 "$HOME/.agents/hooks/session_refresh.py"
 Plain stdout on exit 0 is added to the agent's context. Never fails the session.

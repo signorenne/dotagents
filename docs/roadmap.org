@@ -57,9 +57,10 @@ As of 12 November 2026:
   refresh keeps its notes listing and its git calls under 8 s and the
   after-edit hook bounds clang-format under 60 s. Untested outside Claude
   Code.
-- [ ] Codex may run a session start hook: its binary (0.167.0) names the
-  =SessionStart= and =PostCompact= events, so =session_refresh.py= could reach
-  Codex after a compaction too. Untested.
+- [X] Codex runs =session_refresh.py= on =SessionStart= after =compact= or
+  =resume=, as its hooks documentation describes
+  (=test_codex_refreshes_the_session_after_a_compaction_or_a_resume= in
+  =tests/test_install.py=). Untested in a real Codex session.
 
 ** Tools and platforms
 
