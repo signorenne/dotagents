@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 .private/
 .claude/settings.local.json
+packs/*/evals/results/
