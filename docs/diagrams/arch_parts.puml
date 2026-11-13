@@ -2,11 +2,9 @@
 !include palette.iuml
 title What lives in the repository, and what does each part produce?
 
-package "Source" as source {
-  package "adapters/claude" as adapters {
-    file "Adapter\nsettings.json" as fragment
-  }
+file "adapters/claude/\nsettings.json" as adapters
 
+package "Shared source" as source {
   package "home/.agents" as home {
     file "Global rules\nAGENTS.md" as rules
     folder "Local skills\nskills/" as skills
@@ -34,7 +32,8 @@ package "Checks" {
   folder "tests/" as tests
 }
 
-source --> install : copied, merged
+adapters --> install : merged
+source --> install : copied
 source --> build : zipped
 install -[hidden]right- build
 install --> installed : writes
