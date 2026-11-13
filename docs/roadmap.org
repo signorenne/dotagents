@@ -246,22 +246,31 @@ As of 13 November 2026:
   Claude Code already asks before each server a project's =.mcp.json=
   declares, and a =false= in the user settings does not override a =true= in
   a project's local settings (settings reference, read 13 November 2026).
+  (dropped: unset, Claude Code already asks, and the setting adds nothing.)
 - [ ] A recurring scan that reports drift (stale docs, code that left the
   project's rules) and never fixes or merges anything (from OpenAI's
   "Harness engineering"), for example as an audit mode of project-setup or
-  code-audit; it costs tokens on every run.
+  code-audit; it costs tokens on every run. (dropped as a recurring scan:
+  =tools/validate.py= checks every Org link and anchor on each commit, and
+  as-built-docs sync and code-audit cover the rest on request.)
 - [ ] A replay of past sessions' shell commands through the guard, to measure
   how often it blocks a command it should let through (from the
-  best-of-Agent-Harnesses list); only on the maintainer's request.
+  best-of-Agent-Harnesses list); only on the maintainer's request. Adopted
+  on 13 November 2026, as part of the method: spec first.
 - [ ] A review of a large diff split by file across several reviewer
   subagents, each with the rules for its files (from alibaba/open-code-review,
-  whose benchmark is its authors' own); it costs more calls.
+  whose benchmark is its authors' own); it costs more calls. Not now:
+  mechanical-changes and parallel-agents already split reviews by shard;
+  revisit when a reviewer misses findings or reaches its turn cap on a large
+  diff.
 - [ ] A hook that enforces test-first editing (from TDD Guard); it costs a
-  model call per edit.
+  model call per edit. (dropped: implement records each test's failing run
+  and the reviewer checks it and attacks the test.)
 - [ ] An A/B benchmark: the same tasks run with and without the method (the
   research pack proposed 20 tasks, three runs each), to show whether the
   method beats a plain agent. It costs real money, so it runs only on the
-  maintainer's request.
+  maintainer's request. Adopted on 13 November 2026, as part of the method:
+  spec first, then a pilot before the full run.
 
 ** The method
 
