@@ -2,6 +2,7 @@
 # Copyright (c) 2026 Nicolò Plebani (nexenne)
 """Tests for install.py, run against a temporary HOME."""
 
+import ast
 import importlib.util
 import json
 import os
@@ -370,6 +371,55 @@ class Install(unittest.TestCase):
         result = self.run_hook(handler["command"], payload)
         self.assertEqual((result.returncode, result.stderr), (0, ""))
         self.assertTrue(result.stdout.startswith("Session restarted from compact."), result.stdout)
+
+    def codex_rules(self) -> list:
+        """The fields of each prefix_rule() call in the installed rules file, read as the
+        Starlark it is (for these calls, Python syntax)."""
+        tree = ast.parse((self.home / ".codex/rules/dotagents.rules").read_text())
+        rules = []
+        for node in tree.body:
+            self.assertIsInstance(node, ast.Expr)
+            self.assertEqual(node.value.func.id, "prefix_rule")
+            self.assertEqual(node.value.args, [])
+            rules.append({k.arg: ast.literal_eval(k.value) for k in node.value.keywords})
+        return rules
+
+    def test_codex_rules_forbid_every_push_and_publish(self):
+        # Codex rules docs (learn.chatgpt.com/docs/agent-configuration/rules, experimental):
+        # Codex loads every .rules file in ~/.codex/rules/ at startup; prefix_rule() takes a
+        # pattern (literals, or a list of alternatives at one position), a decision
+        # (forbidden blocks without prompting) and a justification. Codex writes
+        # default.rules itself, so ours has its own name and default.rules is left alone.
+        default = self.home / ".codex/rules/default.rules"
+        default.parent.mkdir(parents=True)
+        default.write_text('prefix_rule(pattern = ["gh", "pr", "view"], decision = "prompt")\n')
+        self.install("--tools", "codex")
+        self.assertEqual(default.read_text(), 'prefix_rule(pattern = ["gh", "pr", "view"], decision = "prompt")\n')
+        forbidden = set()
+        for fields in self.codex_rules():
+            self.assertEqual(set(fields), {"pattern", "decision", "justification"})
+            self.assertEqual(fields["decision"], "forbidden")
+            self.assertIn("maintainer", fields["justification"])
+            prefixes = [[]]
+            for part in fields["pattern"]:
+                prefixes = [p + [word] for p in prefixes for word in (part if isinstance(part, list) else [part])]
+            forbidden |= {" ".join(p) for p in prefixes}
+        self.assertEqual(forbidden, {"git push", "git subtree push", "gh pr create", "gh pr new", "gh pr merge",
+                                     "gh release create", "gh repo sync"})
+
+    @unittest.skipUnless(shutil.which("codex"), "codex not installed")
+    def test_codex_reads_the_rules_as_written(self):
+        self.install("--tools", "codex")
+        rules = self.home / ".codex/rules/dotagents.rules"
+        env = {**os.environ, "HOME": str(self.home), "CODEX_HOME": str(self.home / ".codex")}
+        cases = {("git", "push", "--force", "origin", "main"): "forbidden", ("gh", "pr", "new"): "forbidden",
+                 ("gh", "repo", "sync"): "forbidden", ("git", "status"): None, ("gh", "pr", "view", "7"): None}
+        for command, decision in cases.items():
+            with self.subTest(command=command):
+                result = subprocess.run(["codex", "execpolicy", "check", "--rules", str(rules), "--", *command],
+                                        env=env, capture_output=True, text=True, timeout=60, check=False)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(json.loads(result.stdout).get("decision"), decision)
 
     def test_gemini_hooks_follow_the_documented_format(self):
         # Gemini CLI hooks reference: settings.json holds a hooks object keyed by event

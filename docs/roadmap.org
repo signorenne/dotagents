@@ -38,8 +38,9 @@ As of 12 November 2026:
   hand, from =dist/claude-ai/=.
 - [X] No agent pushes or publishes: the guard blocks every =git push=,
   =git subtree push=, =gh pr create=, =gh pr merge=, =gh release create= and
-  =gh repo sync= in every tool (=tests/test_hooks.py=), and the Claude Code
-  settings deny =git push=.
+  =gh repo sync= in every tool (=tests/test_hooks.py=), the Claude Code
+  settings deny =git push=, and the Codex rules forbid all six
+  (=tests/test_install.py=).
 
 * Open
 
@@ -67,6 +68,9 @@ As of 12 November 2026:
 - [ ] A fetched page claims Gemini CLI was replaced by Antigravity CLI in June
   2026. Unverified; check a primary source before changing the Gemini CLI
   install.
+- [ ] The Codex rules file is untested in a real Codex session; Codex calls
+  its rules experimental, and a prefix rule cannot match =git -C <dir> push=
+  (the guard does).
 - [ ] Codex's default sandbox blocks =git commit=, so =implement= asks for
   approval there or leaves the step uncommitted and logged.
 - [ ] The installer ignores =COPILOT_HOME= and always writes to =~/.copilot=.

@@ -156,6 +156,9 @@ installer runs again.
   and the rest of the file is kept. The adapter also turns off the synced
   plugin =engineering@synced=. A file that does not parse is left alone with a
   note to merge it by hand.
+- /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
+  =prefix_rule= entries forbid every push and publish the guard blocks. Codex
+  writes =default.rules= itself, and the installer leaves it alone.
 - /skillOverrides/ : claude.ai syncs its copy of each uploaded skill into
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
   to the local one. The installer sets each of those to =off= in
@@ -223,7 +226,10 @@ The hooks share one failure model:
   the 10,000 characters past which Claude Code cuts it.
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
-  prompt never offers it.
+  prompt never offers it. In Codex, =~/.codex/rules/dotagents.rules= forbids
+  the same commands and holds even while Codex skips hooks the user has not
+  trusted yet; Codex calls its rules experimental, and a prefix rule cannot
+  see =git -C <dir> push=, which the guard catches.
 - /Not a security boundary/ : the guard splits the command as a shell does and
   falls back to a rough split when it does not parse, so a parse error never
   lets a forbidden command through; commands passed as one string (=bash -c=,
@@ -519,7 +525,7 @@ settings enforce it. Agents commit to local branches; the maintainer reviews
 every change before it leaves the machine, and pushes.
 
 In: =home/.agents/hooks/guard_bash.py=, =adapters/claude/settings.json= (deny),
-=home/.agents/AGENTS.md= (Agentic work, Git).
+=install.py= (Codex rules), =home/.agents/AGENTS.md= (Agentic work, Git).
 
 *** Parallel and risky work is isolated in worktrees
 :PROPERTIES:
