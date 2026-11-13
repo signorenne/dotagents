@@ -380,7 +380,9 @@ Guard (=guard_bash.py=):
    publish means the work is ready for the maintainer's review; a gate bypass
    means fix the failing check or ask the maintainer to run the command.
    Copilot CLI also gets a deny decision as JSON on stdout, the only text its
-   model sees.
+   model sees. Antigravity CLI, whose docs define a JSON decision and no exit
+   codes, gets ={"decision": "deny", "reason": ...}= with exit 0 instead, and
+   ={"decision": "allow"}= when nothing is blocked.
 
 It guards the usual forms; it is not a security boundary: a command passed as
 one string (=bash -c=, =eval=), aliases, scripts and =gh api= are not
@@ -389,7 +391,10 @@ inspected.
 After-edit hook (=after_edit.py=):
 
 1. Read the edited files and the new text from the payload of each tool: an
-   edit's new string, a patch's added lines, a whole file's content.
+   edit's new string, a patch's added lines, a whole file's content. An
+   Antigravity CLI call that reports an error wrote nothing and is skipped;
+   its =multi_replace_file_content= is skipped too, because its docs give no
+   fields for the chunks.
 2. Report each line of the new text that holds an em or en dash (up to eight).
 3. For a C or C++ file in a project with a =.clang-format=, when a clang-format
    binary is found, format in place only the lines the edit changed
@@ -401,5 +406,7 @@ After-edit hook (=after_edit.py=):
    located is not formatted.
 4. A dash or a clang-format failure is exit 2 with the report on stderr,
    which the agent sees; Copilot CLI shows that only to the user, so there the
-   report goes to the model as =additionalContext= with exit 0. A reformat adds
-   a notice to re-read the file before the next edit.
+   report goes to the model as =additionalContext= with exit 0. Antigravity CLI
+   documents only ={}= as the reply, so there the hook prints ={}= with exit 0
+   and the report goes to stderr, which its docs do not say reaches the agent.
+   A reformat adds a notice to re-read the file before the next edit.

@@ -218,10 +218,13 @@ The hooks share one failure model:
 - /Block with exit 2/ : the reason goes to stderr, which the agent sees.
   Copilot CLI shows stderr only to the user, so the guard also prints a deny
   decision with the reason on stdout, and the after-edit hook sends its report
-  as model context with exit 0.
-- /JSON only on Gemini CLI's stdout/ : Gemini CLI needs JSON on stdout when a
-  hook succeeds, so nothing else is printed there. Notices reach the model as
-  additional context in each tool's documented format.
+  as model context with exit 0. Antigravity CLI documents a JSON reply and no
+  exit codes, so there the guard answers a deny decision with the reason and
+  exit 0; its after-edit reply is ={}=, which carries nothing to the agent, so
+  there the hook formats and exits 0, and its dash report goes only to stderr.
+- /JSON only on Gemini CLI's and Antigravity CLI's stdout/ : both read a
+  hook's stdout as JSON, so nothing else is printed there. Notices reach the
+  model as additional context in each tool's documented format.
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
   (8 s for the notes listing and the git calls of the session refresh and of
