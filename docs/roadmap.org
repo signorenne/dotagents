@@ -30,9 +30,10 @@ As of 12 November 2026:
 - [X] The installer for Claude Code, Codex, Gemini CLI, Antigravity CLI,
   Copilot CLI and Cursor, with backups, a dry run, an audit and idempotent
   reruns.
-- [X] Claude Code tested end to end. The other tools' files follow their
-  official documentation, and =tests/test_install.py= checks each generated
-  hook file against it (events, matchers, tool names, timeouts).
+- [X] Claude Code tested end to end, except the compaction brief (open item
+  below). The other tools' files follow their official documentation, and
+  =tests/test_install.py= checks each generated hook file against it (events,
+  matchers, tool names, timeouts).
 - [X] CI runs validate, tests and build on Ubuntu (Python 3.9, and 3.12 with
   Pillow) and on macOS (Python 3.12).
 - [X] claude.ai: the global rules are pasted and the skill zips uploaded by
@@ -55,6 +56,10 @@ As of 12 November 2026:
   the agent.
 - [ ] The field names inside Copilot's =toolArgs= for edits are undocumented;
   =after_edit.py= reads =path=, =file_text= and =new_str=, as its tests do.
+- [ ] The compaction brief (=compact_brief.py=, Claude Code's =PreCompact=) is
+  untested in a real session: whether the summary keeps what it asks for is
+  unmeasured, and what Cursor does with the =PreCompact= entry it imports from
+  =~/.claude/settings.json= is unchecked.
 - [ ] Hook time budgets assume each tool's default timeouts: the session
   refresh keeps its notes listing and its git calls under 8 s and the
   after-edit hook bounds clang-format under 60 s. Untested outside Claude
