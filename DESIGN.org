@@ -4,8 +4,9 @@
 #+STARTUP: showall
 
 This file owns dotagents' design: the public surface, how the pieces compose,
-the install model, the hooks' failure model, naming, and the rules that bind
-every change. [[file:VISION.org][VISION.org]] owns the direction. [[file:AGENTS.md][AGENTS.md]] owns where each
+the install model, the hooks' failure model, what each costly component
+assumes about the model, naming, and the rules that bind every change.
+[[file:VISION.org][VISION.org]] owns the direction. [[file:AGENTS.md][AGENTS.md]] owns where each
 change goes, the hard rules and the review checklist.
 [[file:CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflow and the docs format.
 [[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written. [[file:docs/pipeline.org][docs/pipeline.org]]
@@ -316,6 +317,69 @@ The hooks share one failure model:
   text, but not one given as =-o RemoteCommand=, nor the command of =autossh=
   or =mosh=.
   =tests/test_hooks.py= holds a battery of the forms it does catch.
+
+* What each costly component assumes
+
+Each component below costs tokens, time or a session, and each rests on an
+assumption about what the model cannot do on its own. Anthropic's
+[[https://www.anthropic.com/engineering/harness-design-long-running-apps][Harness design for long-running apps]]
+(24 March 2026, a vendor engineering report) says every such component encodes
+an assumption worth stress testing, because it may be wrong and can go stale
+as models improve: its author dropped context resets once Opus 4.5 largely
+stopped showing the behavior they countered and the sprint structure once Opus
+4.6 could do the work without that decomposition, but kept the planner and the
+evaluator, which still added clear value (here spec and the reviewer play
+those parts). Re-examine this list when a new model becomes the default for a
+role, and change or retire a component when the observation named for it
+holds; the progress logs hold most of the evidence (each review finding with
+its disposition, each gate run with its result). This section records reasons,
+not rules: a change that touches a rule that binds still follows that rule.
+
+- /Spec verification/ (spec step 5: a subagent that did not write the spec
+  paraphrases it, then checks every claim and gives a second reading of each
+  criterion) : assumes the writer misses its own errors (a wrong path or
+  symbol, an unverifiable claim, a criterion with two readings) and that a
+  reader who has only the spec finds where it is ambiguous. Revisit when,
+  over several specs, it finds nothing the writer had not already caught.
+- /Reviewer/ (in Claude Code Opus at high effort, in a fresh context) :
+  assumes the writer misses its own errors and the weak spots of its own
+  tests, and that the strongest model, free of the writing context, finds
+  them. Revisit when its findings on several branches are all minor or
+  already caught by the gates: a cheaper model or effort, or a review only
+  of changes across modules, would then do.
+- /The reviewer's second pass/ (after a fix that changed behavior or added or
+  changed a test) : assumes a fix made under review brings errors of its own
+  and that a new test needs its own attack. Revisit when second passes over
+  several fixes find nothing new.
+- /scout/ (in Claude Code Sonnet) : assumes reading a whole area fills the
+  main context and degrades the plan, and that a cheaper model maps it
+  reliably into a short cited brief. implement already skips it when the
+  spec's affected paths have not changed since the spec was checked. Revisit
+  when plans made without it are no worse, or when its briefs miss owners or
+  callers the plan then needs.
+- /gate-runner on a cheaper model/ (in Claude Code Haiku at low effort,
+  without the =CLAUDE.md= files) : assumes a cheaper model is enough to run
+  documented commands and report the verdicts and the first errors, and that
+  long logs cost the main context more than a subagent call. Revisit when it
+  reports a wrong verdict or misses a first error (raise its model or
+  effort), or when the main model can read gate output as cheaply.
+- /Session refresh and compaction brief/ : assume a compaction summary loses
+  the task's state (the branch, the plan step, the pending decisions, the
+  user's unrecorded constraints) and that the model then trusts its summary
+  as the current code; Claude Code also keeps only the first 5,000 tokens of
+  each skill invoked before a compaction. Revisit when real sessions show the
+  summary keeps that state without the brief (unmeasured today:
+  [[file:docs/roadmap.org][docs/roadmap.org]]), or when the tool keeps whole skills through a compaction.
+- /A fresh session between spec and implement/ : assumes the spec
+  conversation (the interview, the rejected options) would steer the
+  implementation, and that only a reader without it shows the spec is
+  self-contained. Revisit when implementations run in the spec's own session
+  match their specs as well, by the reviewer's findings, over several tasks.
+- /maxTurns caps/ (250 for scout and reviewer, 200 for gate-runner) : assume
+  a subagent can loop without converging, so a cap bounds its cost; they sit
+  above the longest of about 490 past runs ([[file:docs/architecture.org][docs/architecture.org]]).
+  Revisit when a legitimate run reaches its cap (raise it), and count the
+  runs again when a new model changes how long they take.
 
 * Documentation and skill design
 

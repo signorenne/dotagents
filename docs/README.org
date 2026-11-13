@@ -46,24 +46,24 @@ Role names:
 Every doc and its purpose. A new doc is registered here in the commit that
 adds it.
 
-| Doc                      | Purpose                                                                                       |
-|--------------------------+-----------------------------------------------------------------------------------------------|
-| [[file:../README.org][README.org]]               | Project overview, docs list, install and update, layout, the skills                           |
-| [[file:../VISION.org][VISION.org]]               | The problem, the mission, core concepts, principles, non-goals                                |
-| [[file:../DESIGN.org][DESIGN.org]]               | Public surface, composition, install model, hooks' failure model, naming, the rules that bind |
-| [[file:../AGENTS.md][AGENTS.md]]                | Working-memory floor for agents changing this repository: where changes go, gates, checklist  |
-| [[file:../CLAUDE.md][CLAUDE.md]]                | Claude Code bridge that imports =AGENTS.md=                                                   |
-| [[file:../GEMINI.md][GEMINI.md]]                | Gemini CLI bridge that imports =AGENTS.md=                                                    |
-| [[file:../.github/copilot-instructions.md][copilot-instructions.md]]  | GitHub Copilot bridge to =AGENTS.md=                                                          |
-| [[file:../CONTRIBUTING.org][CONTRIBUTING.org]]         | Workflow, where each change goes, local gates, CI, commit messages, docs format               |
-| [[file:../AI_DISCLAIMER.org][AI_DISCLAIMER.org]]        | Accountability for AI-assisted work                                                           |
-| [[file:README.org][docs/README.org]]          | This map: role matrix and registry                                                            |
-| [[file:glossary.org][docs/glossary.org]]        | The repository's terms, one sentence each                                                     |
-| [[file:architecture.org][docs/architecture.org]]    | System structure, the install flow, a session's runtime view, the skill map and the hooks     |
-| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org= and =docs/pipeline.org=           |
-| [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene     |
-| [[file:pipeline.org][docs/pipeline.org]]        | From idea to merge: the stages, their artifacts, landing and pushing, failures, isolation     |
-| [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                      |
-| [[file:roadmap.org][docs/roadmap.org]]         | Status, what is open, and the rules proposed but not yet accepted                             |
-| [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                               |
-| [[file:../claude-ai/README.md][claude-ai/README.md]]      | The claude.ai skill set: upload and update                                                    |
+| Doc                      | Purpose                                                                                                          |
+|--------------------------+------------------------------------------------------------------------------------------------------------------|
+| [[file:../README.org][README.org]]               | Project overview, docs list, install and update, layout, the skills                                              |
+| [[file:../VISION.org][VISION.org]]               | The problem, the mission, core concepts, principles, non-goals                                                   |
+| [[file:../DESIGN.org][DESIGN.org]]               | Public surface, composition, install model, hooks' failure model, model assumptions, naming, the rules that bind |
+| [[file:../AGENTS.md][AGENTS.md]]                | Working-memory floor for agents changing this repository: where changes go, gates, checklist                     |
+| [[file:../CLAUDE.md][CLAUDE.md]]                | Claude Code bridge that imports =AGENTS.md=                                                                      |
+| [[file:../GEMINI.md][GEMINI.md]]                | Gemini CLI bridge that imports =AGENTS.md=                                                                       |
+| [[file:../.github/copilot-instructions.md][copilot-instructions.md]]  | GitHub Copilot bridge to =AGENTS.md=                                                                             |
+| [[file:../CONTRIBUTING.org][CONTRIBUTING.org]]         | Workflow, where each change goes, local gates, CI, commit messages, docs format                                  |
+| [[file:../AI_DISCLAIMER.org][AI_DISCLAIMER.org]]        | Accountability for AI-assisted work                                                                              |
+| [[file:README.org][docs/README.org]]          | This map: role matrix and registry                                                                               |
+| [[file:glossary.org][docs/glossary.org]]        | The repository's terms, one sentence each                                                                        |
+| [[file:architecture.org][docs/architecture.org]]    | System structure, the install flow, a session's runtime view, the skill map and the hooks                        |
+| =docs/diagrams/=         | PlantUML sources of the diagrams in =docs/architecture.org= and =docs/pipeline.org=                              |
+| [[file:workflow.org][docs/workflow.org]]        | How the pieces work together once installed: maieutic method, daily loop, context hygiene                        |
+| [[file:pipeline.org][docs/pipeline.org]]        | From idea to merge: the stages, their artifacts, landing and pushing, failures, isolation                        |
+| [[file:skill-authoring.org][docs/skill-authoring.org]] | How skills are written, checked and tested, with sources                                                         |
+| [[file:roadmap.org][docs/roadmap.org]]         | Status, what is open, and the rules proposed but not yet accepted                                                |
+| [[file:../home/.agents/AGENTS.md][home/.agents/AGENTS.md]]   | The global rules every agent and claude.ai read                                                                  |
+| [[file:../claude-ai/README.md][claude-ai/README.md]]      | The claude.ai skill set: upload and update                                                                       |
