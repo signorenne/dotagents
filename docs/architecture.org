@@ -34,9 +34,6 @@ each edge carries:
 | =claude-ai/README.md= (not drawn)      | =tools/build.py=                   | packed into =claude-ai-skills.zip=                                                                                                |
 | =install.py=                           | =~/.agents= and each tool's folder | the installed files, written                                                                                                      |
 | =tools/build.py=                       | =dist/=                            | the zips, written                                                                                                                 |
-| CI (=ci.yml=)                          | =tools/validate.py=                | run on every push and pull request                                                                                                |
-| CI (=ci.yml=)                          | =tests/=                           | run on every push and pull request                                                                                                |
-| CI (=ci.yml=)                          | =tools/build.py=                   | run on every push and pull request                                                                                                |
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   19 local skills (=skills/=), the three subagents in Claude Code format
@@ -104,9 +101,6 @@ each edge carries:
   =type(scope): description= in lower case, or carries a body or an AI
   trailer, and says what to write instead. Each clone enables it once with
   =git config core.hooksPath .githooks=.
-- =.github/workflows/ci.yml= runs validate, the tests and build on every push
-  and pull request, on Ubuntu with Python 3.9, Ubuntu with Python 3.12 and
-  Pillow, and macOS with Python 3.12.
 - =docs/= holds the guides, the glossary and the diagrams; it
   produces nothing. The rules that bind live in [[file:../DESIGN.org][DESIGN.org]].
 
@@ -780,7 +774,7 @@ After-edit hook (=after_edit.py=):
 
 Two tools give the method evidence about itself. Both run only on the
 maintainer's machine, where the transcripts, the container images and the
-runs are, so CI runs their tests and not them.
+runs are, so the gates run their tests and not them.
 [[file:../DESIGN.org::#guard-replay][DESIGN.org#guard-replay]] says when the guard replay runs; the benchmark
 was dropped on 7 November 2026 and stays unused, with
 [[file:evidence.org][docs/evidence.org]] as the record of what it measured and its runs. Both

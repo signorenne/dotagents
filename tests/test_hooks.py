@@ -1158,7 +1158,7 @@ class AfterEdit(unittest.TestCase):
         self.assertIn("JSON syntax error", agy.stderr)
 
     def test_toml_is_skipped_without_tomllib(self):
-        # Python 3.9 and 3.10 (CI runs 3.9) have no tomllib: TOML goes unchecked, the rest
+        # Python 3.9 and 3.10 have no tomllib: TOML goes unchecked, the rest
         # is still checked. In-process, with the module hidden as it is on those versions.
         toml, toml_payload = self.edited("bad.toml", self.BROKEN["bad.toml"][0])
         _, json_payload = self.edited("bad.json", self.BROKEN["bad.json"][0])

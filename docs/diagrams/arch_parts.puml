@@ -24,10 +24,6 @@ package "Outputs" {
   folder "dist/\nzips" as dist
 }
 
-node "CI\nci.yml" as ci
-component "tools/validate.py" as validate
-folder "tests/" as tests
-
 adapters --> install
 source --> install
 source --> build
@@ -35,13 +31,8 @@ install -[hidden]right- build
 install ..> installed
 build ..> dist
 
-ci -[dotted]-> validate
-ci -[dotted]-> tests
-ci -[dotted]up-> build
-
 legend right
   Solid arrow: read as input
   Dashed arrow: written as output
-  Dotted arrow: run by CI
 endlegend
 @enduml

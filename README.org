@@ -168,7 +168,7 @@ dotagents/
 |-- AGENTS.md           working-memory floor for agents changing this repository
 |-- CLAUDE.md           Claude Code bridge that imports AGENTS.md
 |-- GEMINI.md           Gemini CLI bridge that imports AGENTS.md
-|-- .github/            CI workflow and the Copilot bridge
+|-- .github/            the Copilot bridge
 |-- .githooks/          commit-msg: checks each commit message (enabled per clone)
 |-- home/.agents/       the installed source: AGENTS.md, skills/, agents/, hooks/, path-rules.json
 |-- claude-ai/          skills uploaded to claude.ai, and overrides for local skills uploaded too

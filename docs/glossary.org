@@ -60,7 +60,7 @@ coin a synonym in a local doc when this file already names the concept.
 | rule that binds          | An accepted decision in DESIGN.org under Rules that bind, with a stable anchor, which every later change follows until the maintainer changes it.                                                |
 | proposed rule            | A rule an agent or the maintainer has suggested but the maintainer has not accepted; it binds nobody until the maintainer accepts it.                                                            |
 | guide                    | The text that tells an agent to keep a rule that binds: the global rules, a skill, a subagent's instructions or =AGENTS.md=.                                                                     |
-| sensor                   | The check that catches a breach of a rule that binds: a hook, a settings rule, =tools/validate.py=, a test, CI or the reviewer; DESIGN.org maps them.                                            |
+| sensor                   | The check that catches a breach of a rule that binds: a hook, a settings rule, =tools/validate.py=, a test or the reviewer; DESIGN.org maps them.                                                |
 
 * Workflow terms
 

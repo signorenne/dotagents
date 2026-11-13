@@ -34,7 +34,7 @@ docs/                         Org docs: docs map, architecture, workflow guide, 
 - The method itself (lanes, the plan file, stops, review, checks): METHOD.org, then the skills that apply it.
 - A repo workflow (build, design, close, review...): a skill in home/.agents/skills/<name>/, listed in one pack of tools/build.py (PACKS); then python3 tools/build.py --marketplace.
 - A general skill also wanted in claude.ai chat: claude-ai/skills/<name>/. A local skill wanted there too: an entry in claude-ai/overrides.json, never a copy.
-- A script a skill runs: home/.agents/skills/<name>/scripts/. It uses only the standard library plus at most one common package, and has tests in tests/test_skill_scripts.py that run in CI without that package.
+- A script a skill runs: home/.agents/skills/<name>/scripts/. It uses only the standard library plus at most one common package, and has tests in tests/test_skill_scripts.py that pass without that package.
 - A subagent: home/.agents/agents/<name>.md; per-tool formats come from install.py, never by hand.
 - A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: a description in install.py (TOOL_DESCRIPTIONS), which the shared suite in tests/test_install.py (Descriptions) checks, plus tests for anything new in its format.
@@ -64,7 +64,7 @@ python3 -m unittest discover -s tests
 python3 tools/build.py
 ```
 
-Before each commit, run validate and the test module that covers what the commit changes; run all three on the last commit of a branch, or of a series of commits on main, before it lands. CI runs the same three commands.
+Before each commit, run validate and the test module that covers what the commit changes; run all three on the last commit of a branch, or of a series of commits on main, before it lands.
 
 ## Review checklist
 

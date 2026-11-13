@@ -1,10 +1,10 @@
 #+TITLE: Contributing to dotagents
-#+SUBTITLE: workflow, gates, CI, commit messages and the docs format
+#+SUBTITLE: workflow, gates, commit messages and the docs format
 #+OPTIONS: toc:2 num:nil ^:nil
 #+STARTUP: showall
 
 This file owns the workflow for changing dotagents: the steps, the local
-gates, CI, commit messages and the docs format. [[file:AGENTS.md][AGENTS.md]] owns where each
+gates, commit messages and the docs format. [[file:AGENTS.md][AGENTS.md]] owns where each
 kind of change goes, the hard rules and the review checklist;
 [[file:DESIGN.org][DESIGN.org]] owns the design and the rules that bind;
 [[file:docs/skill-authoring.org][docs/skill-authoring.org]] owns how a skill is written and tested;
@@ -74,20 +74,10 @@ When a gate fails because the change is wrong, fix the change: no skipped,
 deleted or loosened tests and no hook bypass without the maintainer's
 approval.
 
-* CI
-
-GitHub Actions ([[file:.github/workflows/ci.yml][.github/workflows/ci.yml]]) runs the =check= job on every
-push and pull request, in three configurations:
-
-| Runner          | Python | Notes                                                                                 |
-|-----------------+--------+---------------------------------------------------------------------------------------|
-| =ubuntu-24.04=  |    3.9 | the oldest Python the installer supports; setup-python builds none for Ubuntu 26.04   |
-| =ubuntu-latest= |   3.12 | with Pillow, which the skills' image scripts use                                      |
-| =macos-latest=  |   3.12 | the other platform the installer supports                                             |
-
-Each runs the three local gates in order (validate, test with =-v=, build).
-Pillow is installed in one job only, so the other two prove the tests run
-without it.
+There is no CI: the maintainer dropped it on 13 November 2026, and the gates
+run only locally. It also ran them on Python 3.9, on macOS and without
+Pillow, which nothing checks now; its last version is
+=git show d94a125:.github/workflows/ci.yml=.
 
 * Commit messages
 

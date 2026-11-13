@@ -562,7 +562,7 @@ failure hook's reminder.
 | =global-rules-size=         | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (at most 9,000 characters)                                                                                                                    |
 | =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                           | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
 | =skills-from-real-runs=     | =docs/skill-authoring.org=                                                     | none: the model only                                                                                                                                              |
-| =light-scripts=             | =AGENTS.md= (Where changes go)                                                 | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
+| =light-scripts=             | =AGENTS.md= (Where changes go)                                                 | =tests/test_skill_scripts.py= (the cases that need Pillow skip without it)                                                                                        |
 | =qt-facts-in-qt-quick=      | qt-quick, clean-architecture                                                   | none: the model only                                                                                                                                              |
 | =tutor-name=                | this rule                                                                      | none: the model only                                                                                                                                              |
 | =measured-tiers=            | as-built-docs, code-audit, notes-from-work, =METHOD.org= (Delegation)          | the coverage and error rate each as-built-docs run records                                                                                                        |
@@ -791,9 +791,8 @@ A change to =home/.agents/hooks/guard_bash.py= lands only after
 =tools/guard_replay.py= compared the guard of the target branch with the
 changed one over the shell commands of the maintainer's Claude Code
 transcripts, and the maintainer judged each command the change newly blocks;
-the plan file records the counts and the judgement. It is a local step,
-not a CI gate, because the transcripts exist only on the maintainer's
-machine.
+the plan file records the counts and the judgement. It is a local step
+because the transcripts exist only on the maintainer's machine.
 
 In: =tools/guard_replay.py=, =CONTRIBUTING.org= (Workflow), =AGENTS.md=
 (Review checklist).
@@ -861,10 +860,10 @@ In: =docs/skill-authoring.org=; the five rules in =build=,
 :CUSTOM_ID: light-scripts
 :END:
 A script a skill runs uses the standard library plus at most one common
-package, and its tests run in CI without that package, so the skill works
+package, and its tests pass without that package, so the skill works
 wherever it is installed.
 
-In: =tests/test_skill_scripts.py=, =.github/workflows/ci.yml=.
+In: =tests/test_skill_scripts.py=.
 
 *** Qt facts live in qt-quick
 :PROPERTIES:
