@@ -493,6 +493,8 @@ class GuardBypassBattery(unittest.TestCase):
         "find . -execdir git push {} +", "watch -n 5 git push", "strace -f -o /tmp/trace git push",
         "ltrace git push", "chroot / git push", "pkexec --user root git push", "runuser -u me -- git push",
         "unbuffer git push", "torsocks git push", "proxychains4 -q -f /etc/p.conf git push",
+        "find . -exec find . -exec git push {} + \\;", "find . -execdir sudo find . -ok git push \\; \\;",
+        "find . -exec env HUSKY=0 git commit -m x \\;",
         # absolute paths and git's own programs
         "/usr/bin/git push", "/usr/local/bin/git push origin main", "./git push",
         "/usr/lib/git-core/git-push origin main", "git-push origin main", "git-subtree push -P lib origin main",
@@ -530,6 +532,7 @@ class GuardBypassBattery(unittest.TestCase):
         "strace -f git status", "git commit -m 'feat(x): explain git push --force'", "cat <<'X'\ngit push\nX",
         # third-party git-* programs are not git: SKIP= here is the tool's own variable
         "SKIP=changelog git-cliff -o CHANGELOG.md", "git-crypt unlock",
+        "find . -type d -exec find {} -maxdepth 1 -name '*.py' \\;",
     ]
 
     @classmethod
@@ -550,6 +553,15 @@ class GuardBypassBattery(unittest.TestCase):
         for command in self.BLOCKED:
             with self.subTest(command=command):
                 self.assertEqual(self.exit_code(command), 2)
+
+    def test_deep_nesting_is_checked_quickly(self):
+        # Each nested find would scan the rest of the text again (quadratic time); past a
+        # few levels the rest is split roughly at git and gh, so a push still shows.
+        for depth in (3, 20000):
+            with self.subTest(depth=depth):
+                start = time.monotonic()
+                self.assertEqual(self.exit_code("find . -exec " * depth + "git push"), 2)
+                self.assertLess(time.monotonic() - start, 2)
 
     def test_near_misses_pass(self):
         for command in self.NEAR_MISSES:

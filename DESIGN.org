@@ -222,7 +222,7 @@ variables, a disabled =core.hooksPath=) and every push and publish, in every
 tool: =git push=, =git subtree push=, =git send-pack=, =git http-push=,
 =git lfs push=, =git svn dcommit=, =git p4 submit=, =gh pr create=,
 =gh pr merge=, =gh release create=, =gh repo create --push= and
-=gh repo sync= ([[#no-agent-push][no-agent-push]]), also run through =find -exec=, wrappers
+=gh repo sync= ([[#no-agent-push][no-agent-push]]), also run through =find -exec= (nested too), wrappers
 such as =sudo=, =watch= or =strace=, or git's own programs (=git-push=). A
 push that also rewrites or deletes published history (=--force= and its
 variants, =+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and
