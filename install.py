@@ -190,6 +190,13 @@ def codex_rules() -> str:
     return "\n".join(lines) + "\n"
 
 
+def copilot_folder(home: Path) -> Path:
+    """Copilot CLI's configuration folder: $COPILOT_HOME, which replaces the whole
+    ~/.copilot path when it is set, else ~/.copilot."""
+    value = os.environ.get("COPILOT_HOME")
+    return Path(value).expanduser() if value else home / ".copilot"
+
+
 def check_source() -> list:
     """Problems in the repository that would stop an install partway, found before it starts."""
     problems = []
@@ -282,6 +289,7 @@ class Installer:
         self.tools = tuple(tools)
         self.backup_root = home / ".agents-backup" / time.strftime("%Y%m%d-%H%M%S")
         self.agents_home = home / ".agents"
+        self.copilot_home = copilot_folder(home)
         self.changes = 0
         self.backups = 0
         self.notes = []
@@ -487,7 +495,11 @@ class Installer:
         self.merge_json(base / "settings.json", mutate)
 
     def install_copilot(self) -> None:
-        base = self.home / ".copilot"
+        base = self.copilot_home
+        if not base.is_absolute():
+            self.notes.append(f"Copilot CLI: skipped, because COPILOT_HOME ({base}) is a relative path; "
+                              "set it to an absolute one and run install.py again.")
+            return
         self.link(base / "copilot-instructions.md", self.agents_home / "AGENTS.md")
         for path, meta, body in self.subagents():
             self.write(base / "agents" / f"{meta['name']}.agent.md", copilot_agent(meta, body))
@@ -506,7 +518,7 @@ class Installer:
             self.home / ".claude" / "agents": {f"{a}.md" for a in agents},
             self.home / ".codex" / "agents": {f"{a}.toml" for a in agents},
             self.home / ".gemini" / "agents": {f"{a}.md" for a in agents},
-            self.home / ".copilot" / "agents": {f"{a}.agent.md" for a in agents},
+            self.copilot_home / "agents": {f"{a}.agent.md" for a in agents},
         }
         foreign, broken = [], []
         for folder, managed in folders.items():
@@ -539,15 +551,15 @@ class Installer:
 
 def detect(home: Path) -> list[str]:
     probes = {
-        "claude": (".claude", ["claude"]),
-        "codex": (".codex", ["codex"]),
-        "gemini": (".gemini", ["gemini"]),
-        "copilot": (".copilot", ["copilot"]),
-        "cursor": (".cursor", ["cursor-agent", "cursor"]),
+        "claude": (home / ".claude", ["claude"]),
+        "codex": (home / ".codex", ["codex"]),
+        "gemini": (home / ".gemini", ["gemini"]),
+        "copilot": (copilot_folder(home), ["copilot"]),
+        "cursor": (home / ".cursor", ["cursor-agent", "cursor"]),
     }
     found = []
     for tool, (folder, binaries) in probes.items():
-        if (home / folder).is_dir() or any(shutil.which(b) for b in binaries):
+        if folder.is_dir() or any(shutil.which(b) for b in binaries):
             found.append(tool)
     return found
 

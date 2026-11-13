@@ -156,6 +156,9 @@ installer runs again.
   and the rest of the file is kept. The adapter also turns off the synced
   plugin =engineering@synced=. A file that does not parse is left alone with a
   note to merge it by hand.
+- /COPILOT_HOME/ : when it is set, Copilot CLI's files go to
+  =$COPILOT_HOME= instead of =~/.copilot=, since it replaces that whole path;
+  a relative value is refused with a note.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
   =prefix_rule= entries forbid every push and publish the guard blocks. Codex
   writes =default.rules= itself, and the installer leaves it alone.

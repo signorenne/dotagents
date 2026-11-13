@@ -73,7 +73,9 @@ As of 12 November 2026:
   (the guard does).
 - [ ] Codex's default sandbox blocks =git commit=, so =implement= asks for
   approval there or leaves the step uncommitted and logged.
-- [ ] The installer ignores =COPILOT_HOME= and always writes to =~/.copilot=.
+- [X] The installer writes Copilot CLI's files to =$COPILOT_HOME= when it is
+  set, which replaces the whole =~/.copilot= path
+  (=test_copilot_files_follow_copilot_home= in =tests/test_install.py=).
 - [ ] Test whether claude.ai still caps skill descriptions at 200 characters;
   =tools/validate.py= enforces that limit for the claude.ai set and the
   overrides.

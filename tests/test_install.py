@@ -67,13 +67,16 @@ class Install(unittest.TestCase):
         for folder in (".claude", ".codex", ".gemini", ".copilot", ".cursor"):
             (self.home / folder).mkdir()
 
-    def run_install(self, *args: str, installer: Path = INSTALL) -> subprocess.CompletedProcess:
-        env = {**os.environ, "HOME": str(self.home), "PATH": "/usr/bin:/bin"}
+    def run_install(self, *args: str, installer: Path = INSTALL, env: dict = None,
+                    cwd: Path = None) -> subprocess.CompletedProcess:
+        # The tester's own COPILOT_HOME would send the Copilot files out of the temporary HOME.
+        base = {k: v for k, v in os.environ.items() if k != "COPILOT_HOME"}
+        env = {**base, "HOME": str(self.home), "PATH": "/usr/bin:/bin", **(env or {})}
         return subprocess.run([sys.executable, "-B", str(installer), *args], env=env,
-                              capture_output=True, text=True, check=False)
+                              capture_output=True, text=True, check=False, cwd=cwd)
 
-    def install(self, *args: str) -> str:
-        result = self.run_install(*args)
+    def install(self, *args: str, env: dict = None) -> str:
+        result = self.run_install(*args, env=env)
         self.assertEqual(result.returncode, 0, result.stderr)
         return result.stdout
 
@@ -326,6 +329,37 @@ class Install(unittest.TestCase):
         (self.home / ".agents/hooks/compact_brief.py").unlink()
         missing = self.run_hook(handler["command"], payload)
         self.assertEqual(missing.returncode, 0, missing)
+
+    def test_copilot_files_follow_copilot_home(self):
+        # Copilot CLI's configuration directory reference: COPILOT_HOME replaces the whole
+        # ~/.copilot path (copilot-instructions.md, agents/, hooks/); user hook files are
+        # *.json in $COPILOT_HOME/hooks/ when it is set (hooks configuration reference).
+        (self.home / ".copilot").rmdir()
+        custom = self.home / "config" / "copilot"
+        custom.mkdir(parents=True)
+        out = self.install(env={"COPILOT_HOME": str(custom)})
+        self.assertIn("copilot", out.splitlines()[0], "an existing COPILOT_HOME means Copilot CLI is here")
+        self.assertEqual(json.loads((custom / "hooks/agents-global.json").read_text())["version"], 1)
+        self.assertEqual(os.readlink(custom / "copilot-instructions.md"), str(self.home / ".agents/AGENTS.md"))
+        for name in AGENTS:
+            self.assertTrue((custom / "agents" / f"{name}.agent.md").is_file(), name)
+        self.assertFalse((self.home / ".copilot").exists())
+        (custom / "agents/old.agent.md").write_text("")
+        audit = self.install("--audit", env={"COPILOT_HOME": str(custom)})
+        self.assertIn(str(custom / "agents/old.agent.md"), audit)
+        self.assertIn("0 change(s).", self.install(env={"COPILOT_HOME": str(custom)}).splitlines())
+
+    def test_relative_copilot_home_is_refused(self):
+        # Copilot CLI would read a relative path from wherever it starts; the installer
+        # would write it under its own working folder. Neither is the folder meant.
+        result = self.run_install("--tools", "copilot", env={"COPILOT_HOME": "rel/copilot"}, cwd=self.home)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse((self.home / "rel").exists())
+        self.assertIn("COPILOT_HOME", result.stdout)
+
+    def test_empty_copilot_home_means_the_default(self):
+        self.install("--tools", "copilot", env={"COPILOT_HOME": ""})
+        self.assertTrue((self.home / ".copilot/hooks/agents-global.json").is_file())
 
     def assert_hook_group(self, group: dict, script: str, tool: str, matching, other, timeout_range):
         """One matcher group with one command handler, as Codex and Gemini CLI document it."""

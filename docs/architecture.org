@@ -66,8 +66,8 @@ What =python3 install.py= does, in order, and what each tool receives.
    =overrides.json= a skills object. On any problem it prints the list,
    installs nothing and exits 1.
 2. Choose the tools: the =--tools= list, or every tool whose folder
-   (=~/.claude=, =~/.codex=, =~/.gemini=, =~/.copilot=, =~/.cursor=) or command
-   exists.
+   (=~/.claude=, =~/.codex=, =~/.gemini=, =~/.copilot= or =$COPILOT_HOME=,
+   =~/.cursor=) or command exists.
 3. Shared source: copy every file of =home/.agents= to =~/.agents= (hook
    scripts made executable) and the claude.ai set into =~/.agents/skills=, so
    every tool sees both skill sets. A file left in an installed skill folder
@@ -94,9 +94,9 @@ What =python3 install.py= does, in order, and what each tool receives.
    Gemini CLI's defaults of 30 turns and 10 minutes; merge the two hooks into
    =~/.gemini/settings.json= and put =AGENTS.md= first in =context.fileName=,
    so project =AGENTS.md= files load.
-7. Copilot CLI: link =~/.copilot/copilot-instructions.md=; write
-   =agents/<name>.agent.md= with Copilot tool names; write
-   =~/.copilot/hooks/agents-global.json=.
+7. Copilot CLI, in =$COPILOT_HOME= when it is set, else =~/.copilot=: link
+   =copilot-instructions.md=; write =agents/<name>.agent.md= with Copilot tool
+   names; write =hooks/agents-global.json=.
 8. Cursor: write nothing. Cursor reads =~/.agents/skills=, =~/.claude/agents=
    and the Claude Code hooks by itself, so it gets subagents and hooks only
    when Claude Code is installed too; the installer reminds the user to paste
