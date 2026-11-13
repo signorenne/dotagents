@@ -16,7 +16,6 @@ package "claude.ai set" {
   component "tutor" as tutor
 }
 
-component "Local skills\n(other maps)" as local
 
 scoping --> decide
 decide -- analysis
@@ -28,16 +27,10 @@ debug -- tests
 debug --> verify
 tests --> verify
 
-verify -[hidden]down- local
-scoping --> local
-decide --> local
-prompt --> local
-handoff --> local
-debug --> local
 
 legend right
   Solid arrow: hands work to
   Plain line: each names the other
-  Outside the package: skills of the other maps
+  Handoffs to the local skills: in the table
 endlegend
 @enduml
