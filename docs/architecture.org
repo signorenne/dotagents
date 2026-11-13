@@ -220,7 +220,7 @@ themselves, with what each leaves and where, are in [[file:pipeline.org][docs/pi
    systematic-debugging after two failed fixes, runs the full gates through
    gate-runner and the review through reviewer, and creates the worktree
    through isolated-work when the plan's isolation was approved.
-4. On request: gates and review are the user's direct way to the same two
+4. On request: gates and branch-review are the user's direct way to the same two
    subagents; implement calls the subagents itself, not these skills.
 5. Close: session-close writes the handoff that the next fresh session reads
    before resuming implement.

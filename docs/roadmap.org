@@ -117,8 +117,6 @@ As of 12 November 2026:
 - [ ] Test whether claude.ai still caps skill descriptions at 200 characters;
   =tools/validate.py= enforces that limit for the claude.ai set and the
   overrides.
-- [ ] Check whether =/review= in Claude Code runs this repository's =review=
-  skill or Claude Code's built-in one.
 - [ ] The subagent copies the installer writes for Codex, Gemini CLI and
   Copilot drop the =model= field, so =scout= and =gate-runner= run on the
   session's model there; only Claude Code honours the cheaper models.

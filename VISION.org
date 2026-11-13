@@ -37,7 +37,7 @@ once before it reaches any tool.
   in =home/.agents/AGENTS.md=, installed as =~/.agents/AGENTS.md= and pasted
   into claude.ai.
 - /Skill/ : a folder with a =SKILL.md= that an agent loads when a request
-  matches its description: a workflow (=spec=, =implement=, =review=) or a body
+  matches its description: a workflow (=spec=, =implement=, =branch-review=) or a body
   of knowledge (=qt-quick=). Local skills live in =home/.agents/skills/=.
 - /Subagent/ : an agent with a fresh context and one narrow job (=scout=,
   =gate-runner=, =reviewer=), written in Claude Code format in

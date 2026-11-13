@@ -20,7 +20,7 @@ What it gives every session, in chat or in a repository:
   output rules, no em dashes), including a Socratic method: you question the
   agent, the agent settles your decisions with you one question at a time, and
   it tries to refute its own assumptions with checks that could fail.
-- A repository workflow as skills (spec, implement, review, gates,
+- A repository workflow as skills (spec, implement, branch-review, gates,
   session-close, decide, project-setup), and skills for documentation, design,
   code quality, coordination and Qt; the full list is under [[*Skills][Skills]].
 - Three subagents that keep the main context small: =scout= (read-only
@@ -152,7 +152,7 @@ when asked in words.
   through scouting and a maieutic interview, without writing code.
 - [[file:home/.agents/skills/implement/SKILL.md][implement]] : carries out a spec or a scoped task in small verified
   commits, with a progress log, the full gates and an independent review.
-- [[file:home/.agents/skills/review/SKILL.md][review]] : reviews the current branch through the =reviewer= subagent and
+- [[file:home/.agents/skills/branch-review/SKILL.md][branch-review]] : reviews the current branch through the =reviewer= subagent and
   returns findings ranked by severity.
 - [[file:home/.agents/skills/gates/SKILL.md][gates]] : runs the project's documented gates through =gate-runner= and
   reports only verdicts and the first errors.
