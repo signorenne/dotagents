@@ -21,7 +21,7 @@ scoping --> decide
 decide -- analysis
 analysis -- research
 research --> verify
-prompt -right-> editing
+prompt -down-> editing
 debug -- editing
 debug -- tests
 debug --> verify
