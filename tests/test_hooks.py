@@ -584,6 +584,18 @@ class AfterEdit(unittest.TestCase):
                 if tool in events:
                     self.assertEqual(context["hookEventName"], events[tool])
 
+    def test_antigravity_reformat_notice_goes_to_stderr(self):
+        # Antigravity's PostToolUse reply is {} only, so the notice has nowhere else to go;
+        # stderr at least keeps it where its logs may show it.
+        env = self.fake_clang_format('for f; do :; done\nprintf "int f();\\n" > "$f"\n')
+        source = self.tmp / "a.cpp"
+        source.write_text("int   f( );\n")
+        payload = {"toolCall": {"name": "write_to_file", "args": {"TargetFile": str(source),
+                                                                   "CodeContent": "int   f( );\n"}}}
+        result = run("after_edit.py", payload, "antigravity", env)
+        self.assertEqual((result.returncode, result.stdout.strip()), (0, "{}"))
+        self.assertIn("reformatted", result.stderr)
+
     def test_formatting_stays_within_hook_timeout(self):
         # In-process with a 3 s budget, so the test does not wait for the real 60 s timeout.
         env = self.fake_clang_format("exec sleep 2\n")

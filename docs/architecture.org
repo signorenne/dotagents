@@ -424,4 +424,5 @@ After-edit hook (=after_edit.py=):
    report goes to the model as =additionalContext= with exit 0. Antigravity CLI
    documents only ={}= as the reply, so there the hook prints ={}= with exit 0
    and the report goes to stderr, which its docs do not say reaches the agent.
-   A reformat adds a notice to re-read the file before the next edit.
+   A reformat adds a notice to re-read the file before the next edit (on
+   Antigravity CLI, on stderr too).

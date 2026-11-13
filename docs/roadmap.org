@@ -77,7 +77,8 @@ As of 12 November 2026:
   codes, so the guard answers with a JSON decision and exit 0.
 - [ ] Antigravity CLI documents no reply that reaches the agent after an edit
   (a PostToolUse hook returns ={}=), so its after-edit hook formats C and C++
-  but its dash report stays on stderr. A PreToolUse hook that denies a write
+  but its dash report and its reformat notice stay on stderr; after a
+  reformat, the agent's next edit may quote text that is no longer there. A PreToolUse hook that denies a write
   holding a dash, with the reason, would reach the agent; that is the
   maintainer's call.
 - [ ] Antigravity CLI documents no event after a compaction or a resume
