@@ -244,7 +244,8 @@ class Install(unittest.TestCase):
         self.assertEqual(merged["model"], "opus")
         self.assertIn("Bash(npm test *)", merged["permissions"]["allow"])
         self.assertIn("Bash(cmake --build *)", merged["permissions"]["allow"])
-        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PreCompact", "PreToolUse", "SessionStart", "Stop"])
+        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PostToolUseFailure", "PreCompact", "PreToolUse",
+                                                  "SessionStart", "Stop"])
         self.install()
         again = json.loads(settings.read_text())
         self.assertEqual(len(again["hooks"]["PreToolUse"]), 1, "hook entries must not duplicate")
@@ -479,6 +480,32 @@ class Install(unittest.TestCase):
         hooks = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]
         self.assert_stop_check(hooks["Stop"], {"session_id": "s", "cwd": str(self.home), "hook_event_name": "Stop",
                                                "stop_hook_active": False, "last_assistant_message": "Done."})
+
+    def test_claude_points_repeated_bash_failures_to_a_change_of_approach(self):
+        # Claude Code's PostToolUseFailure: matcher on the tool name; input session_id,
+        # tool_name, tool_input, error, is_interrupt; additionalContext reaches Claude.
+        self.install("--tools", "claude")
+        (group,) = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]["PostToolUseFailure"]
+        self.assertTrue(re.fullmatch(group["matcher"], "Bash"))
+        for name in ("Edit", "Write", "Read"):
+            self.assertFalse(re.fullmatch(group["matcher"], name), name)
+        (handler,) = group["hooks"]
+        self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/repeated_failure.py" || true')
+        self.assertLessEqual(handler["timeout"], 10)
+        temp = self.home / "tmp"
+        temp.mkdir()
+        payload = {"session_id": "s", "hook_event_name": "PostToolUseFailure", "tool_name": "Bash",
+                   "tool_input": {"command": "make"}, "error": "Exit code 2\nmake: *** no rule", "is_interrupt": False}
+        results = [subprocess.run(["sh", "-c", handler["command"]], input=json.dumps(payload), capture_output=True,
+                                  text=True, check=False, env={**os.environ, "HOME": str(self.home),
+                                                               "PATH": "/usr/bin:/bin", "TMPDIR": str(temp)})
+                   for _ in range(3)]
+        self.assertEqual([(r.returncode, r.stdout) for r in results[:2]], [(0, ""), (0, "")])
+        self.assertIn("systematic-debugging",
+                      json.loads(results[2].stdout)["hookSpecificOutput"]["additionalContext"])
+        (self.home / ".agents/hooks/repeated_failure.py").unlink()
+        missing = self.run_hook(handler["command"], payload)
+        self.assertEqual((missing.returncode, missing.stdout), (0, ""))
 
     def test_codex_checks_the_progress_log_before_a_stop(self):
         # Codex hooks docs: Stop ignores matcher; input turn_id, stop_hook_active,
