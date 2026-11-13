@@ -576,8 +576,11 @@ class Install(unittest.TestCase):
                 prefixes = [p + [word] for p in prefixes for word in (part if isinstance(part, list) else [part])]
             forbidden |= {" ".join(p) for p in prefixes}
         self.assertEqual(forbidden, {"git push", "git subtree push", "git send-pack", "git http-push", "git lfs push",
-                                     "git svn dcommit", "git p4 submit", "gh pr create", "gh pr new", "gh pr merge",
-                                     "gh release create", "gh release new", "gh repo sync"})
+                                     "git svn dcommit", "git p4 submit", "git send-email", "gh pr create", "gh pr new",
+                                     "gh pr merge", "gh pr ready", "gh pr comment", "gh pr review", "gh pr edit",
+                                     "gh release create", "gh release new", "gh release upload", "gh release edit",
+                                     "gh repo sync", "gh gist create", "gh gist new", "gh issue create",
+                                     "gh issue new", "gh workflow run"})
 
     @unittest.skipUnless(shutil.which("codex"), "codex not installed")
     def test_codex_reads_the_rules_as_written(self):
@@ -585,7 +588,9 @@ class Install(unittest.TestCase):
         rules = self.home / ".codex/rules/dotagents.rules"
         env = {**os.environ, "HOME": str(self.home), "CODEX_HOME": str(self.home / ".codex")}
         cases = {("git", "push", "--force", "origin", "main"): "forbidden", ("gh", "pr", "new"): "forbidden",
-                 ("gh", "repo", "sync"): "forbidden", ("git", "status"): None, ("gh", "pr", "view", "7"): None}
+                 ("gh", "repo", "sync"): "forbidden", ("gh", "pr", "comment", "7", "--body", "x"): "forbidden",
+                 ("git", "send-email", "a.patch"): "forbidden", ("git", "status"): None,
+                 ("gh", "pr", "view", "7"): None, ("gh", "issue", "list"): None}
         for command, decision in cases.items():
             with self.subTest(command=command):
                 result = subprocess.run(["codex", "execpolicy", "check", "--rules", str(rules), "--", *command],

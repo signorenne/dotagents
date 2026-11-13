@@ -19,10 +19,13 @@ git-push):
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
   - every git push, git subtree push, git send-pack, git http-push, git lfs push, git svn
-    dcommit, git p4 submit, gh pr create (or gh pr new), gh pr merge, gh release create
-    (or gh release new), gh repo create --push and gh repo sync, in every agent: the
-    maintainer reviews everything before it leaves the machine, so pushing and
-    publishing are the maintainer's. A push that also rewrites or deletes
+    dcommit, git p4 submit, git send-email, gh pr create (or gh pr new), gh pr merge,
+    ready, comment, review and edit, gh release create (or gh release new), upload and
+    edit, gh repo create --push, gh repo sync, gh gist create (or gh gist new), gh issue
+    create (or gh issue new) and gh workflow run, in every agent: the maintainer reviews
+    everything before it leaves the machine, so pushing and publishing are the
+    maintainer's; the text of a post (a comment, review, issue, gist or patch) goes to
+    the user instead. A push that also rewrites or deletes
     published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
     --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
     required checks) are named as such.
@@ -137,16 +140,40 @@ GIT_PUBLISHERS = {
     "lfs": ("push", "git lfs push publishes objects to a remote"),
     "svn": ("dcommit", "git svn dcommit publishes commits to a Subversion repository"),
     "p4": ("submit", "git p4 submit publishes commits to a Perforce depot"),
+    "send-email": (None, "git send-email sends patches by email"),
 }
+GIST_REASON = "gh gist create publishes a gist"
+ISSUE_REASON = "gh issue create publishes an issue"
+# gh commands that publish, other than gh pr merge and gh repo create --push:
+# {(command, subcommand): reason}; gh's alias new shares the reason of create.
+GH_PUBLISHERS = {
+    ("pr", "create"): PR_CREATE_REASON, ("pr", "new"): PR_CREATE_REASON,
+    ("pr", "ready"): "gh pr ready changes the review state of a pull request",
+    ("pr", "comment"): "gh pr comment posts on a pull request",
+    ("pr", "review"): "gh pr review posts a review on a pull request",
+    ("pr", "edit"): "gh pr edit changes a published pull request",
+    ("release", "create"): RELEASE_REASON, ("release", "new"): RELEASE_REASON,
+    ("release", "upload"): "gh release upload publishes files on a release",
+    ("release", "edit"): "gh release edit changes a published release",
+    ("repo", "sync"): REPO_SYNC_REASON,
+    ("gist", "create"): GIST_REASON, ("gist", "new"): GIST_REASON,
+    ("issue", "create"): ISSUE_REASON, ("issue", "new"): ISSUE_REASON,
+    ("workflow", "run"): "gh workflow run starts a workflow on GitHub",
+}
+# The publish forms that post text, whose text the user can post instead.
+POST_REASONS = {GIST_REASON, ISSUE_REASON, GH_PUBLISHERS[("pr", "comment")], GH_PUBLISHERS[("pr", "review")],
+                GH_PUBLISHERS[("pr", "edit")], GH_PUBLISHERS[("release", "edit")],
+                GIT_PUBLISHERS["send-email"][1]}
 # git's own programs that the guard inspects, run by their own name (git-push from git
 # --exec-path, git-lfs); other git-* programs (git-cliff, git-crypt) are not git.
 GIT_PROGRAMS = HOOK_SUBCOMMANDS | {"config", "subtree"} | set(GIT_PUBLISHERS)
-PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_CREATE_REASON, PR_MERGE_REASON,
-                   RELEASE_REASON, REPO_SYNC_REASON, REPO_CREATE_PUSH_REASON,
-                   *(reason for _, reason in GIT_PUBLISHERS.values())}
+PUBLISH_REASONS = {PUSH_REASON, SUBTREE_PUSH_REASON, PR_MERGE_REASON, REPO_CREATE_PUSH_REASON,
+                   *GH_PUBLISHERS.values(), *(reason for _, reason in GIT_PUBLISHERS.values())}
 PUBLISH_ADVICE = ("Pushing and publishing are the maintainer's: they review every change before "
                   "it leaves this machine. Do not push or publish another way; stop and tell the "
                   "user the work is ready for their review.")
+POST_ADVICE = ("To post a comment, review, issue, gist, description or patch, write its text in "
+               "your reply for the user to post.")
 GATE_ADVICE = ("Gates and published history are the maintainer's call. Fix the failing check, "
                "or stop and ask the user to run this command themselves.")
 CONFIG_VALUE_OPTIONS = {"-f", "--blob", "--comment", "--default", "--file", "--type",
@@ -625,12 +652,8 @@ def gh_reasons(words: list) -> list:
             index += 1  # gh takes the repository flag before or after the subcommand
         elif not word.startswith("-"):
             operands.append(word)
-    if operands[:2] in (["pr", "create"], ["pr", "new"]):
-        return [PR_CREATE_REASON]
-    if operands[:2] in (["release", "create"], ["release", "new"]):
-        return [RELEASE_REASON]
-    if operands[:2] == ["repo", "sync"]:
-        return [REPO_SYNC_REASON]
+    if tuple(operands[:2]) in GH_PUBLISHERS:
+        return [GH_PUBLISHERS[tuple(operands[:2])]]
     if operands[:2] in (["repo", "create"], ["repo", "new"]) and any(
             word.partition("=")[0] == "--push" and word.partition("=")[2].lower() not in ("false", "0")
             for word in words[1:]):
@@ -727,6 +750,8 @@ def main() -> int:
     advice = []
     if any(reasons.values()):
         advice.append(PUBLISH_ADVICE)
+    if POST_REASONS & set(reasons):
+        advice.append(POST_ADVICE)
     if not all(reasons.values()):
         advice.append(GATE_ADVICE)
     message = "Blocked: " + "; ".join(reasons) + ". " + " ".join(advice)

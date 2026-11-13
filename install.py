@@ -115,10 +115,17 @@ CODEX_RULES = (
     (["git", "lfs", "push"], "git lfs push publishes objects to a remote."),
     (["git", "svn", "dcommit"], "git svn dcommit publishes commits to a Subversion repository."),
     (["git", "p4", "submit"], "git p4 submit publishes commits to a Perforce depot."),
+    (["git", "send-email"], "git send-email sends patches by email."),
     (["gh", "pr", ["create", "new"]], "gh pr create publishes a branch as a pull request."),
     (["gh", "pr", "merge"], "gh pr merge merges into a published branch."),
+    (["gh", "pr", ["ready", "comment", "review", "edit"]],
+     "gh pr ready, comment, review and edit change a published pull request."),
     (["gh", "release", ["create", "new"]], "gh release create publishes a release."),
+    (["gh", "release", ["upload", "edit"]], "gh release upload and edit change a published release."),
     (["gh", "repo", "sync"], "gh repo sync pushes to a repository."),
+    (["gh", "gist", ["create", "new"]], "gh gist create publishes a gist."),
+    (["gh", "issue", ["create", "new"]], "gh issue create publishes an issue."),
+    (["gh", "workflow", "run"], "gh workflow run starts a workflow on GitHub."),
 )
 CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "
                       "leaves this machine: stop and tell the user the work is ready for review.")

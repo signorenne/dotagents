@@ -275,6 +275,25 @@ class GuardBash(unittest.TestCase):
         self.assertIn("Pushing and publishing are the maintainer's",
                       run("guard_bash.py", bash("gh release create v1.0")).stderr)
 
+    # Posts on GitHub and patch mail publish text; the rest change what GitHub shows or runs.
+    POSTS = ["gh gist create notes.md", "gh gist new -p notes.md", "gh pr comment 12 --body x",
+             "gh pr review --approve", "gh pr edit 12 --title x", "gh release edit v1 --notes x",
+             "gh issue create --title x --body y", "gh issue new", "git send-email --to a@example.com 0001.patch"]
+    OTHER_PUBLISHES = ["gh release upload v1 dist/a.zip", "gh pr ready 12", "gh pr ready --undo",
+                       "gh workflow run ci.yml"]
+
+    def test_posts_and_other_publish_forms_are_blocked(self):
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(self.POSTS + self.OTHER_PUBLISHES, tool)
+        for command in self.POSTS + self.OTHER_PUBLISHES:
+            with self.subTest(command=command):
+                stderr = run("guard_bash.py", bash(command)).stderr
+                self.assertIn("Pushing and publishing are the maintainer's", stderr)
+                if command in self.POSTS:  # what to do instead: hand the text over
+                    self.assertIn("write its text in your reply for the user to post", stderr)
+                else:
+                    self.assertNotIn("in your reply", stderr)
+
     def test_commands_that_do_not_publish_are_allowed(self):
         self.assert_allowed([
             "git fetch origin", "git pull origin main", "git remote -v", "git log --grep push",
@@ -511,6 +530,9 @@ class GuardBypassBattery(unittest.TestCase):
         "gh pr --repo=o/r create", "GH_REPO=o/r gh pr create", "gh pr merge 1 --squash", "gh pr merge --admin 1",
         "gh release create v1", "gh release new v1", "gh repo sync", "gh repo create x --source=. --push",
         "gh repo new x --push",
+        "gh gist create a.md", "gh -R o/r issue create -t x -b y", "gh pr --repo o/r comment 1 -b x",
+        "gh release upload v1 a.zip --clobber", "gh workflow run ci.yml -f x=1", "gh pr ready",
+        "git send-email a.patch", "git -C repo send-email --annotate a.patch", "git-send-email a.patch",
         # gate bypasses
         "git commit --no-verify -m x", "git commit --no-verif -m x", "git commit -n -m x", "git commit -qn -m x",
         "git commit --amend --no-edit -n", "git -C r commit -n -m x", "git merge --no-verify x",
@@ -533,6 +555,9 @@ class GuardBypassBattery(unittest.TestCase):
         # third-party git-* programs are not git: SKIP= here is the tool's own variable
         "SKIP=changelog git-cliff -o CHANGELOG.md", "git-crypt unlock",
         "find . -type d -exec find {} -maxdepth 1 -name '*.py' \\;",
+        "gh pr view 12 --comments", "gh pr checks 12", "gh issue list", "gh issue view 3", "gh gist list",
+        "gh gist view abc", "gh workflow list", "gh workflow view ci.yml", "gh release download v1",
+        "git format-patch -1", "git log --grep send-email",
     ]
 
     @classmethod
