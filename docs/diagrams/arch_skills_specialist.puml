@@ -29,26 +29,26 @@ component "implement" as implement
 
 archdoc --> puml
 asbuilt --> puml
-asbuilt --> preciseui : pictures
-asbuilt --> audit : list for the audit
-archdoc --> spec : build order
-archdoc -- clean : layers
-audit --> implement : fixes
-preciseui --> tests : behavior test
+asbuilt --> preciseui
+asbuilt --> audit
+archdoc --> spec
+archdoc -- clean
+audit --> implement
+preciseui --> tests
 
-parallel -- mech : split
-mech --> implement : as a task
-parallel --> implement : from section 5
-parallel ---> isolated : each writer
+parallel -- mech
+mech --> implement
+parallel --> implement
+parallel ---> isolated
 isolated --> implement
 mech -[hidden]down- isolated
 
 clean -- qt
-clean --> events : threads
+clean --> events
 qt -- events
-events -- debug : freezes
-clean --> spec : plan steps
-clean ---> implement : plan steps
+events -- debug
+clean --> spec
+clean ---> implement
 
 legend right
   Solid arrow: hands work to
