@@ -3,6 +3,7 @@ name: gate-runner
 description: "Runs build, test, sanitizer, lint, format and docs gates and returns only the verdict and the first actionable errors. Use proactively for any command whose output would be long (builds, test suites, static analysis, doc generation), so logs stay out of the main context."
 tools: Bash, Read, Grep
 model: haiku
+effort: low
 omitClaudeMd: true
 color: yellow
 ---
