@@ -45,7 +45,7 @@ depend on the model remembering it.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
   build commands allowed, =git push= denied (also as =git -C <dir> push=),
   =git reset --hard=, =git clean=, =git rebase=, =git update-ref=,
-  =git merge=, =git branch -f= (or =--force=) and a forced =git branch= delete (=-D= and
+  =git merge=, =git branch -f= (or =--force=), =-M= and =-C= and a forced =git branch= delete (=-D= and
   each other spelling of =--delete --force=) (all but the first two also as
   =git -C <dir> ...=) and =rm -rf= asked first, =.env= files, =~/.ssh= and =~/.gnupg= unreadable, commit and PR attribution
   empty, the synced plugin =engineering@synced= turned off, and the hook
