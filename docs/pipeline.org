@@ -79,9 +79,11 @@ add the skill, the subagents and where a fresh session starts.
   For a change across modules, a public API change, or a migration of data or
   many files, the plan proposes [[file:../home/.agents/skills/isolated-work/SKILL.md][isolated-work]], approved with the plan.
   Before the first step, and on resume, it runs the narrowest documented
-  check on the base commit (on HEAD when resuming) and records the result as
-  the baseline: a failure there predates the steps to come, so it is
-  reported, never fixed silently.
+  check on the base commit (on HEAD when resuming) and records the result,
+  with the number of tests that ran, as the baseline: a failure there
+  predates the steps to come, so it is reported, never fixed silently. On
+  the final commit it compares the test count with the baseline's, and
+  reports a drop, a removed test or an added skip marker without blocking.
 - /Produces/ : the branch =<type>/<slug>=, one commit per step, each behavior
   change with a test seen failing first; the progress log, with the approved
   plan, the baseline, every step with its commit and check, every decision
