@@ -271,17 +271,23 @@ class Install(unittest.TestCase):
                     self.assertIn("Bash(npm publish *)", permissions["ask"])
 
     def test_claude_settings_ask_before_landing_commands(self):
-        # Landing a branch rebases it, moves a branch ref and deletes the branch: each
-        # rewrites or drops history, so Claude Code asks first, also in the git -C form.
-        # Claude Code evaluates deny, then ask, then allow (code.claude.com/docs/en/permissions).
+        # Landing a branch rebases it, moves a branch ref (update-ref, merge --ff-only,
+        # branch -f) and force-deletes the branch: each rewrites or drops history, so
+        # Claude Code asks first, also in the git -C form. Claude Code evaluates deny, then
+        # ask, then allow, and matches the words before a rule's first * as written
+        # (code.claude.com/docs/en/permissions), so each spelling of a forced delete
+        # needs its own rule; those that start with -f fall under the branch -f rule.
         self.install("--tools", "claude")
         permissions = json.loads((self.home / ".claude/settings.json").read_text())["permissions"]
-        for rule in ("Bash(git rebase *)", "Bash(git -C * rebase *)", "Bash(git update-ref *)",
-                     "Bash(git -C * update-ref *)", "Bash(git branch -D *)", "Bash(git -C * branch -D *)"):
-            with self.subTest(rule=rule):
-                self.assertIn(rule, permissions["ask"])
-                self.assertNotIn(rule, permissions["deny"])
-                self.assertNotIn(rule, permissions["allow"])
+        forced_deletes = ["-D", "-df", "-fd", "-d -f", "-d --force", "--delete -f", "--delete --force",
+                          "--force -d", "--force --delete"]
+        landing = ["rebase", "update-ref", "merge", "branch -f"] + [f"branch {flags}" for flags in forced_deletes]
+        for command in landing:
+            for rule in (f"Bash(git {command} *)", f"Bash(git -C * {command} *)"):
+                with self.subTest(rule=rule):
+                    self.assertIn(rule, permissions["ask"])
+                    self.assertNotIn(rule, permissions["deny"])
+                    self.assertNotIn(rule, permissions["allow"])
 
     def test_claude_guard_blocks_when_it_cannot_run(self):
         # Claude Code hooks docs: "onFailure": "block" on a command hook (v2.1.295 or later)
