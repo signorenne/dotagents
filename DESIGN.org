@@ -248,7 +248,8 @@ the newest task notes itself. The progress check runs when the agent ends
 its turn: on a branch =<type>/<slug>= whose =.private/progress/<slug>.*=
 exists, it sends the agent back once when a commit of the branch (one no
 other local or remote-tracking branch holds) is newer than the log or not
-named in it, to record the step, its commit and its check. The repeated
+named in it, to record the step, its commit and its check (after a rebase,
+the new hashes). The repeated
 failure hook counts each failing shell command per session, by its command
 and its whole error with each word that holds a digit masked after the first
 line (timings, counts, addresses and temporary names change between runs);

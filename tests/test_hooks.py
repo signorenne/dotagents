@@ -1341,6 +1341,9 @@ class ProgressCheck(unittest.TestCase):
         self.assertIn("feat/task", lines[0])
         self.assertIn("commit hash", lines[1])
         self.assertIn("check", lines[1])
+        # After a rebase every hash changes: mapping old to new is the whole fix.
+        self.assertIn("if a rebase only changed their hashes", lines[1])
+        self.assertIn("each old hash with its new one is enough", lines[1])
         self.assertEqual(lines[2], "Then end the turn.")
 
     def test_blocks_when_a_commit_is_missing_from_the_log(self):
