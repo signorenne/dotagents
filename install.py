@@ -41,6 +41,10 @@ OUR_HOOK = re.compile(r"(?:{})(?![\w.-])".format("|".join(
     [re.escape(f"/.agents/hooks/{name}") for name in OUR_HOOK_SCRIPTS]
     + [re.escape(f"/.claude/hooks/{name}") for name in OLD_HOOK_SCRIPTS])))
 OLD_PACK_SKILLS = {"learn": "Tutoring mode.", "handoff": "Close a session:"}
+# Skills this repository renamed or dropped (review became branch-review): an old copy
+# would still load in every tool that reads ~/.agents/skills.
+RETIRED_SKILLS = ("review",)
+OUR_LICENSE = "Nicolò Plebani (nexenne)"
 CLAUDE_IMPORT = "@~/.agents/AGENTS.md"
 CLAUDE_MD = (
     f"{CLAUDE_IMPORT}\n\n"
@@ -405,6 +409,13 @@ class Installer:
                 if stale.is_file() and "__pycache__" not in stale.parts \
                         and not (skill / stale.relative_to(installed)).exists():
                     self.backup(stale)
+        for name in RETIRED_SKILLS:
+            installed = self.agents_home / "skills" / name
+            skill_md = installed / "SKILL.md"
+            if installed.is_dir() and not installed.is_symlink() and skill_md.is_file():
+                text = skill_md.read_text(encoding="utf-8", errors="replace")
+                if f"\nname: {name}\n" in text and OUR_LICENSE in text:
+                    self.backup(installed)
 
     def subagents(self):
         for path in sorted((SRC / "agents").glob("*.md")):
@@ -437,6 +448,10 @@ class Installer:
             if saved and current != OLD_CLAUDE_MD:
                 self.notes.append(f"Claude Code: replaced {claude_md}, which did not import "
                                   f"~/.agents/AGENTS.md; the old one {'would be' if self.dry else 'is'} in {saved}.")
+        for name in RETIRED_SKILLS:
+            retired = base / "skills" / name
+            if retired.is_symlink() and os.readlink(retired) == str(self.agents_home / "skills" / name):
+                self.backup(retired)
         for name, marker in OLD_PACK_SKILLS.items():
             old = base / "skills" / name / "SKILL.md"
             if old.is_file() and not old.is_symlink() and marker in old.read_text(encoding="utf-8"):
