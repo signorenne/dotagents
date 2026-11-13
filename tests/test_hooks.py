@@ -879,6 +879,25 @@ class SessionRefresh(unittest.TestCase):
                     self.assertIn(f"{(repo / '.private' / name).as_posix()} ({when})", result.stdout)
                 self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)
 
+    def test_lists_the_other_worktrees(self):
+        # Work in parallel or in isolation runs in sibling worktrees; after a compaction
+        # the agent must know they exist and which branch each holds.
+        repo, env = self.committed_repo()
+        alone = self.refresh(repo, env)
+        self.assertEqual((alone.returncode, alone.stderr), (0, ""))
+        self.assertNotIn("worktrees", alone.stdout.lower())
+        worktree = linked_worktree(self, repo, env)
+        gone = linked_worktree(self, repo, env, branch="feat/gone")
+        shutil.rmtree(gone)  # prunable: its folder no longer exists
+        for cwd, other, branch in ((repo, worktree, "feat/task"), (worktree, repo, "work")):
+            with self.subTest(cwd=cwd):
+                result = self.refresh(cwd, env)
+                self.assertEqual((result.returncode, result.stderr), (0, ""))
+                self.assertIn(f"Other worktrees of this repository:\n{other.resolve().as_posix()} ({branch})\n",
+                              result.stdout + "\n")
+                self.assertNotIn(f"{cwd.resolve().as_posix()} (", result.stdout)
+                self.assertNotIn("feat/gone", result.stdout)
+
     def test_no_task_notes_no_reminder(self):
         repo, env = self.committed_repo()
         for notes in ({}, {"specs/s.org": 1_790_000_000}):
@@ -923,6 +942,7 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Current branch: work", result.stdout)
         self.assertIn("Uncommitted changes not shown", result.stdout)
         self.assertIn("Last commits not shown", result.stdout)
+        self.assertIn("Other worktrees not shown", result.stdout)
         # The notes are files, not git output: a slow git does not hide them.
         self.assertIn(".private/progress/p.org", result.stdout)
         self.assertIn(self.REREAD, result.stdout)
