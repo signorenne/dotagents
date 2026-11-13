@@ -95,6 +95,14 @@ As of 12 November 2026:
 - [ ] The Codex rules file is untested in a real Codex session; Codex calls
   its rules experimental, and a prefix rule cannot match =git -C <dir> push=
   (the guard does).
+- [ ] Codex ignores =sandbox_mode= in a custom agent file (its subagents
+  docs), so the installer's read-only setting for =scout= has no effect there;
+  dropping the field, or reducing scout's capabilities another way, is open.
+- [ ] =gate-runner='s =omitClaudeMd= needs Claude Code v2.1.271 or later;
+  what older versions do with the field is unchecked.
+- [ ] =tools/validate.py= caps a skill body at 20,000 bytes as an estimate of
+  the 5,000 tokens Claude Code keeps of each skill after a compaction; the
+  byte-to-token ratio is unverified.
 - [ ] Codex's default sandbox blocks =git commit=, so =implement= asks for
   approval there or leaves the step uncommitted and logged.
 - [X] The installer writes Copilot CLI's files to =$COPILOT_HOME= when it is

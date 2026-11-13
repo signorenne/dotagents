@@ -61,7 +61,11 @@ depend on the model remembering it.
 - A subagent starts in a fresh context with its own file as instructions and
   its tool list: =scout= read-only, =gate-runner= running commands it does not
   fix, =reviewer= never editing. In Claude Code they run on Sonnet, Haiku and
-  Opus; Codex runs =scout= in a read-only sandbox.
+  Opus, and =gate-runner= starts without the user, project and local
+  =CLAUDE.md= files (=omitClaudeMd=), with only its own body and the brief;
+  the other tools' copies drop that field. Codex ignores the =sandbox_mode= of
+  a custom agent file, so there =scout= inherits the session's sandbox and
+  stays read-only only by its instructions.
 - Hooks run outside the model, on tool events, and reach it only through what
   they print.
 
@@ -335,10 +339,11 @@ In: =home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md=
 :PROPERTIES:
 :CUSTOM_ID: progress-log
 :END:
-implement writes =.private/progress/<slug>.<ext>= as it works: each step with
-its commit and check, each gate run with the commit it ran on, each decision
-with who took it, its reason and the alternative; an agent's decision stays
-pending until the user keeps or changes it. The user reviews every choice in
+implement writes =.private/progress/<slug>.<ext>= as it works: the baseline
+check on the base commit, each step with its commit and check, each gate run
+with the commit it ran on, each decision with who took it, its reason and the
+alternative, each attempt that failed, and each review finding's disposition;
+an agent's decision stays pending until the user keeps or changes it. The user reviews every choice in
 one place, and a later session resumes from facts.
 
 In: =home/.agents/skills/implement/SKILL.md= (section 5),
