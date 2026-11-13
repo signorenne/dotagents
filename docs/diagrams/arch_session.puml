@@ -1,13 +1,14 @@
 @startuml arch_session
 !include palette.iuml
+hide footbox
 title What does an agent session load, and when?
 
 actor User as user
 participant "Tool\n(harness)" as tool
+participant "Hooks" as hooks
 participant "Model" as model
 collections "Instructions" as rules
 collections "Skills" as skills
-participant "Hooks" as hooks
 participant "Subagent" as sub
 
 == Session start ==

@@ -1,13 +1,14 @@
 @startuml arch_hooks
 !include palette.iuml
+hide footbox
 title What do the hooks do around the agent's work?
 
 participant "Agent tool" as tool
-participant "compact_brief.py" as brief
-participant "session_refresh.py" as refresh
 participant "guard_bash.py" as guard
 participant "repeated_failure.py" as failure
 participant "after_edit.py" as edit
+participant "compact_brief.py" as brief
+participant "session_refresh.py" as refresh
 participant "progress_check.py" as progress
 participant "git" as git
 collections ".private/" as notes

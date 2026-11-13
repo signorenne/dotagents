@@ -1,5 +1,6 @@
 @startuml arch_claude_ai
 !include palette.iuml
+hide footbox
 title How do the rules and skills reach claude.ai?
 
 actor Maintainer as user
