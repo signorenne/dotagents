@@ -210,10 +210,17 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
 - /Agents commit/ : on their own branch, one logical change per commit, when
   the maintainer asked or a skill they ran says so.
 - /No agent pushes or publishes/ : in any tool ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). The
-  guard blocks every =git push=, =git subtree push=, =gh pr create=,
-  =gh pr merge=, =gh release create= and =gh repo sync=, and in Claude Code the
-  settings also deny =git push=. The guard does not inspect =gh api=; there the
-  rule rests on the agent.
+  guard blocks every form of =git push= and git's other ways to publish
+  (=git send-email=, =git svn dcommit= and the like), runs only the
+  read-only =gh= commands and blocks every other one, and follows the
+  command behind wrappers (=sudo=, =env=, =find -exec=, the remote command
+  of =ssh= and the like); [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]]
+  lists them. In Claude Code the settings also deny =git push=, and in Codex
+  a rules file forbids the same git commands and the =gh= commands that are
+  not read-only. The guard does not inspect a command passed as one string
+  (=bash -c=, =eval=), aliases, scripts, =gh api= or =ssh -o RemoteCommand=,
+  nor a program it does not know that runs its arguments; there the rule
+  rests on the agent.
 - /Agents land on the maintainer's go/ : an isolated branch lands locally as
   isolated-work says, then its worktree and branch are removed
   ([[file:../DESIGN.org::#isolated-worktrees][DESIGN.org, isolated-worktrees]]).

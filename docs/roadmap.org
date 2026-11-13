@@ -38,11 +38,14 @@ As of 12 November 2026:
   Pillow) and on macOS (Python 3.12).
 - [X] claude.ai: the global rules are pasted and the skill zips uploaded by
   hand, from =dist/claude-ai/=.
-- [X] No agent pushes or publishes: the guard blocks every =git push=,
-  =git subtree push=, =gh pr create=, =gh pr merge=, =gh release create= and
-  =gh repo sync= in every tool (=tests/test_hooks.py=), the Claude Code
-  settings deny =git push=, and the Codex rules forbid all six
-  (=tests/test_install.py=).
+- [X] No agent pushes or publishes: in every tool the guard blocks every
+  form of =git push= and git's other ways to publish, and runs only the
+  read-only =gh= commands, also behind the wrappers it follows
+  (=tests/test_hooks.py=; [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]] lists
+  them). The Claude Code settings deny =git push=, and the Codex rules
+  forbid the same git commands and every command of gh 2.100.0 that is not
+  read-only (=tests/test_install.py=). What the guard does not inspect is
+  under Open.
 
 * Open
 
@@ -51,9 +54,13 @@ As of 12 November 2026:
 - [ ] Cursor's shell tool may be named =Shell= rather than =Bash=, so the
   guard's =Bash= matcher may not fire there. Untested.
 - [ ] An empty hook reply may block in Cursor. Untested.
-- [ ] The guard does not inspect =gh api=, which can create pull requests,
-  releases and refs through GitHub's REST API; there the push rule rests on
-  the agent.
+- [ ] Commands the guard still lets through, where the push rule rests on
+  the agent: =gh api=, which can create pull requests, releases and refs
+  through GitHub's REST API; a command passed as one string (=bash -c=,
+  =env -S=, =flock -c=, =git submodule foreach=, the arguments after
+  =parallel='s =:::=) and =eval=; aliases and scripts; the remote command of
+  =ssh -o RemoteCommand=; and programs it does not know that run their
+  arguments or a remote command (=autossh=, =mosh=, =numactl=, =faketime=).
 - [ ] The field names inside Copilot's =toolArgs= for edits are undocumented;
   =after_edit.py= reads =path=, =file_text= and =new_str=, as its tests do.
 - [ ] The compaction brief (=compact_brief.py=, Claude Code's =PreCompact=) is
