@@ -215,7 +215,9 @@ rewrites or deletes published history (=--force= and its variants,
 =+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and =gh pr merge --admin=
 are named as such. The after-edit hook flags em and en dashes in the text just
 written and runs clang-format, when the project has a =.clang-format=, on the
-lines of a C or C++ file that the edit changed (a newly written file whole).
+lines of a C or C++ file that the edit changed (a newly written file whole),
+and checks the syntax of an edited Python, JSON or TOML file with the
+standard library (TOML from Python 3.11, which brought =tomllib=).
 The session refresh reminds the agent that its picture of the code is a
 summary (after a compaction, also to invoke its workflow skill again, since
 Claude Code keeps only the start of each skill through one), prints the real

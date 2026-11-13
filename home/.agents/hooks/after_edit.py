@@ -21,6 +21,15 @@ Usage in a hook config:
    located by its context, a new string located where it occurs once, or everywhere it
    occurs when the edit replaced every occurrence. An edit whose lines cannot be located
    is not formatted.
+3. Checks the syntax of each edited Python, JSON or TOML file, whole, with the standard
+   library: compile() for .py (warnings ignored), json for .json (a byte order mark
+   allowed; tsconfig*.json, jsconfig*.json, .eslintrc.json, devcontainer.json,
+   .devcontainer.json and files under .vscode/ or .devcontainer/ are skipped, since
+   those tools allow comments, and a file that parses once its comments outside strings,
+   and then its trailing commas, are blanked out is not reported either, since more
+   tools read JSON with comments than a list can hold), and tomllib for .toml where the Python is 3.11 or later (skipped before). Files over
+   2 MB, and missing ones, are skipped. An error is reported like a dash, with the
+   Python version for a .py file, since code for a newer Python may not compile.
 
 Payload shapes understood: Claude Code and Cursor (Write/Edit with file_path, content,
 new_string), Gemini CLI (write_file/replace with file_path, content, new_string), Codex
@@ -52,8 +61,14 @@ import shutil
 import subprocess
 import sys
 import time
+import warnings
 from pathlib import Path
 from typing import NamedTuple, Optional
+
+try:
+    import tomllib  # Python 3.11 or later
+except ImportError:
+    tomllib = None
 
 DASHES = {"\u2014": "em dash", "\u2013": "en dash"}
 CXX_SUFFIXES = {".h", ".hh", ".hpp", ".hxx", ".ipp", ".tpp", ".inl",
@@ -65,6 +80,18 @@ PATCH_MOVE = re.compile(r"^\*\*\* Move to: (.+)$")
 DEADLINE_SECONDS = 50
 CALL_TIMEOUT_SECONDS = 45
 MIN_CALL_SECONDS = 1
+SYNTAX_SUFFIXES = {".py", ".json", ".toml"}
+MAX_SYNTAX_BYTES = 2_000_000
+# JSON files that their tools read with comments allowed (TypeScript, ESLint, VS Code,
+# dev containers).
+JSONC_NAME = re.compile(r"^((tsconfig|jsconfig)(\..+)?\.json|\.eslintrc\.json|\.?devcontainer\.json)$")
+JSONC_FOLDERS = {".vscode", ".devcontainer"}
+# A JSON string (to the end of its line when it never closes), a // or /* comment
+# outside one (a /* that never closes runs to the end), or a comma before a closing
+# bracket. Every part matches without failing, so nothing backtracks.
+JSON_STRING = r'"(?:[^"\\\n]|\\.)*"?'
+JSON_STRING_OR_COMMENT = re.compile(JSON_STRING + r'|//[^\n]*|/\*(?:[^*]|\*(?!/))*(?:\*/)?')
+JSON_STRING_OR_TRAILING_COMMA = re.compile(JSON_STRING + r'|,(?=\s*[\]}])')
 
 
 def as_dict(value) -> dict:
@@ -303,6 +330,65 @@ def dash_report(paths: list[Path], text: str) -> str:
     )
 
 
+def blank(match) -> str:
+    """A comment or a trailing comma as spaces, newlines kept, so positions stay."""
+    text = match.group(0)
+    return text if text.startswith('"') else re.sub(r"[^\n]", " ", text)
+
+
+def without_comments(text: str) -> str:
+    """JSON text with its comments outside strings blanked out and, when it had any, its
+    trailing commas too (JSON with comments allows them); the same text when it had none."""
+    stripped = JSON_STRING_OR_COMMENT.sub(blank, text)
+    return text if stripped == text else JSON_STRING_OR_TRAILING_COMMA.sub(blank, stripped)
+
+
+def syntax_error(path: Path) -> str:
+    """A one-line report of a syntax error in a Python, JSON or TOML file, or ""."""
+    suffix = path.suffix.lower()
+    if suffix not in SYNTAX_SUFFIXES or (suffix == ".toml" and tomllib is None):
+        return ""
+    if suffix == ".json" and (JSONC_NAME.match(path.name) or JSONC_FOLDERS & set(path.parts)):
+        return ""
+    if not path.is_file() or path.stat().st_size > MAX_SYNTAX_BYTES:
+        return ""
+    data = path.read_bytes()
+    if suffix == ".py":
+        try:
+            with warnings.catch_warnings():
+                warnings.simplefilter("ignore")
+                compile(data, str(path), "exec", dont_inherit=True)
+        except SyntaxError as error:
+            where = f":{error.lineno}" if error.lineno else ""
+            version = f"{sys.version_info[0]}.{sys.version_info[1]}"
+            return f"Python syntax error in {path}{where}: {error.msg} (checked with Python {version})."
+        except (ValueError, RecursionError, MemoryError):  # null bytes, or too deep to check
+            pass
+        return ""
+    kind = suffix[1:].upper()
+    try:
+        text = data.decode("utf-8-sig" if suffix == ".json" else "utf-8")
+    except UnicodeDecodeError as error:
+        return f"{kind} file {path} is not valid UTF-8: {error}."
+    try:
+        if suffix == ".json":
+            try:
+                json.loads(text)
+            except json.JSONDecodeError:
+                # JSON with comments, read by a tool that allows them, passes once they
+                # are blanked out; any other error remains, at the same place.
+                json.loads(without_comments(text))
+        else:
+            tomllib.loads(text)
+    except json.JSONDecodeError as error:
+        return f"JSON syntax error in {path}:{error.lineno}:{error.colno}: {error.msg}."
+    except RecursionError:
+        pass
+    except ValueError as error:  # tomllib.TOMLDecodeError
+        return f"TOML syntax error in {path}: {error}."
+    return ""
+
+
 def has_clang_format_config(file_path: Path) -> bool:
     for directory in [file_path.parent, *file_path.parent.parents]:
         if (directory / ".clang-format").is_file() or (directory / "_clang-format").is_file():
@@ -389,6 +475,12 @@ def main() -> int:
     if report:
         problems.append(report)
     for path in paths:
+        try:
+            error = syntax_error(path)
+        except OSError:
+            error = ""
+        if error:
+            problems.append(error)
         try:
             notice, error = run_clang_format(path, deadline, targets.get(path, []))
         except OSError:
