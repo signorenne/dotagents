@@ -229,10 +229,13 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
 The full gates run again on the final commit after any fix, and the reviewer
 again on a fix that changed behavior or added or changed a test. A step marked
 in progress without its commit is not discarded silently: the agent shows its
-diff and the maintainer says whether to finish or discard it. A parallel agent
-stopped by a usage limit resumes from its commits once the coordinator tells
-it what is done and what comes next. A guard block on a gate bypass means: fix
-the failing check, or ask the maintainer to run the command themselves.
+diff and the maintainer says whether to finish or discard it. A step logged
+"not committed" because the sandbox blocked the commit is committed, with the
+maintainer's approval, before the full gates; while one stays uncommitted, the
+work is not landable. A parallel agent stopped by a usage limit resumes from
+its commits once the coordinator tells it what is done and what comes next. A
+guard block on a gate bypass means: fix the failing check, or ask the
+maintainer to run the command themselves.
 
 A refuted claim that does not change the plan is corrected and recorded in the
 progress log and the handoff. For each one a rule should have prevented,
