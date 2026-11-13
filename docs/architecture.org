@@ -45,7 +45,8 @@ What the repository holds, and what each part produces.
   (skill and subagent frontmatter, name and description limits, a
   =LICENSE.txt= per skill, no inline backticks in skill prose, no em or en
   dash in any tracked or trackable file, no unfilled template marker, the
-  global rules under 200 lines, every Python file compiling).
+  global rules under 200 lines, every Python file compiling, every Org link
+  reaching an existing file and its =CUSTOM_ID= or heading).
 - =tests/= holds four unittest suites: the hooks fed each tool's payload
   shape, the installer run against a temporary =HOME=, validate, build and
   the commit-msg hook run on a copy of the repository or on sample messages,

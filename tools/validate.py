@@ -21,7 +21,12 @@ Checks:
   outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
 - the global instructions stay under 200 lines;
-- every Python file compiles.
+- every Python file compiles;
+- every Org link in an Org file resolves: [[file:path]] names an existing file
+  (relative to the linking file; ~ and absolute paths are not checked), ::#id and #id
+  a CUSTOM_ID of the target file, ::*Heading and *Heading one of its headings (title
+  without tags, any run of spaces as one); links in src and example blocks or in
+  =verbatim= and ~code~ spans, web links and other searches are not checked.
 """
 
 import json
@@ -48,6 +53,13 @@ SKILL_BODY_LIMIT = 20000
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
 DASHES = ("\u2014", "\u2013")
+ORG_LINK = re.compile(r"\[\[([^\[\]\n]+)\](?:\[[^\]]*\])?\]")
+ORG_BLOCK = re.compile(r"^[ \t]*#\+begin_(src|example)\b.*?^[ \t]*#\+end_\1\b", re.I | re.M | re.S)
+CUSTOM_ID = re.compile(r"^[ \t]*:CUSTOM_ID:[ \t]+(\S+)[ \t]*$", re.M)
+ORG_HEADING = re.compile(r"^\*+[ \t]+(.*?)[ \t]*$", re.M)
+ORG_TAGS = re.compile(r"[ \t]+:([\w@#%]+:)+$")
+# Verbatim and code spans (=...=, ~...~) on one line: their text is not a link.
+ORG_VERBATIM = re.compile(r"(?<![^\s(\[{'\"-])([=~])(?=\S)[^\n]*?(?<=\S)\1(?=[\s.,:;!?)\]}'\"-]|$)", re.M)
 
 
 def frontmatter(path: Path) -> tuple[dict, str]:
@@ -193,6 +205,59 @@ def text_files():
             yield path, data.decode("utf-8", errors="replace")
 
 
+def org_title(text: str) -> str:
+    return " ".join(ORG_TAGS.sub("", text).split())
+
+
+def org_anchors(path: Path, cache: dict) -> tuple:
+    """(CUSTOM_IDs, heading titles) of an Org file, read once."""
+    if path not in cache:
+        text = path.read_text(encoding="utf-8", errors="replace")
+        cache[path] = (set(CUSTOM_ID.findall(text)), {org_title(h) for h in ORG_HEADING.findall(text)})
+    return cache[path]
+
+
+def org_link_problem(source: Path, target: str, cache: dict) -> str:
+    """Why an Org link from source does not resolve, or ""."""
+    destination, search = source, target
+    if target.startswith("file:"):
+        name, _, search = target[len("file:"):].partition("::")
+        if name.startswith(("~", "/")):
+            return ""
+        destination = (source.parent / name).resolve() if name else source
+        if not destination.exists():
+            return f"{relative(destination)} does not exist"
+    elif not target.startswith(("#", "*")):
+        return ""  # a web link or another link type
+    if not search.startswith(("#", "*")) or not destination.is_file():
+        return ""
+    ids, headings = org_anchors(destination, cache)
+    if search.startswith("#") and search[1:] not in ids:
+        return f"no CUSTOM_ID {search[1:]} in {relative(destination)}"
+    if search.startswith("*") and org_title(search[1:]) not in headings:
+        return f"no heading {org_title(search[1:])!r} in {relative(destination)}"
+    return ""
+
+
+def relative(path: Path) -> str:
+    try:
+        return path.resolve().relative_to(ROOT.resolve()).as_posix()
+    except ValueError:
+        return str(path)
+
+
+def check_org_links(path: Path, text: str, cache: dict, errors: list) -> None:
+    # Blank out src and example blocks, and verbatim spans, keeping the line numbers.
+    scanned = ORG_BLOCK.sub(lambda block: "\n" * block.group(0).count("\n"), text)
+    scanned = ORG_VERBATIM.sub("", scanned)
+    for link in ORG_LINK.finditer(scanned):
+        target = link.group(1).strip()
+        problem = org_link_problem(path, target, cache)
+        if problem:
+            line = scanned.count("\n", 0, link.start()) + 1
+            errors.append(f"{relative(path)}:{line}: broken link [[{target}]]: {problem}")
+
+
 def main() -> int:
     errors: list[str] = []
 
@@ -208,8 +273,11 @@ def main() -> int:
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)
 
+    org_cache: dict = {}
     for path, text in text_files():
         rel = path.relative_to(ROOT)
+        if path.suffix == ".org":
+            check_org_links(path, text, org_cache, errors)
         for number, line in enumerate(text.splitlines(), start=1):
             if any(dash in line for dash in DASHES):
                 errors.append(f"{rel}:{number}: em or en dash")
