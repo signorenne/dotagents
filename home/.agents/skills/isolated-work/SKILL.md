@@ -33,7 +33,7 @@ When the work is done (gates and review passed on its last commit), report the b
 
 Write every hash into the commands literally: shell variables do not survive between commands. Write the pinned and the rebased hashes into the progress log as soon as you have them, so an interrupted landing resumes from the commits it had reached.
 
-1. Pin: git -C <path> rev-parse HEAD, and log the hash.
+1. Pin: git -C <path> status --porcelain must print nothing, because a modified or untracked file the gates used would not land with the commit; otherwise report what it lists and stop. Then git -C <path> rev-parse HEAD, and log the hash.
 2. Rebase onto the target's current tip in the worktree (git -C <path> rebase <target>), resolve conflicts there, and pin the rebased commit, logging it next to the first. When it equals the hash pinned in step 1 (the target had not moved) and the progress log of the agent or session that ran the gates (with parallel-agents, its .private/progress/<slug>-<agent>.<ext>) records the full gates passing on a clean tree at that hash, skip the gate run, because that exact commit already passed, and log the skip with that reason. Otherwise run the full gates on that exact commit through gate-runner, given the worktree path and the pinned hash: a rebased commit has never been tested.
 3. Fast-forward the target to the pinned hash: where the target is checked out and clean, git -C <that checkout> merge --ff-only <hash>; where it is checked out nowhere, git update-ref refs/heads/<target> <hash> <old target hash> after git merge-base --is-ancestor <target> <hash> succeeds. Use a merge commit (git merge --no-ff) only when the project's documented convention asks for one.
 4. Confirm git rev-parse <target> prints the pinned hash.
