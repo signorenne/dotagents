@@ -492,7 +492,9 @@ Guard (=guard_bash.py=):
 
 It guards the usual forms; it is not a security boundary: a command passed as
 one string (=bash -c=, =eval=, the arguments after =parallel='s =:::=),
-aliases, scripts and =gh api= are not inspected.
+aliases, scripts, =gh api=, the remote command of =ssh -o RemoteCommand= and
+programs it does not know that run their arguments (=autossh=, =mosh=,
+=numactl=, =faketime=) are not inspected.
 
 After-edit hook (=after_edit.py=):
 
