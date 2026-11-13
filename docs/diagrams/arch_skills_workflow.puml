@@ -2,14 +2,12 @@
 !include palette.iuml
 title Which skills and subagents serve each stage of a change?
 
-package "Set up (once)" {
-  component "project-setup\nscout, gate-runner" as setup
-}
+component "Set up (once): project-setup\nscout, gate-runner" as setup
 package "Decide and specify" {
   component "decide" as decide
   component "spec\nscout, reviewer" as spec
 }
-package "Implement, gates and review (fresh session)" {
+package "Implement, gates and review" {
   component "implement\nscout, gate-runner, reviewer" as implement
   component "trustworthy-tests" as tests
   component "systematic-debugging" as debug
@@ -18,15 +16,11 @@ package "On request" {
   component "gates\ngate-runner" as gates
   component "branch-review\nreviewer" as review
 }
-package "Close" {
-  component "session-close" as close
-}
-package "Land and clean up" {
-  component "isolated-work\ngate-runner" as isolated
-}
+component "Close: session-close" as close
+component "Land and clean up: isolated-work\ngate-runner" as isolated
 
 setup --> decide : open points
-spec -up-> decide : design choices
+spec -right-> decide : design choices
 spec ..> implement : spec file
 implement -up-> decide : user's choices
 implement --> tests : test first
