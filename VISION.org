@@ -45,7 +45,9 @@ once before it reaches any tool.
 - /Hook/ : a script the tool runs around the agent's work, outside the
   model: the guard before a shell command, the after-edit check after a file
   edit, and, in Claude Code and Codex, the session refresh after a
-  compaction or a resume and the progress check when the agent ends its turn.
+  compaction or a resume and the progress check when the agent ends its turn;
+  in Claude Code also the compaction brief before a compaction and the
+  repeated failure reminder after a failed command.
 - /Installer/ : =install.py=, which copies the source to =~/.agents=, links or
   generates each tool's files from it, and backs up whatever it replaces.
 - /claude.ai set/ : the skills under =claude-ai/skills/= that also run in chat,
