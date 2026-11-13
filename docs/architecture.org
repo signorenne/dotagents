@@ -461,20 +461,23 @@ Guard (=guard_bash.py=):
    pre-commit); disabling =core.hooksPath=.
 3. Block, in every tool, every push and publish: =git push=,
    =git subtree push=, =git send-pack=, =git http-push=, =git lfs push=,
-   =git svn dcommit=, =git p4 submit=, =git send-email=, =gh pr create=
-   (or =gh pr new=), =gh pr merge=, =gh pr ready=, =comment=, =review= and
-   =edit=, =gh release create= (or =gh release new=), =upload= and =edit=,
-   =gh repo create --push=, =gh repo sync=, =gh gist create= and
-   =gh issue create= (or =new=), and =gh workflow run=
+   =git svn dcommit=, =git p4 submit=, =git send-email=, and every =gh=
+   command but the read-only ones (=view=, =list= or =ls=, =diff=, =status=
+   and =checks= in any group, =repo= and =gist clone=, =search=, =status=,
+   =auth status=, =browse -n=, help and =--version=; =gh api= is not
+   inspected), so a write command =gh= adds later is blocked too
    ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). A push that forces, deletes, mirrors or
    prunes, and =gh pr merge --admin=, are named as such. In Claude Code the
    adapter also denies =git push=, so the permission prompt never offers it;
-   in Codex, =~/.codex/rules/dotagents.rules= forbids the same commands, also
-   before the user trusts the hooks.
+   in Codex, =~/.codex/rules/dotagents.rules= forbids the same git commands
+   and every =gh= command of gh 2.100.0 but the read-only ones, also before
+   the user trusts the hooks (a prefix rule cannot forbid all but a list, so
+   a command =gh= adds later is the guard's alone).
 4. Blocking is exit 2 with the reasons on stderr, and advice: a push or a
    publish means the work is ready for the maintainer's review, and the text
-   of a post (a comment, review, issue, gist or patch) goes in the reply for
-   the user to post; a gate bypass means fix the failing check or ask the
+   of a post (a comment, review, issue, discussion, gist or patch) goes in
+   the reply for the user to post, and another =gh= command is the user's to
+   run; a gate bypass means fix the failing check or ask the
    maintainer to run the command.
    Copilot CLI also gets a deny decision as JSON on stdout, the only text its
    model sees. Antigravity CLI, whose docs define a JSON decision and no exit

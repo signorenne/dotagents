@@ -107,7 +107,11 @@ GEMINI_HOOKS = {
 # Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts
 # with its pattern, without prompting. They hold even while Codex skips the hooks, which
 # it does until the user trusts them. A pattern part that is a list matches any of its words.
-# A prefix cannot see a flag, so gh repo create --push is left to the guard.
+# A prefix cannot see a flag, so gh repo create --push is left to the guard. gh: the guard
+# runs only read-only commands and a prefix cannot say "all but these", so the rules forbid
+# every other command of gh 2.100.0's tree (gh help, aliases included); a command gh adds
+# later is the guard's alone. gh browse (read-only with -n) and gh api (not inspected)
+# have no rule.
 CODEX_RULES = (
     (["git", "push"], "git push publishes commits to a remote."),
     (["git", "subtree", "push"], "git subtree push publishes commits to a remote."),
@@ -116,16 +120,45 @@ CODEX_RULES = (
     (["git", "svn", "dcommit"], "git svn dcommit publishes commits to a Subversion repository."),
     (["git", "p4", "submit"], "git p4 submit publishes commits to a Perforce depot."),
     (["git", "send-email"], "git send-email sends patches by email."),
-    (["gh", "pr", ["create", "new"]], "gh pr create publishes a branch as a pull request."),
-    (["gh", "pr", "merge"], "gh pr merge merges into a published branch."),
-    (["gh", "pr", ["ready", "comment", "review", "edit"]],
-     "gh pr ready, comment, review and edit change a published pull request."),
-    (["gh", "release", ["create", "new"]], "gh release create publishes a release."),
-    (["gh", "release", ["upload", "edit"]], "gh release upload and edit change a published release."),
-    (["gh", "repo", "sync"], "gh repo sync pushes to a repository."),
-    (["gh", "gist", ["create", "new"]], "gh gist create publishes a gist."),
-    (["gh", "issue", ["create", "new"]], "gh issue create publishes an issue."),
-    (["gh", "workflow", "run"], "gh workflow run starts a workflow on GitHub."),
+    *((["gh", groups if len(groups) > 1 else groups[0], *nested, subcommands],
+       "Only read-only gh commands run (view, list, diff, status, checks, clone, search); this one is not.")
+      for groups, nested, subcommands in (
+          (["auth"], [], ["login", "logout", "refresh", "setup-git", "switch", "token"]),
+          (["codespace", "cs"], [], ["code", "cp", "create", "delete", "edit", "jupyter", "logs", "ports",
+                                     "rebuild", "ssh", "stop"]),
+          (["discussion"], [], ["comment", "create", "edit"]),
+          (["gist"], [], ["create", "delete", "edit", "new", "rename"]),
+          (["issue"], [], ["close", "comment", "create", "delete", "develop", "edit", "lock", "new", "pin",
+                           "reopen", "transfer", "unlock", "unpin"]),
+          (["pr"], [], ["checkout", "close", "co", "comment", "create", "edit", "lock", "merge", "new", "ready",
+                        "reopen", "revert", "review", "unlock", "update-branch"]),
+          (["project"], [], ["close", "copy", "create", "delete", "edit", "field-create", "field-delete",
+                             "field-list", "item-add", "item-archive", "item-create", "item-delete", "item-edit",
+                             "item-list", "link", "mark-template", "unlink"]),
+          (["release"], [], ["create", "delete", "delete-asset", "download", "edit", "new", "upload", "verify",
+                             "verify-asset"]),
+          (["repo"], [], ["archive", "create", "delete", "edit", "fork", "new", "read-dir", "read-file", "rename",
+                          "set-default", "sync", "unarchive"]),
+          (["repo"], ["autolink"], ["create", "delete"]),
+          (["repo"], ["deploy-key"], ["add", "delete"]),
+          (["skill", "skills"], [], ["add", "install", "preview", "publish", "search", "show", "update"]),
+          (["cache"], [], ["delete"]),
+          (["run"], [], ["cancel", "delete", "download", "rerun", "watch"]),
+          (["workflow"], [], ["disable", "enable", "run"]),
+          (["agent-task", "agent-tasks", "agent", "agents"], [], ["create"]),
+          (["alias"], [], ["delete", "import", "set"]),
+          (["attestation", "at"], [], ["download", "trusted-root", "verify"]),
+          (["config"], [], ["clear-cache", "get", "set"]),
+          (["extension", "extensions", "ext"], [], ["browse", "create", "exec", "install", "remove", "search",
+                                                     "uninstall", "upgrade"]),
+          (["gpg-key"], [], ["add", "delete"]),
+          (["label"], [], ["clone", "create", "delete", "edit"]),
+          (["ruleset", "rs"], [], ["check"]),
+          (["secret"], [], ["delete", "remove", "set"]),
+          (["ssh-key"], [], ["add", "delete"]),
+          (["variable"], [], ["delete", "get", "remove", "set"]))),
+    (["gh", ["completion", "copilot", "licenses", "preview"]],
+     "Only read-only gh commands run (view, list, diff, status, checks, clone, search); this one is not."),
 )
 CODEX_RULES_ADVICE = ("Pushing and publishing are the maintainer's, who reviews every change before it "
                       "leaves this machine: stop and tell the user the work is ready for review.")

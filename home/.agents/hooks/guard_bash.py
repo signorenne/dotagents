@@ -19,13 +19,12 @@ command of an ssh, and for a git command run as its own program, such as git-pus
     core.hooksPath set to an empty path or /dev/null, git -c or --config-env
     core.hooksPath=..., GIT_CONFIG_KEY_<n> or GIT_CONFIG_PARAMETERS naming core.hooksPath;
   - every git push, git subtree push, git send-pack, git http-push, git lfs push, git svn
-    dcommit, git p4 submit, git send-email, gh pr create (or gh pr new), gh pr merge,
-    ready, comment, review and edit, gh release create (or gh release new), upload and
-    edit, gh repo create --push, gh repo sync, gh gist create (or gh gist new), gh issue
-    create (or gh issue new) and gh workflow run, in every agent: the maintainer reviews
-    everything before it leaves the machine, so pushing and publishing are the
-    maintainer's; the text of a post (a comment, review, issue, gist or patch) goes to
-    the user instead. A push that also rewrites or deletes
+    dcommit, git p4 submit and git send-email, and every gh command but the read-only
+    ones (view, list, diff, status and checks in any group, repo and gist clone, search,
+    status, auth status, browse -n, help; gh api is not inspected), so a write command gh
+    adds later is blocked too, in every agent: the maintainer reviews everything before
+    it leaves the machine, so pushing and publishing are the maintainer's; the text of a
+    post (a comment, review, issue, discussion, gist or patch) goes to the user instead. A push that also rewrites or deletes
     published history (--force, -f, --force-with-lease, --force-if-includes, +refspec,
     --delete, -d, :ref, --mirror, --prune) and gh pr merge --admin (merges without the
     required checks) are named as such.
@@ -210,12 +209,28 @@ GH_PUBLISHERS = {
     ("repo", "sync"): REPO_SYNC_REASON,
     ("gist", "create"): GIST_REASON, ("gist", "new"): GIST_REASON,
     ("issue", "create"): ISSUE_REASON, ("issue", "new"): ISSUE_REASON,
+    ("issue", "comment"): "gh issue comment posts on an issue",
+    ("discussion", "create"): "gh discussion create publishes a discussion",
+    ("discussion", "comment"): "gh discussion comment posts on a discussion",
     ("workflow", "run"): "gh workflow run starts a workflow on GitHub",
 }
 # The publish forms that post text, whose text the user can post instead.
-POST_REASONS = {GIST_REASON, ISSUE_REASON, GH_PUBLISHERS[("pr", "comment")], GH_PUBLISHERS[("pr", "review")],
-                GH_PUBLISHERS[("pr", "edit")], GH_PUBLISHERS[("release", "edit")],
-                GIT_PUBLISHERS["send-email"][1]}
+POST_REASONS = {GIST_REASON, ISSUE_REASON, GIT_PUBLISHERS["send-email"][1],
+                *(GH_PUBLISHERS[key] for key in (("pr", "comment"), ("pr", "review"), ("pr", "edit"),
+                                                 ("release", "edit"), ("issue", "comment"),
+                                                 ("discussion", "create"), ("discussion", "comment")))}
+# GitHub: only read-only gh commands run (gh 2.100.0's command tree), and every other gh
+# command is blocked, so a write command gh adds later is blocked too; gh api is not
+# inspected. Read-only: the subcommands below in any group (ls is gh's alias of list),
+# the top-level commands below, repo and gist clone (gh label clone copies labels into a
+# repository), the read subcommands of repo's nested groups, browse with -n or
+# --no-browser (it prints the address), and help.
+GH_READ_SUBCOMMANDS = {"checks", "diff", "list", "ls", "status", "view"}
+GH_READ_COMMANDS = {"api", "help", "search", "status", "version"}
+GH_CLONES = {("repo", "clone"), ("gist", "clone")}
+GH_READ_GROUPS = {("repo", "autolink"), ("repo", "deploy-key"), ("repo", "gitignore"), ("repo", "license")}
+GH_NOT_READ_ONLY = "is not one of the read-only gh commands (view, list, diff, status, checks, clone, search)"
+GH_ADVICE = "Run only read-only gh commands, and ask the user to run any other."
 # git's own programs that the guard inspects, run by their own name (git-push from git
 # --exec-path, git-lfs); other git-* programs (git-cliff, git-crypt) are not git.
 GIT_PROGRAMS = HOOK_SUBCOMMANDS | {"config", "subtree"} | set(GIT_PUBLISHERS)
@@ -715,6 +730,20 @@ def git_reasons(words: list) -> list:
     return [reason for reason in reasons if reason]
 
 
+def gh_read_only(words: list, operands: list) -> bool:
+    """True for a gh command that only reads (see GH_READ_SUBCOMMANDS). -h is help only as
+    the last word, since gh auth reads it as --hostname."""
+    if not operands or "--help" in words or words[-1] == "-h":
+        return True  # gh alone, gh --version and help
+    if operands[0] in GH_READ_COMMANDS:
+        return True
+    if operands[0] == "browse":
+        return any(word in ("-n", "--no-browser") for word in words)
+    if len(operands) > 1 and (operands[1] in GH_READ_SUBCOMMANDS or tuple(operands[:2]) in GH_CLONES):
+        return True
+    return tuple(operands[:2]) in GH_READ_GROUPS and len(operands) > 2 and operands[2] in GH_READ_SUBCOMMANDS
+
+
 def gh_reasons(words: list) -> list:
     operands, index = [], 1
     while index < len(words):
@@ -724,6 +753,8 @@ def gh_reasons(words: list) -> list:
             index += 1  # gh takes the repository flag before or after the subcommand
         elif not word.startswith("-"):
             operands.append(word)
+    if gh_read_only(words, operands):
+        return []
     if tuple(operands[:2]) in GH_PUBLISHERS:
         return [GH_PUBLISHERS[tuple(operands[:2])]]
     if operands[:2] in (["repo", "create"], ["repo", "new"]) and any(
@@ -731,7 +762,7 @@ def gh_reasons(words: list) -> list:
             for word in words[1:]):
         return [REPO_CREATE_PUSH_REASON]
     if operands[:2] != ["pr", "merge"]:
-        return []
+        return [f"gh {' '.join(operands[:2])} {GH_NOT_READ_ONLY}"]
     reasons = [PR_MERGE_REASON]
     for word in words[1:]:
         name, _, value = word.partition("=")
@@ -781,7 +812,7 @@ def command_reasons(commands: list) -> dict:
             found.extend(git_reasons(rest))
         elif program == "gh":
             found.extend(gh_reasons(rest))
-        publishes = any(reason in PUBLISH_REASONS for reason in found)
+        publishes = any(reason in PUBLISH_REASONS or reason.endswith(GH_NOT_READ_ONLY) for reason in found)
         for reason in found:
             if reason:
                 reasons[reason] = reasons.get(reason, True) and publishes
@@ -839,6 +870,8 @@ def main() -> int:
         advice.append(PUBLISH_ADVICE)
     if POST_REASONS & set(reasons):
         advice.append(POST_ADVICE)
+    if any(reason.endswith(GH_NOT_READ_ONLY) for reason in reasons):
+        advice.append(GH_ADVICE)
     if not all(reasons.values()):
         advice.append(GATE_ADVICE)
     message = "Blocked: " + "; ".join(reasons) + ". " + " ".join(advice)

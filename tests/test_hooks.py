@@ -277,10 +277,37 @@ class GuardBash(unittest.TestCase):
 
     # Posts on GitHub and patch mail publish text; the rest change what GitHub shows or runs.
     POSTS = ["gh gist create notes.md", "gh gist new -p notes.md", "gh pr comment 12 --body x",
+             "gh issue comment 3 --body x", "gh discussion create --title x --body y",
              "gh pr review --approve", "gh pr edit 12 --title x", "gh release edit v1 --notes x",
              "gh issue create --title x --body y", "gh issue new", "git send-email --to a@example.com 0001.patch"]
     OTHER_PUBLISHES = ["gh release upload v1 dist/a.zip", "gh pr ready 12", "gh pr ready --undo",
                        "gh workflow run ci.yml"]
+
+    # gh 2.100.0's help (13 Nov 2026): only read-only commands run, any other gh command is
+    # blocked, so a write command gh adds later is blocked too. list has the alias ls; -h is
+    # --hostname under gh auth; gh label clone copies labels into a repository.
+    GH_READS = ["gh pr view 12", "gh pr diff 12", "gh pr checks 12 --watch", "gh pr status", "gh pr ls",
+                "gh issue list --state open", "gh issue view 3 --comments", "gh issue status",
+                "gh run view 7 --log", "gh run list", "gh repo view", "gh repo clone owner/repo",
+                "gh gist clone abc", "gh repo license view mit", "gh repo gitignore list", "gh -R o/r pr list",
+                "gh auth status", "gh search issues bug --repo o/r", "gh status", "gh browse -n",
+                "gh browse 12 --no-browser", "gh pr create --help", "gh issue close 3 -h", "gh help pr",
+                "gh --version", "gh version", "gh", "gh api repos/o/r", "gh release list", "gh label list",
+                "gh skills ls", "gh cs list"]
+    GH_OTHERS = ["gh pr checkout 12", "gh pr co 12", "gh release download v1", "gh repo create x --private",
+                 "gh repo create x --push=false", "gh repo fork", "gh repo delete o/r --yes", "gh label clone o/r",
+                 "gh issue close 1", "gh secret set X", "gh browse", "gh browse 12", "gh extension install o/gh-x",
+                 "gh some-new-command", "gh auth login -h github.com", "gh run rerun 7",
+                 "gh repo autolink create x", "gh codespace ports", "gh cs create"]
+
+    def test_only_read_only_gh_commands_run(self):
+        self.assert_allowed(self.GH_READS)
+        for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
+            self.assert_blocked(self.GH_OTHERS, tool)
+        stderr = run("guard_bash.py", bash("gh pr checkout 12")).stderr
+        self.assertIn("gh pr checkout is not one of the read-only gh commands", stderr)
+        self.assertIn("Pushing and publishing are the maintainer's", stderr)
+        self.assertIn("ask the user to run any other", stderr)
 
     def test_posts_and_other_publish_forms_are_blocked(self):
         for tool in ("claude", "codex", "gemini", "copilot", "cursor"):
@@ -299,7 +326,7 @@ class GuardBash(unittest.TestCase):
             "git fetch origin", "git pull origin main", "git remote -v", "git log --grep push",
             "echo git push", "grep -rn 'git push' docs", "git subtree split -P lib -b split",
             "git subtree add --prefix push origin main", "git subtree pull --prefix=lib origin main",
-            "gh pr view 12", "gh pr list", "gh pr checkout 12", "gh pr diff 12",
+            "gh pr view 12", "gh pr list", "gh pr diff 12",
             "gh release list", "gh release view v1.0", "gh repo view", "gh repo clone owner/repo",
         ])
 
@@ -559,6 +586,8 @@ class GuardBypassBattery(unittest.TestCase):
         "gh pr --repo=o/r create", "GH_REPO=o/r gh pr create", "gh pr merge 1 --squash", "gh pr merge --admin 1",
         "gh release create v1", "gh release new v1", "gh repo sync", "gh repo create x --source=. --push",
         "gh repo new x --push",
+        "gh pr checkout 12", "gh repo create x --private", "gh repo create x --push=false", "gh release download v1",
+        "gh label clone o/r", "gh -R o/r issue close 1", "gh codespace create", "gh new-subcommand-of-tomorrow",
         "gh gist create a.md", "gh -R o/r issue create -t x -b y", "gh pr --repo o/r comment 1 -b x",
         "gh release upload v1 a.zip --clobber", "gh workflow run ci.yml -f x=1", "gh pr ready",
         "git send-email a.patch", "git -C repo send-email --annotate a.patch", "git-send-email a.patch",
@@ -578,14 +607,15 @@ class GuardBypassBattery(unittest.TestCase):
         "git status", "git log --grep push", 'echo "git push"', "printf '%s\\n' 'git push'", "git stash push -m wip",
         "git -C push status", "git remote set-url --push origin x", "git config push.default current",
         "git help push", "man git-push", "git log -- push.c", "grep -rn 'gh pr create' docs", "gh pr view 1",
-        "gh release view v1", "gh repo create x --private", "gh repo create x --push=false", "git lfs ls-files",
+        "gh release view v1", "git lfs ls-files",
         "git svn fetch", "git p4 sync", "find . -name '*.py' -exec grep -n push {} +", "watch -n 5 git status",
         "strace -f git status", "git commit -m 'feat(x): explain git push --force'", "cat <<'X'\ngit push\nX",
         # third-party git-* programs are not git: SKIP= here is the tool's own variable
         "SKIP=changelog git-cliff -o CHANGELOG.md", "git-crypt unlock",
         "find . -type d -exec find {} -maxdepth 1 -name '*.py' \\;",
         "gh pr view 12 --comments", "gh pr checks 12", "gh issue list", "gh issue view 3", "gh gist list",
-        "gh gist view abc", "gh workflow list", "gh workflow view ci.yml", "gh release download v1",
+        "gh gist view abc", "gh workflow list", "gh workflow view ci.yml",
+        "gh pr diff 3", "gh run view 7 --log", "gh repo view o/r", "gh repo clone o/r",
         "git format-patch -1", "git log --grep send-email",
         "ssh host git status", "ssh -T git@github.com", "ssh host 'git log --grep push'",
         "ssh -N -L 8080:localhost:80 host", "ssh host echo git push", "ssh -p 2222 host", "parallel gzip ::: a b",
