@@ -42,8 +42,9 @@ depend on the model remembering it.
   guard and the after-edit hook learn which tool called them from =--tool=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
   build commands allowed, =git push= denied (also as =git -C <dir> push=),
-  =git reset --hard=, =git clean=, =git rebase= and =rm -rf= asked first,
-  =.env= files, =~/.ssh= and =~/.gnupg= unreadable, commit and PR attribution
+  =git reset --hard=, =git clean=, =git rebase=, =git update-ref=,
+  =git branch -D= (the last three also as =git -C <dir> ...=) and =rm -rf=
+  asked first, =.env= files, =~/.ssh= and =~/.gnupg= unreadable, commit and PR attribution
   empty, the synced plugin =engineering@synced= turned off, and the hook
   entries.
 
