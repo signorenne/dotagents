@@ -18,22 +18,22 @@ package "claude.ai set" {
 
 component "Local skills\n(other maps)" as local
 
-scoping --> decide : user's choice
-decide -- analysis : products
-analysis -- research : facts
-research --> verify : before settled
-prompt --> editing : one change
-debug -- editing : the fix
-debug -- tests : failing test
-debug --> verify : before fixed
-tests --> verify : before done
+scoping --> decide
+decide -- analysis
+analysis -- research
+research --> verify
+prompt -right-> editing
+debug -- editing
+debug -- tests
+debug --> verify
+tests --> verify
 
 verify -[hidden]down- local
-scoping --> local : spec,\narchitecture-doc
-decide --> local : spec
-prompt --> local : project-setup
-handoff --> local : session-close
-debug --> local : implement,\nevent-driven-ui
+scoping --> local
+decide --> local
+prompt --> local
+handoff --> local
+debug --> local
 
 legend right
   Solid arrow: hands work to
