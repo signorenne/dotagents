@@ -444,16 +444,19 @@ Guard (=guard_bash.py=):
 
 1. Find the command in the tool's payload and split it the way a shell does
    (quotes, operators, substitutions, here-documents, wrappers such as =sudo=,
-   =env= and =timeout=). Text that does not parse is split roughly, ignoring
-   quotes, so a parse error never lets a command through.
+   =env=, =timeout=, =watch= and =strace=, the command of a =find -exec=, and
+   git's own programs such as =git-push=). Text that does not parse is split
+   roughly, ignoring quotes, so a parse error never lets a command through.
 2. Block, in every tool, the gate bypasses: =--no-verify= on =git commit=,
    =push=, =merge=, =rebase=, =am=, =pull= and =cherry-pick=; =git commit -n=
    and =git am -n=; hook-skip variables (=*_SKIP_HOOKS=, =HUSKY= or
    =LEFTHOOK= set to off, =OVERCOMMIT_DISABLE=, a =SKIP= list with git or
    pre-commit); disabling =core.hooksPath=.
 3. Block, in every tool, every push and publish: =git push=,
-   =git subtree push=, =gh pr create= (or =gh pr new=), =gh pr merge=,
-   =gh release create= and =gh repo sync=
+   =git subtree push=, =git send-pack=, =git http-push=, =git lfs push=,
+   =git svn dcommit=, =git p4 submit=, =gh pr create= (or =gh pr new=),
+   =gh pr merge=, =gh release create= (or =gh release new=),
+   =gh repo create --push= and =gh repo sync=
    ([[file:../DESIGN.org::#no-agent-push][DESIGN.org, no-agent-push]]). A push that forces, deletes, mirrors or
    prunes, and =gh pr merge --admin=, are named as such. In Claude Code the
    adapter also denies =git push=, so the permission prompt never offers it;
