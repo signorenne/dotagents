@@ -26,12 +26,13 @@ install -> agents : copy home/.agents\nand claude-ai/skills
 install -> claude : CLAUDE.md that imports\nAGENTS.md, if missing
 install -> claude : link skills/<name>
 install -> claude : copy agents/*.md
+install -> claude : write rules/dotagents-<skill>.md\n(path rules)
 install -> claude : merge settings.json\n(permissions, hooks,\nskillOverrides)
 
 == Codex ==
 install -> codex : link AGENTS.md
 install -> codex : write agents/*.toml
-install -> codex : merge hooks.json\n(and SessionStart)
+install -> codex : merge hooks.json\n(and SessionStart, Stop)
 install -> codex : write rules/dotagents.rules\n(no push, no publish)
 
 == Gemini CLI ==
