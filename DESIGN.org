@@ -190,7 +190,7 @@ installer runs again.
   tools get none yet.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
   =prefix_rule= entries forbid the git commands that push or publish and
-  every command of gh 2.100.0 that is not read-only. A prefix rule cannot
+  every command of gh 2.100.0 that writes, except =gh api=. A prefix rule cannot
   forbid all but a list, so a =gh= command added later, and one with a flag
   before its subcommand (=gh -R o/r pr create=), are the guard's alone. Codex
   writes =default.rules= itself, and the installer leaves it alone.
@@ -303,7 +303,7 @@ The hooks share one failure model:
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
   prompt never offers it. In Codex, =~/.codex/rules/dotagents.rules= forbids
-  the same git commands and the =gh= commands that are not read-only, and
+  the same git commands and the =gh= commands that write, and
   holds even while Codex skips hooks the user has not trusted yet; Codex
   calls its rules experimental, and a prefix rule cannot see
   =git -C <dir> push=, which the guard catches.

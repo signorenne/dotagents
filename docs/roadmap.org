@@ -44,8 +44,8 @@ As of 13 November 2026:
   read-only =gh= commands, also behind the wrappers it follows
   (=tests/test_hooks.py=; [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]] lists
   them). The Claude Code settings deny =git push=, and the Codex rules
-  forbid the same git commands and every command of gh 2.100.0 that is not
-  read-only (=tests/test_install.py=). What the guard does not inspect is
+  forbid the same git commands and every command of gh 2.100.0 that writes,
+  except =gh api= (=tests/test_install.py=). What the guard does not inspect is
   under Open.
 
 * Open
@@ -88,7 +88,8 @@ As of 13 November 2026:
   spellings of a forced rename or copy (=-m -f=, =-mf=, =--move --force=,
   =-c -f=, =-cf=, =--copy --force=), nor options written before the flags
   (=git branch -q -D x=): a rule matches the words before its first =*= as
-  written.
+  written. Other commands that move a branch ask nothing: =git reset=,
+  =git checkout -B=, =git switch -C= and an unforced =git branch -m=.
 - [ ] Tests with a wall-clock bound can fail on a heavily loaded machine. In
   =tests/test_hooks.py=: the after-edit deadline test
   (=AfterEdit.test_formatting_stays_within_hook_timeout=, under 5 s) and the
