@@ -447,10 +447,13 @@ Guard (=guard_bash.py=):
 
 1. Find the command in the tool's payload and split it the way a shell does
    (quotes, operators, substitutions, here-documents, wrappers such as =sudo=,
-   =env=, =timeout=, =watch= and =strace=, the command of a =find -exec=, also
-   nested, and
-   git's own programs such as =git-push=). Text that does not parse is split
-   roughly, ignoring quotes, so a parse error never lets a command through.
+   =env=, =timeout=, =watch=, =strace=, =parallel=, =systemd-run=,
+   =firejail=, =unshare= and =nsenter=, the command of a =find -exec=, also
+   nested, the remote command of =ssh=, parsed as the remote shell would, and
+   git's own programs such as =git-push=). Text that does not parse, and
+   commands nested more than 8 levels deep or past 100,000 characters of
+   remote text, are split roughly, ignoring quotes, so neither a parse error
+   nor nesting lets a command through.
 2. Block, in every tool, the gate bypasses: =--no-verify= on =git commit=,
    =push=, =merge=, =rebase=, =am=, =pull= and =cherry-pick=; =git commit -n=
    and =git am -n=; hook-skip variables (=*_SKIP_HOOKS=, =HUSKY= or
@@ -479,8 +482,8 @@ Guard (=guard_bash.py=):
    ={"decision": "allow"}= when nothing is blocked.
 
 It guards the usual forms; it is not a security boundary: a command passed as
-one string (=bash -c=, =eval=), aliases, scripts and =gh api= are not
-inspected.
+one string (=bash -c=, =eval=, the arguments after =parallel='s =:::=),
+aliases, scripts and =gh api= are not inspected.
 
 After-edit hook (=after_edit.py=):
 

@@ -226,7 +226,8 @@ tool: =git push=, =git subtree push=, =git send-pack=, =git http-push=,
 =edit=, =gh release create=, =upload= and =edit=, =gh repo create --push=,
 =gh repo sync=, =gh gist create=, =gh issue create= and =gh workflow run=
 ([[#no-agent-push][no-agent-push]]), also run through =find -exec= (nested too), wrappers
-such as =sudo=, =watch= or =strace=, or git's own programs (=git-push=). A
+such as =sudo=, =watch=, =strace=, =parallel=, =systemd-run= or =nsenter=, the
+remote command of =ssh=, or git's own programs (=git-push=). A
 push that also rewrites or deletes published history (=--force= and its
 variants, =+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and
 =gh pr merge --admin= are named as such. The after-edit hook flags em and en
@@ -304,9 +305,11 @@ The hooks share one failure model:
 - /Not a security boundary/ : the guard splits the command as a shell does and
   falls back to a rough split when it does not parse, so a parse error never
   lets a forbidden command through; commands passed as one string (=bash -c=,
-  =env -S=, =flock -c=, =git submodule foreach=), =eval=, aliases, scripts and
-  =gh api= are not inspected, nor programs it does not know that run their
-  arguments (=parallel=, =systemd-run=, =firejail=, =ssh= and others).
+  =env -S=, =flock -c=, =git submodule foreach=, the arguments after
+  =parallel='s =:::=), =eval=, aliases, scripts and =gh api= are not
+  inspected, nor programs it does not know that run their arguments (such as
+  =numactl= or =faketime=). It reads the remote command of =ssh= as shell
+  text.
   =tests/test_hooks.py= holds a battery of the forms it does catch.
 
 * Documentation and skill design
