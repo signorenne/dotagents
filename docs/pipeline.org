@@ -136,8 +136,8 @@ add the skill, the subagents and where a fresh session starts.
   commands run, commands still needed, risks, refuted assumptions, and how
   to check it: for each acceptance criterion, the command or the steps and
   the visible result to expect, with each check that needs a human look
-  marked), a draft rule change for each lesson, and the list of decisions
-  waiting for the maintainer.
+  marked), a draft check or rule change for each lesson, and the list of
+  decisions waiting for the maintainer.
 - /Lives in/ : =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>=, git-ignored.
 - /Next/ : the reply names the handoff and the single next action for a fresh
   session.
@@ -245,8 +245,10 @@ maintainer to run the command themselves.
 
 A refuted claim that does not change the plan is corrected and recorded in the
 progress log and the handoff. For each one a rule should have prevented,
-session-close drafts the smallest rule change, which waits for the
-maintainer's approval of its exact text.
+session-close drafts the smallest check that would have caught it (a hook, a
+validation rule, a test or a lint) when one command can detect the mistake,
+and otherwise the smallest rule change; either waits for the maintainer's
+approval of its exact text.
 
 * Reviewing the agents' decisions
 
