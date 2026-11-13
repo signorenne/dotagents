@@ -10,18 +10,20 @@ the repository itself.
 ## Layout
 
 ```text
-home/.agents/AGENTS.md     global rules, installed as ~/.agents/AGENTS.md
-home/.agents/skills/       local skills (decide, spec, implement, branch-review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, isolated-work, mechanical-changes, precise-ui-changes, qt-quick, clean-architecture, event-driven-ui, code-audit)
-home/.agents/agents/       subagents in Claude Code format, the source for every tool's copy
-home/.agents/hooks/        hook scripts shared by every agent
-claude-ai/skills/          skills uploaded to claude.ai (and installed locally for every agent)
-claude-ai/overrides.json   local skills also uploaded to claude.ai, with their short description
-adapters/claude/           Claude Code settings merged by the installer
-install.py                 installer: copies the source and generates each tool's files
-tools/                     validate.py and build.py
-tests/                     unittest suites for hooks, installer, tools and skill scripts
-docs/                      Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide, glossary and roadmap
-*.org at the root          README, VISION, DESIGN (with the rules that bind), CONTRIBUTING, AI_DISCLAIMER; the bridges CLAUDE.md, GEMINI.md and .github/copilot-instructions.md point here
+home/.agents/AGENTS.md        global rules, installed as ~/.agents/AGENTS.md
+home/.agents/skills/          local skills (decide, spec, implement, branch-review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, isolated-work, mechanical-changes, precise-ui-changes, qt-quick, clean-architecture, event-driven-ui, code-audit)
+home/.agents/agents/          subagents in Claude Code format, the source for every tool's copy
+home/.agents/hooks/           hook scripts shared by every agent
+home/.agents/path-rules.json  path rules: each skill with the file globs that call for it (Claude Code gets ~/.claude/rules/dotagents-<skill>.md)
+claude-ai/skills/             skills uploaded to claude.ai (and installed locally for every agent)
+claude-ai/overrides.json      local skills also uploaded to claude.ai, with their short description
+adapters/claude/              Claude Code settings merged by the installer
+install.py                    installer: copies the source and generates each tool's files
+tools/                        validate.py and build.py
+tests/                        unittest suites for hooks, installer, tools and skill scripts
+.githooks/commit-msg          this repository's commit message check (git config core.hooksPath .githooks enables it)
+docs/                         Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide, glossary and roadmap
+*.org at the root             README, VISION, DESIGN (with the rules that bind), CONTRIBUTING, AI_DISCLAIMER; the bridges CLAUDE.md, GEMINI.md and .github/copilot-instructions.md point here
 ```
 
 ## Where changes go
@@ -34,6 +36,8 @@ docs/                      Org docs: docs map, architecture, pipeline, workflow 
 - A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: install.py, with a test in tests/test_install.py.
 - A new check: tools/validate.py, with a test in tests/test_tools.py.
+- A path rule (a skill an agent should use on matching files): home/.agents/path-rules.json, checked by tools/validate.py; install.py writes each tool's rule files from it, with a test in tests/test_install.py.
+- A check on this repository's commit messages: .githooks/commit-msg, with tests in tests/test_tools.py.
 
 ## Hard rules
 
