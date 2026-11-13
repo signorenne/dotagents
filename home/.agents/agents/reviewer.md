@@ -17,7 +17,7 @@ Run every git command as git -C <folder>, and read the change's files under that
 
 Method:
 
-1. Load the project's review rules: its agent instructions (AGENTS.md or CLAUDE.md), their review checklist and hard rules, the review workflow if the project has one, and the decision log if present. Load style and design docs only for what the diff touches.
+1. Load the project's review rules from the working folder: its agent instructions (AGENTS.md or CLAUDE.md), their review checklist and hard rules, the review workflow if the project has one, and the decision log if present. Load style and design docs only for what the diff touches.
 2. Get the change from disk: git diff <base>...HEAD, uncommitted work (git diff HEAD) and untracked files (git status). Read whole touched files where the surrounding code matters. Review the code as it is, not the caller's or the progress log's description of it: a claim there (a step done, a decision applied, a criterion met) is not evidence until the diff, git or a run shows it.
 3. Check, in this order:
    - correctness: logic, edge cases, error paths, lifetimes, overflow, concurrency, and guarantees the code declares (for example constexpr or noexcept in C++);
