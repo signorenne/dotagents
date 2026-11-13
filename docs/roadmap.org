@@ -23,10 +23,11 @@ rules that bind; [[file:../CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflo
 
 * Status
 
-As of 12 November 2026:
+As of 13 November 2026:
 
 - [X] One source in =home/.agents=, installed as =~/.agents=, with the global
-  rules, the local skills, the claude.ai set, three subagents and four hooks.
+  rules, the local skills, the claude.ai set, three subagents, six hooks and
+  the path rules.
 - [X] The installer for Claude Code, Codex, Gemini CLI, Antigravity CLI,
   Copilot CLI and Cursor, with backups, a dry run, an audit and idempotent
   reruns.
@@ -61,6 +62,41 @@ As of 12 November 2026:
   =parallel='s =:::=) and =eval=; aliases and scripts; the remote command of
   =ssh -o RemoteCommand=; and programs it does not know that run their
   arguments or a remote command (=autossh=, =mosh=, =numactl=, =faketime=).
+- [X] A battery of bypass forms (=GuardBypassBattery= in =tests/test_hooks.py=)
+  holds the push, publish and gate bypass forms the guard must block and the
+  near misses it must let through; the forms it found passing were fixed
+  (de3a625, then c6041a0, 5dfc8bd, 8e83455, 9594429, ba4d183 and 6b2f021).
+- [X] The guard runs only the read-only =gh= commands and blocks every other
+  one, so a write command gh adds later is blocked too (7ee6891).
+- [X] The progress check (=progress_check.py=, on =Stop= in Claude Code and
+  Codex) sends the agent back once when its task branch has a commit that the
+  progress log does not name or that is newer than the log; after a rebase,
+  the new hashes are enough (0185668, dc3d9ff; =ProgressCheck= in
+  =tests/test_hooks.py=). Untested in a real session; Cursor runs it without
+  =stop_hook_active=, so there it lets every stop through.
+- [X] Claude Code asks before the commands that land or move a branch:
+  =git rebase=, =git update-ref=, =git merge=, =git branch -f= and =--force=,
+  =-M=, =-C=, =-D= and the other spellings of =--delete --force=, each also
+  after =git -C <dir>= (84e7028, ba1200e, 6f59444, 369121a;
+  =test_claude_settings_ask_before_landing_commands=).
+- [ ] The =git -C <dir>= ask rules match any text between =git -C= and the
+  command's name (in a Bash rule a =*= matches any text, spaces included), so
+  a =git -C <dir> commit= whose message holds " merge " asks too; accepted for
+  now. By the same matching the deny rule =git -C * push *= would refuse a
+  =git -C <dir> commit= whose message holds " push ". Untested.
+- [ ] The ask rules cover =git branch -M= and =-C= but not the other
+  spellings of a forced rename or copy (=-m -f=, =-mf=, =--move --force=,
+  =-c -f=, =-cf=, =--copy --force=), nor options written before the flags
+  (=git branch -q -D x=): a rule matches the words before its first =*= as
+  written.
+- [ ] Tests with a wall-clock bound can fail on a heavily loaded machine. In
+  =tests/test_hooks.py=: the after-edit deadline test
+  (=AfterEdit.test_formatting_stays_within_hook_timeout=, under 5 s) and the
+  slow-git tests (=test_slow_git_stays_within_hook_timeout= of
+  =SessionRefresh=, =CompactBrief= and =ProgressCheck=, under 9.5 s around a
+  git that sleeps 4 s); two more bound the work at 2 s
+  (=GuardBypassBattery.test_deep_nesting_is_checked_quickly= and
+  =AfterEdit.test_a_broken_json_file_is_checked_quickly_whatever_its_strings=).
 - [ ] The field names inside Copilot's =toolArgs= for edits are undocumented;
   =after_edit.py= reads =path=, =file_text= and =new_str=, as its tests do.
 - [ ] The compaction brief (=compact_brief.py=, Claude Code's =PreCompact=) is
@@ -75,11 +111,11 @@ As of 12 November 2026:
   =resume=, as its hooks documentation describes
   (=test_codex_refreshes_the_session_after_a_compaction_or_a_resume= in
   =tests/test_install.py=). Untested in a real Codex session.
-- [ ] In Claude Code a hook that crashes, times out or is missing lets the
-  command run. ="onFailure": "block"= on the guard entry (Claude Code
-  v2.1.295 or later, hooks docs) would block instead; the guard still exits 0
-  on unreadable input. DESIGN.org owns the failure model, so this is the
-  maintainer's call.
+- [X] In Claude Code a guard that cannot start, crashes or times out blocks
+  the command: its entry sets ="onFailure": "block"= (Claude Code v2.1.295 or
+  later), and it still exits 0 on unreadable input (ddf4ecb,
+  =test_claude_guard_blocks_when_it_cannot_run=). The other hooks still let
+  the work go on when they fail.
 - [ ] A Claude Code =ConfigChange= hook could refuse a change to the user
   settings that removes =guard_bash.py=, so a session cannot drop its own
   guard. Low priority; untested.
@@ -167,7 +203,20 @@ As of 12 November 2026:
 - [ ] Claude Code's auto memory overlaps each project's decision log and the
   notes in =.private/=: keeping it, limiting it or turning it off is the
   maintainer's decision.
-- [ ] A =maxTurns= cap on =gate-runner= would bound its cost. Low value.
+- [X] A =maxTurns= cap on each subagent, from one source: 250 for scout and
+  reviewer, 200 for gate-runner; Gemini CLI gets it as =max_turns=, and Codex
+  and Copilot CLI agents have no such field (d34b967).
+- [X] Path rules: =home/.agents/path-rules.json= sends work on QML, PlantUML
+  and test files to qt-quick, plantuml-diagrams and trustworthy-tests, and
+  Claude Code gets one =~/.claude/rules/dotagents-<skill>.md= per skill
+  (0107b05). The other tools get none yet; untested in a real session.
+- [X] =.githooks/commit-msg= checks this repository's commit messages once a
+  clone enables it (224d6a8, 609e893; =CommitMsg= in =tests/test_tools.py=).
+- [X] =tools/validate.py= checks that every Org link reaches its file and its
+  =CUSTOM_ID= or heading (ff35833).
+- [ ] Untested: whether Codex's sandbox lets an agent in a linked worktree
+  write its progress log in the main checkout's =.private/=, which lies
+  outside the worktree.
 
 ** Skills
 
@@ -180,15 +229,47 @@ As of 12 November 2026:
 
 ** Research
 
-- [ ] OpenAI's "Harness engineering" article (a P0 entry of the research pack
-  of 12 November 2026) could not be opened; its practices are unread.
-- [-] Of the pack's 86 entries, 38 were studied on 12 November 2026. Of the
+- [X] OpenAI's "Harness engineering" article (a P0 entry of the research pack
+  of 12 November 2026) refused automated access; it was read on 13 November
+  2026 through a reprint, and session-close's draft check for a lesson that
+  one command can catch draws on it.
+- [X] Of the pack's 86 entries, 38 were studied on 12 November 2026. Of the
   other 48, the coding agents (OpenHands, Aider, SWE-agent, Goose, Hermes
-  Agent, Kiro, Augment Intent, Tessl) and the five directories are being
-  studied. The rest were judged out of scope: frameworks for writing an
-  agent, observability gateways and proxies (they would hold the
+  Agent, Kiro, Augment Intent, Tessl) and the five directories were studied
+  on 13 November 2026. The rest were judged out of scope: frameworks for
+  writing an agent, observability gateways and proxies (they would hold the
   credentials), benchmarks, cloud sandboxes and protocols, memory databases
   and tool retrieval, and API caching and batch pricing.
+- [ ] Setting Claude Code's =enableAllProjectMcpServers= in the adapter (from
+  trailofbits/claude-code-config, ideas only: it has no license). Unset,
+  Claude Code already asks before each server a project's =.mcp.json=
+  declares, and a =false= in the user settings does not override a =true= in
+  a project's local settings (settings reference, read 13 November 2026).
+- [ ] A recurring scan that reports drift (stale docs, code that left the
+  project's rules) and never fixes or merges anything (from OpenAI's
+  "Harness engineering"), for example as an audit mode of project-setup or
+  code-audit; it costs tokens on every run.
+- [ ] A replay of past sessions' shell commands through the guard, to measure
+  how often it blocks a command it should let through (from the
+  best-of-Agent-Harnesses list); only on the maintainer's request.
+- [ ] A review of a large diff split by file across several reviewer
+  subagents, each with the rules for its files (from alibaba/open-code-review,
+  whose benchmark is its authors' own); it costs more calls.
+- [ ] A hook that enforces test-first editing (from TDD Guard); it costs a
+  model call per edit.
+- [ ] An A/B benchmark: the same tasks run with and without the method (the
+  research pack proposed 20 tasks, three runs each), to show whether the
+  method beats a plain agent. It costs real money, so it runs only on the
+  maintainer's request.
+
+** The method
+
+- [ ] METHOD.org: a normative, versioned specification of the nexenne method
+  (MUST, SHOULD and MAY; foundations, roles, artifacts, task states, guides
+  and sensors, conformance, prior art), with dotagents' docs as its reference
+  implementation. The maintainer decided on 13 November 2026 that it is
+  normative and versioned, lives in this repository, and starts after the
+  work now in flight.
 
 * Proposed rules
 
