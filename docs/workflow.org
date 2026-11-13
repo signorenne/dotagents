@@ -39,7 +39,7 @@ global rules.
 
 | Situation                                                                        | What to run                                                                                                                                                                                                                                                                                                                                                                                                                    |
 |----------------------------------------------------------------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Small fix                                                                        | Ask directly. Hooks block gate bypasses and pushes, flag em and en dashes, format the C and C++ lines an edit changed                                                                                                                                                                                                                                                                                                          |
+| Small fix                                                                        | Ask directly. Hooks block gate bypasses and pushes, flag em and en dashes, check Python, JSON and TOML syntax, format the C and C++ lines an edit changed                                                                                                                                                                                                                                                                      |
 | Feature or design work                                                           | spec (raise the effort), then a fresh session, then implement on the spec file, then session-close; every stage is in [[file:pipeline.org][docs/pipeline.org]]                                                                                                                                                                                                                                                                                        |
 | Large or parallel work (Claude Code)                                             | The agent proposes a workflow with its rough cost only for large work that splits into independent parts; ask for one with "use a workflow" (or ultracode); =/deep-research= for a question about the web; ask for parallel subagents for a question across several code areas; for several agents writing code at once, parallel-agents. In auto mode only the first launch asks. Save a run you want again from =/workflows= |
 | A choice that is yours                                                           | decide                                                                                                                                                                                                                                                                                                                                                                                                                         |
@@ -65,6 +65,19 @@ Slash command form in Claude Code, Copilot and Cursor: =/name=. Codex:
 The subagents keep the main conversation small: scout maps code and docs
 read-only, gate-runner runs builds and tests and returns only verdicts and
 first errors, reviewer reviews a finished change in a fresh context.
+
+Hooks and rules also act on their own ([[file:architecture.org::*The hooks][docs/architecture.org, The hooks]]).
+In Claude Code, path rules send the agent to qt-quick, plantuml-diagrams or
+trustworthy-tests when it reads or edits a QML, PlantUML or test file; a
+shell command that fails the same way three times brings a reminder to
+stop, restate the evidence and change approach (systematic-debugging); a
+guard that cannot run blocks the command; and the commands that land or
+move a branch (=git rebase=, =git merge=, =git update-ref=, a forced
+=git branch= move, rename, copy or delete, also after =git -C <dir>=) ask
+you first. In Claude Code and Codex, when the agent ends its turn on a task
+branch whose progress log misses one of the branch's commits, the progress
+check sends it back once to record it; after a rebase the new hashes are
+enough.
 
 * Context hygiene
 

@@ -95,7 +95,11 @@ add the skill, the subagents and where a fresh session starts.
   plan, the baseline, every step with its commit and check, every decision
   with who took it, every refuted assumption, and every attempt that failed
   (what was tried, the result, why it was dropped), so a fresh session does
-  not retry it.
+  not retry it. In Claude Code and Codex the progress check holds the log to
+  the branch: when the agent ends its turn on =<type>/<slug>= while a commit
+  of the branch is missing from the log or newer than its last change, it
+  sends the agent back once to record the step, its commit and its check
+  (after a rebase, writing the new hashes is enough).
 - /Lives in/ : the commits on a local branch. With isolation the branch lives
   in its own worktree, =../<repository>-<slug>=, created from the tip of the
   branch it will land on. The progress log is
@@ -168,7 +172,11 @@ add the skill, the subagents and where a fresh session starts.
   commit has never been tested (skipped, with its reason logged, when the
   rebase left the commit unchanged and the gates already passed on it);
   fast-forward the target to it; confirm the target now points there. A merge
-  commit only when the project's documented convention asks for one.
+  commit only when the project's documented convention asks for one. In
+  Claude Code each command that lands or moves a branch (=git rebase=,
+  =git merge=, =git update-ref=, a forced =git branch= move, rename, copy or
+  delete, each also after =git -C <dir>=) asks the maintainer first, so a
+  landing prompts at each of those steps.
 - /Produces/ : a linear history on the local target branch.
 
 Without isolation, the branch stays in the main checkout until the maintainer
@@ -220,7 +228,8 @@ invoke its workflow skill again. In the other tools, ask for that re-read.
   not read-only. The guard does not inspect a command passed as one string
   (=bash -c=, =eval=), aliases, scripts, =gh api= or =ssh -o RemoteCommand=,
   nor a program it does not know that runs its arguments; there the rule
-  rests on the agent.
+  rests on the agent. In Claude Code a guard that cannot run (it cannot
+  start, crashes or times out) blocks the command instead of letting it run.
 - /Agents land on the maintainer's go/ : an isolated branch lands locally as
   isolated-work says, then its worktree and branch are removed
   ([[file:../DESIGN.org::#isolated-worktrees][DESIGN.org, isolated-worktrees]]).
@@ -254,7 +263,10 @@ the full gates (one commit for steps whose files overlap, named in the log);
 while one stays uncommitted, the work is not landable. A parallel agent
 stopped by a usage limit resumes from its commits once the coordinator tells
 it what is done and what comes next. A guard block on a gate bypass means: fix
-the failing check, or ask the maintainer to run the command themselves.
+the failing check, or ask the maintainer to run the command themselves. In
+Claude Code, from the third identical failure of a shell command on, a hook
+reminds the agent of the row on two failed fixes and points it to
+systematic-debugging.
 
 A refuted claim that does not change the plan is corrected and recorded in the
 progress log and the handoff. For each one a rule should have prevented,
