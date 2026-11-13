@@ -191,10 +191,11 @@ are named as such. The after-edit hook flags em and en dashes in the text just
 written and runs clang-format, when the project has a =.clang-format=, on the
 lines of a C or C++ file that the edit changed (a newly written file whole).
 The session refresh reminds the agent that its picture of the code is a
-summary, prints the real branch, changes and last commits, lists the newest
-files of =.private/progress/= and =.private/handoff/=, and asks the agent to
-re-read the progress log. The compaction brief tells the summary what resuming
-needs: the task and its slug, the branch, the paths of the progress log and
+summary (after a compaction, also to invoke its workflow skill again, since
+Claude Code keeps only the start of each skill through one), prints the real
+branch, changes and last commits, lists the newest files of
+=.private/progress/= and =.private/handoff/=, and asks the agent to re-read the
+progress log. The compaction brief tells the summary what resuming needs: the task and its slug, the branch, the paths of the progress log and
 handoff, the current plan step, the decisions marked Review: pending, the files
 changed and the commands still needed with their last results; it fills in the
 branch, the uncommitted changes and the newest task notes itself.
