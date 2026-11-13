@@ -521,11 +521,13 @@ class Install(unittest.TestCase):
         allowed = self.run_hook(pre["hooks"][0]["command"], payload)
         self.assertEqual((allowed.returncode, json.loads(allowed.stdout)), (0, {"decision": "allow"}))
         # A hook turned off by hand stays off, and a second run changes nothing.
-        name = next(n for n, events in config.items() if "PreToolUse" in events and n != "my-linter-hook")
-        config[name]["enabled"] = False
+        names = [n for n in config if n != "my-linter-hook"]
+        for name in names:
+            config[name]["enabled"] = False
         config_file.write_text(json.dumps(config))
         self.install("--tools", "antigravity")
-        self.assertIs(json.loads(config_file.read_text())[name]["enabled"], False)
+        for name in names:
+            self.assertIs(json.loads(config_file.read_text())[name]["enabled"], False, name)
         self.assertIn("0 change(s).", self.install("--tools", "antigravity").splitlines())
 
     def test_antigravity_reads_the_global_rules_and_the_skills(self):
