@@ -4,6 +4,7 @@ description: "Independent reviewer of a finished change, run in a fresh context 
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
+maxTurns: 250
 color: red
 ---
 

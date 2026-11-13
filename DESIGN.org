@@ -35,8 +35,8 @@ depend on the model remembering it.
   zip.
 - /Subagents/ : =scout=, =gate-runner= and =reviewer= in
   =home/.agents/agents/=, in Claude Code format (name, description, tools,
-  model, and where set effort and color), the source of every other tool's
-  copy.
+  model, and where set effort, maxTurns and color), the source of every other
+  tool's copy.
 - /Hooks/ : =guard_bash.py=, =after_edit.py=, =session_refresh.py=,
   =compact_brief.py=, =progress_check.py= and =repeated_failure.py= in
   =home/.agents/hooks/=,
@@ -147,7 +147,9 @@ installer runs again.
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
   for Copilot CLI), with tool names mapped to the tool's own; the Codex copy
   carries the reasoning effort, and the Gemini CLI copy a turn and a time limit
-  (=max_turns=, =timeout_mins=) above Gemini CLI's defaults. A skill wanted on
+  (=max_turns= from the source's =maxTurns=, =timeout_mins=) above Gemini
+  CLI's defaults; Codex and Copilot CLI agents have no turn limit, so their
+  copies carry none. A skill wanted on
   claude.ai is an override entry, never a second folder.
 - /Checked before it starts/ : the installer validates the subagents and the
   JSON sources first and installs nothing when one is broken.

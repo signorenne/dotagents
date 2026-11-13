@@ -97,11 +97,11 @@ What =python3 install.py= does, in order, and what each tool receives.
    =rules/dotagents.rules=, whose =prefix_rule= entries forbid every push and
    publish (Codex rules are experimental).
 6. Gemini CLI: link =~/.gemini/GEMINI.md=; write =agents/<name>.md= with Gemini
-   tool names and a turn and time limit (=max_turns= 100 for each subagent;
-   =timeout_mins= 120 for gate-runner, 60 for reviewer, 30 for scout), above
-   Gemini CLI's defaults of 30 turns and 10 minutes; merge the two hooks into
-   =~/.gemini/settings.json= and put =AGENTS.md= first in =context.fileName=,
-   so project =AGENTS.md= files load.
+   tool names and a turn and time limit (=max_turns= from the source's
+   =maxTurns=; =timeout_mins= 120 for gate-runner, 60 for reviewer, 30 for
+   scout), above Gemini CLI's defaults of 30 turns and 10 minutes; merge the
+   two hooks into =~/.gemini/settings.json= and put =AGENTS.md= first in
+   =context.fileName=, so project =AGENTS.md= files load.
 7. Antigravity CLI: link =~/.gemini/GEMINI.md= (the same link as Gemini
    CLI's); merge the guard and the after-edit hook into
    =~/.gemini/config/hooks.json= under the names =dotagents-guard= and
@@ -208,6 +208,13 @@ and decides nothing (Codex gets the same reasoning effort; Gemini CLI and
 Copilot CLI have no such field). In Claude Code gate-runner also
 starts without the user, project and local =CLAUDE.md= files (=omitClaudeMd=,
 Claude Code v2.1.271 or later); the other tools' copies drop the field.
+
+Each subagent has a turn limit, =maxTurns=: 250 for scout and reviewer, 200
+for gate-runner. In Claude Code a subagent that reaches it returns its output
+marked partial, and the caller can resume it (v2.1.246 or later); Gemini CLI
+takes the same number as =max_turns=. The values sit above the longest of
+about 490 past runs on this machine (scout 173 turns, reviewer 165,
+gate-runner 154 apart from one run of 280), so only a runaway stops early.
 
 * The workflow skills
 

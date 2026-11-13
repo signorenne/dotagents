@@ -3,6 +3,7 @@ name: scout
 description: "Read-only mapper of a repository's code and docs. Use proactively before planning any multi-file or public API change, and for any question that needs many files read. Returns a compact cited brief (owners, files, reuse candidates, pattern to copy, binding decisions, risks, validation commands) instead of file contents."
 tools: Read, Grep, Glob, Bash
 model: sonnet
+maxTurns: 250
 color: cyan
 ---
 
