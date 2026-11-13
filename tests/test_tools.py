@@ -185,6 +185,23 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
         scout.write_text(original)
         self.assertEqual(self.run_tool("validate.py").returncode, 0)
 
+    def test_validate_checks_the_path_rules(self):
+        rules = self.repo / "home/.agents/path-rules.json"
+        source = json.loads(rules.read_text())
+        cases = {"unknown skill": ({"no-such-skill": ["**/*.x"]}, "path rule for unknown skill 'no-such-skill'"),
+                 "no globs": ({"qt-quick": []}, "path rule qt-quick: globs must be a non-empty list"),
+                 "bad glob": ({"qt-quick": ["**/*.qml", 5]}, "path rule qt-quick: globs must be a non-empty list"),
+                 "quote": ({"qt-quick": ['a"b']}, "path rule qt-quick: glob 'a\"b' has a quote, a backslash or a"),
+                 "not an object": ([], "home/.agents/path-rules.json: no rules object")}
+        for label, (value, problem) in cases.items():
+            with self.subTest(label=label):
+                rules.write_text(json.dumps({"rules": value} if label != "not an object" else value))
+                result = self.run_tool("validate.py")
+                self.assertEqual(result.returncode, 1, result.stdout)
+                self.assertIn(problem, result.stdout)
+        rules.write_text(json.dumps(source))
+        self.assertEqual(self.run_tool("validate.py").returncode, 0)
+
     def test_validate_catches_broken_skills_and_dashes(self):
         skill = self.repo / "claude-ai/skills/tutor/SKILL.md"
         text = skill.read_text()

@@ -15,6 +15,8 @@ Checks:
   (about the 5,000 tokens of a skill that Claude Code keeps after compaction);
 - each override in claude-ai/overrides.json names a local skill and has a description
   of 1 to 200 characters without angle brackets;
+- each path rule in home/.agents/path-rules.json names a skill of the repository and
+  lists globs without quotes, backslashes or newlines;
 - subagents carry name, description, tools and model, the name matches the file, an
   effort is one of Claude Code's levels, a maxTurns is a positive whole number, and the
   body has no ''' (the Codex copy holds it in a TOML literal string);
@@ -41,6 +43,7 @@ ROOT = Path(__file__).resolve().parent.parent
 HOME = ROOT / "home" / ".agents"
 ONLINE = ROOT / "claude-ai" / "skills"
 OVERRIDES = ROOT / "claude-ai" / "overrides.json"
+PATH_RULES = HOME / "path-rules.json"
 TEMPLATES = HOME / "skills" / "project-setup" / "templates"
 SKIP_DIRS = {".git", "dist", "__pycache__", ".private"}
 NAME = re.compile(r"^[a-z0-9]+(-[a-z0-9]+)*$")
@@ -177,6 +180,32 @@ def check_overrides(errors: list[str]) -> None:
             errors.append(f"{rel}: {name}: description has angle brackets")
 
 
+def check_path_rules(errors: list[str]) -> None:
+    """Each path rule names a skill of the repository and lists globs that fit in a
+    double-quoted YAML string of the generated rule."""
+    rel = PATH_RULES.relative_to(ROOT)
+    if not PATH_RULES.is_file():
+        return
+    try:
+        data = json.loads(PATH_RULES.read_text(encoding="utf-8"))
+    except ValueError as error:
+        errors.append(f"{rel}: {error}")
+        return
+    rules = data.get("rules") if isinstance(data, dict) else None
+    if not isinstance(rules, dict):
+        errors.append(f"{rel}: no rules object")
+        return
+    for skill, globs in rules.items():
+        if not ((HOME / "skills" / skill / "SKILL.md").is_file() or (ONLINE / skill / "SKILL.md").is_file()):
+            errors.append(f"{rel}: path rule for unknown skill {skill!r}")
+        if not (isinstance(globs, list) and globs and all(isinstance(g, str) and g.strip() for g in globs)):
+            errors.append(f"{rel}: path rule {skill}: globs must be a non-empty list of text")
+            continue
+        for glob in globs:
+            if any(char in glob for char in '"\\\n'):
+                errors.append(f"{rel}: path rule {skill}: glob {glob!r} has a quote, a backslash or a newline")
+
+
 def git_files():
     """Files git tracks or would track (untracked, not ignored); None without git."""
     try:
@@ -275,6 +304,7 @@ def main() -> int:
     for name in sorted({p.name for p in local} & {p.name for p in online}):
         errors.append(f"{name}: skill in both home/.agents/skills and claude-ai/skills")
     check_overrides(errors)
+    check_path_rules(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)

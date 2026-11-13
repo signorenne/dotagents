@@ -32,6 +32,11 @@ SRC = PACK / "home" / ".agents"
 ONLINE = PACK / "claude-ai" / "skills"
 CLAUDE_FRAGMENT = PACK / "adapters" / "claude" / "settings.json"
 UPLOADED_EXTRA = PACK / "claude-ai" / "overrides.json"
+# Path rules: {skill: [globs]}. In Claude Code each becomes ~/.claude/rules/dotagents-<skill>.md,
+# a rule that loads only when Claude works with a matching file (paths globs, relative to
+# the session's primary working directory) and points it to the skill.
+PATH_RULES = SRC / "path-rules.json"
+RULE_PREFIX = "dotagents-"
 SYNCED_PREFIX = "anthropic-skills:"
 TOOLS = ("claude", "codex", "gemini", "antigravity", "copilot", "cursor")
 # Hook scripts this repository installs, and those an older version kept in ~/.claude/hooks.
@@ -214,6 +219,20 @@ def codex_rules() -> str:
     return "\n".join(lines) + "\n"
 
 
+def path_rule(skill: str, globs: list) -> str:
+    """A Claude Code rule file that sends work on files matching globs to a skill."""
+    return "\n".join(["---", "paths:", *[f"  - {json.dumps(glob)}" for glob in globs], "---", "",
+                      f"Use the {skill} skill for work on these files. If it is not in your skill list, "
+                      f"read ~/.agents/skills/{skill}/SKILL.md and follow it.", ""])
+
+
+def path_rules() -> dict:
+    """The path rules of the repository, {} when it has none."""
+    if not PATH_RULES.is_file():
+        return {}
+    return json.loads(PATH_RULES.read_text(encoding="utf-8"))["rules"]
+
+
 def copilot_folder(home: Path) -> Path:
     """Copilot CLI's configuration folder: $COPILOT_HOME, which replaces the whole
     ~/.copilot path when it is set, else ~/.copilot."""
@@ -233,9 +252,9 @@ def check_source() -> list:
             problems.append(f"{path.relative_to(PACK)}: missing field {error}")
         except ValueError as error:
             problems.append(f"{path.relative_to(PACK)}: {error}")
-    for path, key in ((CLAUDE_FRAGMENT, "hooks"), (UPLOADED_EXTRA, "skills")):
-        if path == UPLOADED_EXTRA and not path.is_file():
-            continue  # optional: no local skill is uploaded to claude.ai
+    for path, key in ((CLAUDE_FRAGMENT, "hooks"), (UPLOADED_EXTRA, "skills"), (PATH_RULES, "rules")):
+        if path != CLAUDE_FRAGMENT and not path.is_file():
+            continue  # optional: no local skill is uploaded to claude.ai, no path rules
         try:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError) as error:
@@ -243,6 +262,10 @@ def check_source() -> list:
             continue
         if not (isinstance(data, dict) and isinstance(data.get(key), dict)):
             problems.append(f"{path.relative_to(PACK)}: no {key} object")
+        elif path == PATH_RULES:
+            for skill, globs in data[key].items():
+                if not (isinstance(globs, list) and globs and all(isinstance(g, str) and g for g in globs)):
+                    problems.append(f"{path.relative_to(PACK)}: {skill}: globs must be a non-empty list of text")
     return problems
 
 
@@ -474,6 +497,7 @@ class Installer:
                 self.link(skills / name, self.agents_home / "skills" / name)
         for path, meta, body in self.subagents():
             self.write(base / "agents" / path.name, path.read_text(encoding="utf-8"))
+        self.install_path_rules(base / "rules")
         for old_hook in OLD_HOOK_SCRIPTS:
             if (base / "hooks" / old_hook).is_file():
                 self.backup(base / "hooks" / old_hook)
@@ -497,6 +521,20 @@ class Installer:
             self.notes.append(
                 "Claude Code: every skill comes from this repository; the copies synced from claude.ai "
                 "of the same skills are turned off (skillOverrides in ~/.claude/settings.json).")
+
+    def path_rule_files(self) -> dict:
+        return {f"{RULE_PREFIX}{skill}.md": path_rule(skill, globs) for skill, globs in path_rules().items()}
+
+    def install_path_rules(self, rules: Path) -> None:
+        """Write a rule per path rule; back up and remove our own (dotagents-*.md) rules that
+        the repository no longer has. Every other file in the folder is the user's."""
+        wanted = self.path_rule_files()
+        for name, text in sorted(wanted.items()):
+            self.write(rules / name, text)
+        if rules.is_dir():
+            for stale in sorted(rules.glob(f"{RULE_PREFIX}*.md")):
+                if stale.name not in wanted and (stale.is_file() or stale.is_symlink()):
+                    self.backup(stale)
 
     def install_codex(self) -> None:
         base = self.home / ".codex"
@@ -583,6 +621,7 @@ class Installer:
             self.agents_home / "hooks": hooks | {"__pycache__"},
             self.home / ".claude" / "skills": skills | {"synced", ".trash"},
             self.home / ".claude" / "agents": {f"{a}.md" for a in agents},
+            self.home / ".claude" / "rules": set(self.path_rule_files()),
             self.home / ".codex" / "agents": {f"{a}.toml" for a in agents},
             self.home / ".gemini" / "agents": {f"{a}.md" for a in agents},
             self.copilot_home / "agents": {f"{a}.agent.md" for a in agents},
