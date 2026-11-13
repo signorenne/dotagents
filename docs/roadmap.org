@@ -68,6 +68,20 @@ As of 12 November 2026:
   =resume=, as its hooks documentation describes
   (=test_codex_refreshes_the_session_after_a_compaction_or_a_resume= in
   =tests/test_install.py=). Untested in a real Codex session.
+- [ ] In Claude Code a hook that crashes, times out or is missing lets the
+  command run. ="onFailure": "block"= on the guard entry (Claude Code
+  v2.1.295 or later, hooks docs) would block instead; the guard still exits 0
+  on unreadable input. DESIGN.org owns the failure model, so this is the
+  maintainer's call.
+- [ ] A Claude Code =ConfigChange= hook could refuse a change to the user
+  settings that removes =guard_bash.py=, so a session cannot drop its own
+  guard. Low priority; untested.
+- [ ] A =Stop= hook could report uncommitted work to the user
+  (=systemMessage=) without blocking: blocking would push the agent to
+  commit, which the global rules leave to the maintainer.
+- [ ] A Claude Code status line could show the context used and the session
+  cost (=context_window.used_percentage=, =cost.total_cost_usd=). Convenience
+  only.
 
 ** Tools and platforms
 
@@ -128,11 +142,46 @@ As of 12 November 2026:
 - [ ] Gemini CLI may load =AGENTS.md= twice on a machine set up by the
   installer: once through =context.fileName= and once through the
   =@AGENTS.md= import in =GEMINI.md=.
+- [ ] Claude Code's OS sandbox (off by default; Linux needs bubblewrap and
+  socat) would confine writes to the working folder and deny writes to
+  =.git/hooks= and =.git/config=, independently of the guard. It changes daily
+  work (network prompts, builds outside the folder), so try it for one session
+  with =claude --settings= before deciding.
+- [ ] A model map: which model and effort each role uses in each tool (main
+  session, =scout=, =gate-runner=, =reviewer=). Today only Claude Code honours
+  the subagents' =model= field (item above).
+- [ ] Claude Code lists skill descriptions within about 1% of the context
+  window and drops the least used ones when the list overflows; our
+  descriptions total about 11,700 characters. On 13 November 2026 a large
+  context session listed every description in full; a 200k session is
+  unchecked. Check the Skills row of =/context= there before rewording a
+  skill that fails to trigger; the fixes are =skillListingBudgetFraction=,
+  name-only listing for rare skills, or shorter descriptions.
+- [ ] Claude Code's auto memory overlaps each project's decision log and the
+  notes in =.private/=: keeping it, limiting it or turning it off is the
+  maintainer's decision.
+- [ ] A =maxTurns= cap on =gate-runner= would bound its cost. Low value.
 
 ** Skills
 
 - [ ] First real runs of the new =as-built-docs= on ATC and ASM.
 - [ ] First real run of =code-audit=.
+- [ ] An on-request script for trigger tests (requests that should and should
+  not trigger a skill, several runs each) and a skill-off baseline, standard
+  library only, as =docs/skill-authoring.org= asks. Estimated at 1 to 3 US
+  dollars per run of five skills (estimate, research of 12 November 2026).
+
+** Research
+
+- [ ] OpenAI's "Harness engineering" article (a P0 entry of the research pack
+  of 12 November 2026) could not be opened; its practices are unread.
+- [-] Of the pack's 86 entries, 38 were studied on 12 November 2026. Of the
+  other 48, the coding agents (OpenHands, Aider, SWE-agent, Goose, Hermes
+  Agent, Kiro, Augment Intent, Tessl) and the five directories are being
+  studied. The rest were judged out of scope: frameworks for writing an
+  agent, observability gateways and proxies (they would hold the
+  credentials), benchmarks, cloud sandboxes and protocols, memory databases
+  and tool retrieval, and API caching and batch pricing.
 
 * Proposed rules
 
