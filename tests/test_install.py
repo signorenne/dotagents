@@ -244,7 +244,7 @@ class Install(unittest.TestCase):
         self.assertEqual(merged["model"], "opus")
         self.assertIn("Bash(npm test *)", merged["permissions"]["allow"])
         self.assertIn("Bash(cmake --build *)", merged["permissions"]["allow"])
-        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PreCompact", "PreToolUse", "SessionStart"])
+        self.assertEqual(sorted(merged["hooks"]), ["PostToolUse", "PreCompact", "PreToolUse", "SessionStart", "Stop"])
         self.install()
         again = json.loads(settings.read_text())
         self.assertEqual(len(again["hooks"]["PreToolUse"]), 1, "hook entries must not duplicate")
@@ -449,12 +449,45 @@ class Install(unittest.TestCase):
         # apply_patch, Edit or Write); timeout is in seconds.
         self.install("--tools", "codex")
         hooks = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]
-        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse", "SessionStart"])
+        self.assertEqual(sorted(hooks), ["PostToolUse", "PreToolUse", "SessionStart", "Stop"])
         (pre,), (post,) = hooks["PreToolUse"], hooks["PostToolUse"]
         self.assert_hook_group(pre, "guard_bash.py", "codex", ["Bash"], ["apply_patch", "Edit", "Write"],
                                range(1, 601))
         self.assert_hook_group(post, "after_edit.py", "codex", ["apply_patch", "Edit", "Write"], ["Bash"],
                                range(1, 601))
+
+    def assert_stop_check(self, groups: list, payload: dict):
+        """One Stop group without a matcher whose command never keeps the agent going on its
+        own failure: exit 2 from a Stop hook continues the turn, and python3 exits 2 when
+        the script is missing, so the command ends in || true."""
+        (group,) = groups
+        self.assertNotIn("matcher", group)
+        (handler,) = group["hooks"]
+        self.assertEqual(handler["type"], "command")
+        self.assertEqual(handler["command"], 'python3 "$HOME/.agents/hooks/progress_check.py" || true')
+        self.assertLessEqual(handler["timeout"], 10)
+        self.assertNotIn("onFailure", handler)
+        installed = self.run_hook(handler["command"], payload)
+        self.assertEqual((installed.returncode, installed.stdout, installed.stderr), (0, "", ""))
+        (self.home / ".agents/hooks/progress_check.py").unlink()
+        missing = self.run_hook(handler["command"], payload)
+        self.assertEqual((missing.returncode, missing.stdout), (0, ""))
+
+    def test_claude_checks_the_progress_log_before_a_stop(self):
+        # Claude Code's Stop: no matcher; input stop_hook_active, last_assistant_message.
+        self.install("--tools", "claude")
+        hooks = json.loads((self.home / ".claude/settings.json").read_text())["hooks"]
+        self.assert_stop_check(hooks["Stop"], {"session_id": "s", "cwd": str(self.home), "hook_event_name": "Stop",
+                                               "stop_hook_active": False, "last_assistant_message": "Done."})
+
+    def test_codex_checks_the_progress_log_before_a_stop(self):
+        # Codex hooks docs: Stop ignores matcher; input turn_id, stop_hook_active,
+        # last_assistant_message; JSON on stdout with exit 0, and no output lets it stop.
+        self.install("--tools", "codex")
+        hooks = json.loads((self.home / ".codex/hooks.json").read_text())["hooks"]
+        self.assert_stop_check(hooks["Stop"], {"session_id": "s", "turn_id": "t", "cwd": str(self.home),
+                                               "hook_event_name": "Stop", "model": "m", "permission_mode": "default",
+                                               "stop_hook_active": False, "last_assistant_message": None})
 
     def test_codex_refreshes_the_session_after_a_compaction_or_a_resume(self):
         # Codex hooks docs: the SessionStart matcher filters the source (startup, resume, clear,
