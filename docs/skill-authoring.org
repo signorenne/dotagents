@@ -55,12 +55,36 @@ behind this guide is in [[file:../DESIGN.org::#concise-skills][DESIGN.org, under
 
 * Checklist before committing a skill
 
-- Description: what and when, third person, user's words, no overlap with
-  another skill.
-- Every step and rule earns its place: would a capable model get this wrong
-  without it?
-- Nothing stated twice, nothing the global rules (=home/.agents/AGENTS.md=)
-  already say, nothing contradicting them or a rule in [[file:../DESIGN.org][DESIGN.org]].
+Review the description and the body against the rubric below, whose
+dimensions are those of Tessl's skill review [7]. Each item passes or names
+its fix; there is no score, because a total can hide one failing item.
+
+The description, which decides when the skill loads:
+
+- Specificity: it names the concrete actions and what they produce, not a
+  category of work.
+- Completeness: it says what the skill does and when to use it, in the third
+  person.
+- Trigger terms: it uses the words a user would type for the request.
+- Distinctiveness: no other skill's description claims the same requests, and
+  a near-miss names the skill that takes it.
+
+The body, which guides the agent once loaded:
+
+- Conciseness: every step and rule earns its place (would a capable model get
+  this wrong without it?), nothing is stated twice, and nothing repeats the
+  global rules (=home/.agents/AGENTS.md=).
+- Actionability: each step says what to do, with the exact command, path or
+  check where a mistake is costly.
+- Workflow clarity: a skill with steps runs them in order, each with its exit
+  and what to do when it fails, and gives one default path instead of a menu.
+- Progressive disclosure: =SKILL.md= holds what every run needs, and detail
+  only some runs need sits in a file one level deep, linked with when to read
+  it.
+
+Then:
+
+- Nothing contradicts the global rules or a rule in [[file:../DESIGN.org][DESIGN.org]].
 - Every skill, subagent, file, command and flag it names exists and works.
 - =python3 tools/validate.py=, =python3 -m unittest discover -s tests= and
   =python3 tools/build.py= pass.
@@ -101,3 +125,6 @@ Test with use, not by rereading [1]:
    https://agentskills.io/specification
 6. Agent Skills, Optimizing skill descriptions (open standard guide):
    https://agentskills.io/skill-creation/optimizing-descriptions
+7. Tessl, Check a skill's quality using review (vendor documentation; the
+   review itself scores with a hosted model, which this checklist does not
+   use): https://docs.tessl.io/improving-your-skills/reviewing-skills
