@@ -509,7 +509,8 @@ an agent's decision stays pending until the user keeps or changes it. The user r
 one place, and a later session resumes from facts.
 
 In: =home/.agents/skills/implement/SKILL.md= (section 5),
-=home/.agents/skills/session-close/SKILL.md=.
+=home/.agents/skills/session-close/SKILL.md=,
+=home/.agents/hooks/progress_check.py=.
 
 *** Tests are written by the implementer and attacked by the reviewer
 :PROPERTIES:
@@ -734,7 +735,8 @@ then its worktree and branch are removed. The main checkout and the target
 branch move only when reviewed work lands, and nothing is left behind.
 
 In: =home/.agents/AGENTS.md= (Agentic work),
-=home/.agents/skills/isolated-work/SKILL.md=.
+=home/.agents/skills/isolated-work/SKILL.md=, =adapters/claude/settings.json=
+(ask).
 
 *** No AI attribution in commits
 :PROPERTIES:
@@ -744,7 +746,7 @@ Commits and pull requests carry no =Co-Authored-By= or other AI trailer; the
 human committer owns every line ([[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]]).
 
 In: =adapters/claude/settings.json= (attribution), =AGENTS.md= (Hard rules),
-=home/.agents/AGENTS.md= (Git).
+=home/.agents/AGENTS.md= (Git), =.githooks/commit-msg=.
 
 *** MIT license held by Nicolò Plebani (nexenne)
 :PROPERTIES:
