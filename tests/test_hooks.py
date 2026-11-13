@@ -989,6 +989,14 @@ class CompactBrief(unittest.TestCase):
         self.assertIn("The branch: feat/task.", result.stdout)
         self.assertIn(f"{(repo / '.private/progress/task.org').as_posix()} (", result.stdout)
 
+    def test_keeps_the_running_workflow_skill_and_its_step(self):
+        # After a compaction the session refresh asks the agent to invoke its workflow
+        # skill again; the summary must say which one and where in it the work stood.
+        result = self.brief({"cwd": "/no/such/folder"})
+        self.assert_brief(result)
+        self.assertIn("- The workflow skill in use (such as implement or spec) and the section or step "
+                      "of it that was running, so it is invoked again there.", result.stdout)
+
     def test_long_state_stays_under_the_cap(self):
         repo, env = committed_repo(self)
         for index in range(60):

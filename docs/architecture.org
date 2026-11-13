@@ -343,7 +343,8 @@ Compaction brief (=compact_brief.py=):
 
 1. Ask the summary to keep what resuming needs: the task, its slug and the
    check that says it is done; the branch; the paths of the task's progress
-   log and handoff; the current plan step; each decision marked
+   log and handoff; the workflow skill and the section or step of it that was
+   running; the current plan step; each decision marked
    =Review: pending=; the files changed; the commands still needed and the
    last result of each command run.
 2. Fill in what it can read: the branch, up to 15 lines of

@@ -4,9 +4,10 @@
 """PreCompact hook (Claude Code): tell the compaction summary what resuming the work
 needs. When a PreCompact hook exits 0, Claude Code uses its stdout as instructions for
 the summary, cut at 10,000 characters. The brief asks the summary to keep the task and
-its slug, the branch, the paths of the task's progress log and handoff, the current
-plan step, the decisions marked Review: pending, the files changed, and the commands
-still needed with their last results. It fills in what it can read itself: the branch,
+its slug, the branch, the paths of the task's progress log and handoff, the workflow
+skill and its running section or step, the current plan step, the decisions marked
+Review: pending, the files changed, and the commands still needed with their last
+results. It fills in what it can read itself: the branch,
 the uncommitted changes, and the newest files of .private/progress/ and
 .private/handoff/ (session_refresh.py's finder).
 
@@ -79,6 +80,8 @@ def brief(branch: str, changes: str, notes: str) -> str:
         f"- The branch: {branch}." if branch else "- The branch the work is on.",
         "- The paths of the task's progress log and handoff, verbatim"
         + (f". The newest task notes:\n{indented(notes)}" if notes else "."),
+        "- The workflow skill in use (such as implement or spec) and the section or step of it "
+        "that was running, so it is invoked again there.",
         "- The current plan step: the step in progress, the steps done and the steps left.",
         "- Each decision marked Review: pending, with who took it and why.",
         "- The files changed, each with what changed"
