@@ -351,6 +351,17 @@ class GuardBash(unittest.TestCase):
             "gh -R o/r pr merge 1 --admin",
         ])
 
+    def test_parallel_arguments_are_not_part_of_its_command(self):
+        # GNU parallel's command ends at its first argument separator (::: :::: :::+
+        # ::::+); what follows are arguments, not refspecs, so the push is only a push.
+        for command in ("parallel git push ::: origin", "parallel git push :::: remotes.txt",
+                        "parallel git push :::+ a ::: b", "parallel -j2 git push ::::+ a.txt"):
+            with self.subTest(command=command):
+                result = run("guard_bash.py", bash(command))
+                self.assertEqual(result.returncode, 2, result.stderr)
+                self.assertIn("git push publishes commits to a remote", result.stderr)
+                self.assertNotIn("deleting a remote ref", result.stderr)
+
     def test_admin_merge_skips_required_checks(self):
         self.assert_blocked(["gh pr merge 12 --admin --squash", "gh pr merge --admin"])
         self.assertIn("--admin merges without the required checks",
@@ -516,6 +527,10 @@ class GuardBypassBattery(unittest.TestCase):
         "find . -exec env HUSKY=0 git commit -m x \\;",
         "parallel git push ::: origin", "parallel -j 4 git -C {} push ::: a b",
         "parallel --jobs 2 --halt now,fail=1 git push", "parallel -j4 -k gh pr create --fill ::: x",
+        # options that take a value, from GNU parallel 20261022's option table
+        "parallel --trim lr git push ::: a", "parallel --sshdelay 2 git push ::: a",
+        "parallel --termseq INT,200 git push", "parallel --sql-master sqlite3:///x.db git push",
+        "parallel -S host git push ::: a", "parallel --nice 5 --tmpl a=b git push",
         "systemd-run --user --wait git push", "systemd-run -p Nice=5 --unit x -- git push",
         "systemd-run --user --property=CPUQuota=10% git push", "firejail git push",
         "firejail --noprofile --net=none git push", "firejail -- git push", "unshare -r git push",
