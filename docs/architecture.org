@@ -19,21 +19,23 @@ What the repository holds, and what each part produces.
 [[file:diagrams/arch_parts.svg]]
 
 The diagram groups =home/.agents/= and =claude-ai/= as the shared source,
-which both programs read; the adapter feeds =install.py= only, and
-=tools/build.py= does not read it. What each edge carries:
+which =install.py= reads as a whole; =tools/build.py= reads three of its
+boxes, and the adapter feeds =install.py= only. What each edge carries:
 
-| From                            | To                                 | What passes                                                                                                                                              |
-|---------------------------------+------------------------------------+----------------------------------------------------------------------------------------------------------------------------------------------------------|
-| =adapters/claude/settings.json= | =install.py=                       | merged into =~/.claude/settings.json=                                                                                                                    |
-| Shared source: =home/.agents/=  | =install.py=                       | all of it, copied to =~/.agents=                                                                                                                         |
-| Shared source: =claude-ai/=     | =install.py=                       | the claude.ai set, copied to =~/.agents/skills=; the overrides, read to turn off Claude Code's synced copy of each uploaded skill                        |
-| Shared source: =home/.agents/=  | =tools/build.py=                   | the local skills named in the overrides and the project-setup templates, zipped                                                                          |
-| Shared source: =claude-ai/=     | =tools/build.py=                   | the claude.ai set, zipped; the overrides, read for the local skills to zip and their short descriptions; =README.md=, packed into =claude-ai-skills.zip= |
-| =install.py=                    | =~/.agents= and each tool's folder | the installed files, written                                                                                                                             |
-| =tools/build.py=                | =dist/=                            | the zips, written                                                                                                                                        |
-| CI (=ci.yml=)                   | =tools/validate.py=                | run on every push and pull request                                                                                                                       |
-| CI (=ci.yml=)                   | =tests/=                           | run on every push and pull request                                                                                                                       |
-| CI (=ci.yml=)                   | =tools/build.py=                   | run on every push and pull request                                                                                                                       |
+| From                                   | To                                 | What passes                                                                                                                       |
+|----------------------------------------+------------------------------------+-----------------------------------------------------------------------------------------------------------------------------------|
+| =adapters/claude/settings.json=        | =install.py=                       | merged into =~/.claude/settings.json=                                                                                             |
+| Shared source: =home/.agents/=         | =install.py=                       | all of it, copied to =~/.agents=                                                                                                  |
+| Shared source: =claude-ai/=            | =install.py=                       | the claude.ai set, copied to =~/.agents/skills=; the overrides, read to turn off Claude Code's synced copy of each uploaded skill |
+| Local skills (=home/.agents/skills/=)  | =tools/build.py=                   | the local skills named in the overrides and the project-setup templates, zipped                                                   |
+| claude.ai set (=claude-ai/skills/=)    | =tools/build.py=                   | the claude.ai set, zipped                                                                                                         |
+| Overrides (=claude-ai/overrides.json=) | =tools/build.py=                   | read for the local skills to zip and their short descriptions                                                                     |
+| =claude-ai/README.md= (not drawn)      | =tools/build.py=                   | packed into =claude-ai-skills.zip=                                                                                                |
+| =install.py=                           | =~/.agents= and each tool's folder | the installed files, written                                                                                                      |
+| =tools/build.py=                       | =dist/=                            | the zips, written                                                                                                                 |
+| CI (=ci.yml=)                          | =tools/validate.py=                | run on every push and pull request                                                                                                |
+| CI (=ci.yml=)                          | =tests/=                           | run on every push and pull request                                                                                                |
+| CI (=ci.yml=)                          | =tools/build.py=                   | run on every push and pull request                                                                                                |
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
