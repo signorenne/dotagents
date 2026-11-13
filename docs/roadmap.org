@@ -27,8 +27,9 @@ As of 12 November 2026:
 
 - [X] One source in =home/.agents=, installed as =~/.agents=, with the global
   rules, the local skills, the claude.ai set, three subagents and four hooks.
-- [X] The installer for Claude Code, Codex, Gemini CLI, Copilot CLI and
-  Cursor, with backups, a dry run, an audit and idempotent reruns.
+- [X] The installer for Claude Code, Codex, Gemini CLI, Antigravity CLI,
+  Copilot CLI and Cursor, with backups, a dry run, an audit and idempotent
+  reruns.
 - [X] Claude Code tested end to end. The other tools' files follow their
   official documentation, and =tests/test_install.py= checks each generated
   hook file against it (events, matchers, tool names, timeouts).
@@ -65,9 +66,32 @@ As of 12 November 2026:
 
 ** Tools and platforms
 
-- [ ] A fetched page claims Gemini CLI was replaced by Antigravity CLI in June
-  2026. Unverified; check a primary source before changing the Gemini CLI
-  install.
+- [X] Gemini CLI was replaced by Antigravity CLI (=agy=) for Google AI Pro,
+  Ultra and free users on 18 June 2026; Gemini CLI stays for Code Assist
+  Standard and Enterprise licences and paid API keys (Google Developers Blog,
+  19 May 2026). The installer keeps the Gemini CLI adapter and adds one for
+  Antigravity CLI, built from its hooks, skills, rules and customization
+  discovery pages (=test_antigravity_*= in =tests/test_install.py= and
+  =tests/test_hooks.py=).
+- [ ] Antigravity CLI is untested in a real session. Its docs give no exit
+  codes, so the guard answers with a JSON decision and exit 0.
+- [ ] Antigravity CLI documents no reply that reaches the agent after an edit
+  (a PostToolUse hook returns ={}=), so its after-edit hook formats C and C++
+  but its dash report stays on stderr. A PreToolUse hook that denies a write
+  holding a dash, with the reason, would reach the agent; that is the
+  maintainer's call.
+- [ ] Antigravity CLI documents no event after a compaction or a resume
+  (=SessionStart= fires for a new conversation), so it gets no session
+  refresh.
+- [ ] Antigravity CLI's custom agents (=~/.gemini/config/agents/<name>.md=,
+  with their own frontmatter and tool names) are not generated yet.
+- [ ] The docs give no fields for the chunks of Antigravity CLI's
+  =multi_replace_file_content=, so the after-edit hook neither checks nor
+  formats that edit.
+- [ ] Antigravity CLI uses =~/.gemini= too, so on a machine with only
+  Antigravity CLI the installer also detects Gemini CLI and writes its files;
+  of those, Antigravity's docs list only =GEMINI.md= among the files it
+  reads.
 - [ ] The Codex rules file is untested in a real Codex session; Codex calls
   its rules experimental, and a prefix rule cannot match =git -C <dir> push=
   (the guard does).

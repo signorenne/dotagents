@@ -52,8 +52,8 @@ depend on the model remembering it.
 ** Who loads what
 
 - The global rules load at the start of every session: by the import in
-  =~/.claude/CLAUDE.md= in Claude Code, through links in Codex, Gemini CLI and
-  Copilot CLI, and by paste in Cursor and claude.ai.
+  =~/.claude/CLAUDE.md= in Claude Code, through links in Codex, Gemini CLI,
+  Antigravity CLI and Copilot CLI, and by paste in Cursor and claude.ai.
 - A skill's description is listed to the model (Claude Code drops the least
   used ones past a budget); its =SKILL.md= loads when a request matches the
   description or the user calls it by name. A reference file next to it loads
@@ -126,13 +126,14 @@ There is one source, =home/.agents=, installed as =~/.agents=
 Nothing is edited in a tool's own folder: a change is made here and the
 installer runs again.
 
-| Agent       | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                |
-|-------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+--------------------------------------------------------------------------------------|
-| Claude Code | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PreCompact, and SessionStart after compact or resume |
-| Codex       | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json= (approve in Codex)                                             |
-| Gemini CLI  | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                            |
-| Copilot CLI | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                |
-| Cursor      | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                                       |
+| Agent           | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                |
+|-----------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+--------------------------------------------------------------------------------------|
+| Claude Code     | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PreCompact, and SessionStart after compact or resume |
+| Codex           | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json= (approve in Codex)                                             |
+| Gemini CLI      | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                            |
+| Antigravity CLI | =~/.gemini/GEMINI.md= link, shared with Gemini CLI              | =~/.gemini/config/skills.json= lists =~/.agents/skills=     | none                                        | =~/.gemini/config/hooks.json=                                                        |
+| Copilot CLI     | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                |
+| Cursor          | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                                       |
 
 - /Generated, not copied by hand/ : each tool's subagent file is rendered from
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
@@ -153,9 +154,18 @@ installer runs again.
   entries are merged into the tool's settings file: earlier copies of this
   repository's hook entries are removed and the current ones appended, a rule
   the adapter denies is removed from =ask= (where an older install put it),
-  and the rest of the file is kept. The adapter also turns off the synced
+  and the rest of the file is kept. Antigravity CLI's hooks file maps hook
+  names to events: the installer rewrites its own two names
+  (=dotagents-guard=, =dotagents-after-edit=), keeps an =enabled= value set by
+  hand, and adds =~/.agents/skills= to the entries of the skills manifest. The adapter also turns off the synced
   plugin =engineering@synced=. A file that does not parse is left alone with a
   note to merge it by hand.
+- /Antigravity CLI/ : it replaced Gemini CLI for Google AI Pro, Ultra and free
+  users on 18 June 2026; Gemini CLI stays for Code Assist licences and paid
+  API keys, so both adapters stay. Antigravity CLI gets the guard and the
+  after-edit hook but no session refresh, because it documents no event after
+  a compaction or a resume, and no subagents yet. It is detected by
+  =~/.gemini/antigravity-cli= or the =agy= command.
 - /COPILOT_HOME/ : when it is set, Copilot CLI's files go to
   =$COPILOT_HOME= instead of =~/.copilot=, since it replaces that whole path;
   a relative value is refused with a note.
@@ -180,12 +190,12 @@ against it (events, matchers, tool names, timeouts).
 
 * Hooks and their failure model
 
-| Hook                 | Runs                                            | Tools                                   | Timeout |
-|----------------------+-------------------------------------------------+-----------------------------------------+---------|
-| =guard_bash.py=      | before a shell command                          | all five (Cursor through Claude Code's) | 10 s    |
-| =after_edit.py=      | after a file edit or write                      | all five (Cursor through Claude Code's) | 60 s    |
-| =session_refresh.py= | at session start after a compaction or a resume | Claude Code, Codex                      | 10 s    |
-| =compact_brief.py=   | before a compaction                             | Claude Code                             | 10 s    |
+| Hook                 | Runs                                            | Tools                                  | Timeout |
+|----------------------+-------------------------------------------------+----------------------------------------+---------|
+| =guard_bash.py=      | before a shell command                          | all six (Cursor through Claude Code's) | 10 s    |
+| =after_edit.py=      | after a file edit or write                      | all six (Cursor through Claude Code's) | 60 s    |
+| =session_refresh.py= | at session start after a compaction or a resume | Claude Code, Codex                     | 10 s    |
+| =compact_brief.py=   | before a compaction                             | Claude Code                            | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
