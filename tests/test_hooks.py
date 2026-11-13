@@ -42,6 +42,36 @@ def fake_program(folder: Path, name: str, body: str) -> Path:
     return program
 
 
+def committed_repo(test: unittest.TestCase) -> tuple:
+    """A repository on branch work with one commit, removed after the test."""
+    # An empty global config keeps the user's git settings out of the test; status.branch
+    # is a setting some users have, and its "## branch" line is not a change.
+    repo = Path(tempfile.mkdtemp())
+    test.addCleanup(shutil.rmtree, repo)
+    env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull}
+    git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
+           "-c", "commit.gpgsign=false"]
+    subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True, env=env)
+    subprocess.run([*git, "config", "status.branch", "true"], check=True, env=env)
+    (repo / "tracked.txt").write_text("one\n")
+    subprocess.run([*git, "add", "tracked.txt"], check=True, env=env)
+    subprocess.run([*git, "commit", "-q", "-m", "init"], check=True, env=env)
+    return repo, env
+
+
+def write_notes(repo: Path, notes: dict) -> None:
+    """Create .private files {relative path: modification time in epoch seconds},
+    git-ignored as in a real project."""
+    exclude = repo / ".git" / "info" / "exclude"
+    exclude.parent.mkdir(parents=True, exist_ok=True)
+    exclude.write_text(".private/\n")
+    for name, mtime in notes.items():
+        path = repo / ".private" / name
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("notes\n")
+        os.utime(path, (mtime, mtime))
+
+
 class GuardBash(unittest.TestCase):
     BLOCKED = [
         "git commit -m 'feat(x): y' --no-verify",
@@ -648,19 +678,7 @@ class SessionRefresh(unittest.TestCase):
         self.assertIn("Current branch: work", result.stdout)
 
     def committed_repo(self) -> tuple:
-        # An empty global config keeps the user's git settings out of the test; status.branch
-        # is a setting some users have, and its "## branch" line is not a change.
-        repo = Path(tempfile.mkdtemp())
-        self.addCleanup(shutil.rmtree, repo)
-        env = {**os.environ, "GIT_CONFIG_GLOBAL": os.devnull}
-        git = ["git", "-C", str(repo), "-c", "user.name=t", "-c", "user.email=t@example.com",
-               "-c", "commit.gpgsign=false"]
-        subprocess.run(["git", "init", "-q", "-b", "work", str(repo)], check=True, env=env)
-        subprocess.run([*git, "config", "status.branch", "true"], check=True, env=env)
-        (repo / "tracked.txt").write_text("one\n")
-        subprocess.run([*git, "add", "tracked.txt"], check=True, env=env)
-        subprocess.run([*git, "commit", "-q", "-m", "init"], check=True, env=env)
-        return repo, env
+        return committed_repo(self)
 
     def refresh(self, repo: Path, env: dict) -> subprocess.CompletedProcess:
         return self.refresh_with({"cwd": str(repo), "source": "resume"}, env)
@@ -707,16 +725,7 @@ class SessionRefresh(unittest.TestCase):
     REREAD = "Re-read the task's progress log before the next step."
 
     def write_notes(self, repo: Path, notes: dict) -> None:
-        """Create .private files {relative path: modification time in epoch seconds},
-        git-ignored as in a real project."""
-        exclude = repo / ".git" / "info" / "exclude"
-        exclude.parent.mkdir(parents=True, exist_ok=True)
-        exclude.write_text(".private/\n")
-        for name, mtime in notes.items():
-            path = repo / ".private" / name
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text("notes\n")
-            os.utime(path, (mtime, mtime))
+        write_notes(repo, notes)
 
     def test_points_to_the_most_recent_task_notes(self):
         repo, env = self.committed_repo()
@@ -786,6 +795,104 @@ class SessionRefresh(unittest.TestCase):
         # The notes are files, not git output: a slow git does not hide them.
         self.assertIn(".private/progress/p.org", result.stdout)
         self.assertIn(self.REREAD, result.stdout)
+
+
+class CompactBrief(unittest.TestCase):
+    # Claude Code's PreCompact: stdout of an exit 0 becomes instructions for the summary,
+    # cut at 10,000 characters; exit 2 blocks the compaction (code.claude.com/docs/en/hooks).
+    ITEMS = ["The task:", "its slug", "progress log and handoff", "The current plan step",
+             "Review: pending", "The files changed", "commands still needed",
+             "last result of each"]
+
+    def brief(self, payload, env: dict = None, script: Path = HOOKS / "compact_brief.py",
+              cwd: Path = None):
+        data = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, str(script)], input=data, capture_output=True,
+                              text=True, check=False, env=env, cwd=cwd)
+
+    def assert_brief(self, result):
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        for item in self.ITEMS:
+            self.assertIn(item, result.stdout)
+        self.assertLess(len(result.stdout), 10000)
+
+    def test_keeps_what_resuming_needs_with_the_real_state(self):
+        repo, env = committed_repo(self)
+        write_notes(repo, {"progress/task.org": 1_790_000_000,
+                                   "handoff/2026-11-12-task.org": 1_790_000_060})
+        (repo / "tracked.txt").write_text("two\n")
+        result = self.brief({"cwd": str(repo), "hook_event_name": "PreCompact", "trigger": "auto",
+                             "custom_instructions": None}, env)
+        self.assert_brief(result)
+        self.assertIn("The branch: work.", result.stdout)
+        self.assertIn(".private/progress/task.org", result.stdout)
+        self.assertIn(".private/handoff/2026-11-12-task.org", result.stdout)
+        self.assertIn("Uncommitted now:\n   M tracked.txt", result.stdout)
+
+    def test_long_state_stays_under_the_cap(self):
+        repo, env = committed_repo(self)
+        for index in range(60):
+            (repo / f"{index:02}{'x' * 200}.txt").write_text("new\n")
+        result = self.brief({"cwd": str(repo)}, env)
+        self.assert_brief(result)
+        self.assertIn("... and 45 more", result.stdout)
+
+    def test_never_blocks_on_bad_input(self):
+        # Without a usable cwd the hook reads its own working folder, here not a repository.
+        outside = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, outside)
+        for payload in ("not json", DEEP_JSON, [1], {"cwd": 5}, {"cwd": "bad\u0000path"},
+                        {"cwd": "/no/such/folder"}):
+            with self.subTest(payload=str(payload)[:40]):
+                result = self.brief(payload, cwd=outside)
+                self.assert_brief(result)
+                self.assertIn("- The branch the work is on.", result.stdout)
+
+    def test_brief_survives_no_stdin_and_a_narrow_stdout(self):
+        # Exit 1 does not block a compaction, but it loses the whole brief.
+        repo, env = committed_repo(self)
+        subprocess.run(["git", "-C", str(repo), "checkout", "-q", "-b", "w\u00f6rk"], check=True, env=env)
+        closed = subprocess.run(["sh", "-c", f'"{sys.executable}" "{HOOKS / "compact_brief.py"}" 0<&-'],
+                                capture_output=True, text=True, check=False, env=env, cwd=repo)
+        self.assert_brief(closed)
+        ascii_out = self.brief({"cwd": str(repo)}, {**env, "PYTHONIOENCODING": "ascii"})
+        self.assert_brief(ascii_out)
+        self.assertIn("The branch: w?rk.", ascii_out.stdout)
+
+    def test_reuses_session_refresh_without_leaving_a_cache(self):
+        hooks = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, hooks)
+        repo, env = committed_repo(self)
+        for name in ("compact_brief.py", "session_refresh.py"):
+            shutil.copy(HOOKS / name, hooks)
+        env = {k: v for k, v in env.items() if k != "PYTHONDONTWRITEBYTECODE"}
+        result = self.brief({"cwd": str(repo)}, env, script=hooks / "compact_brief.py")
+        self.assert_brief(result)
+        self.assertIn("The branch: work.", result.stdout)
+        self.assertEqual(sorted(p.name for p in hooks.iterdir()), ["compact_brief.py", "session_refresh.py"])
+
+    def test_brief_without_session_refresh(self):
+        hooks = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, hooks)
+        repo, env = committed_repo(self)
+        shutil.copy(HOOKS / "compact_brief.py", hooks)
+        result = self.brief({"cwd": str(repo)}, env, script=hooks / "compact_brief.py")
+        self.assert_brief(result)
+        self.assertIn("- The branch the work is on.", result.stdout)
+
+    def test_slow_git_stays_within_hook_timeout(self):
+        tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, tmp)
+        fake_program(tmp, "git", 'sleep 4\n[ "$1" = branch ] && echo work\nexit 0\n')
+        (tmp / ".git").mkdir()
+        write_notes(tmp, {"progress/p.org": 1_790_000_000})
+        env = {**os.environ, "PATH": f"{tmp}{os.pathsep}{os.environ.get('PATH', '')}"}
+        start = time.monotonic()
+        result = self.brief({"cwd": str(tmp)}, env)
+        self.assertLess(time.monotonic() - start, 9.5)
+        self.assert_brief(result)
+        self.assertIn("The branch: work.", result.stdout)
+        self.assertIn(".private/progress/p.org", result.stdout)
 
 
 if __name__ == "__main__":

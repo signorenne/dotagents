@@ -37,9 +37,9 @@ depend on the model remembering it.
   =home/.agents/agents/=, in Claude Code format (name, description, tools,
   model, and where set effort and color), the source of every other tool's
   copy.
-- /Hooks/ : =guard_bash.py=, =after_edit.py= and =session_refresh.py= in
-  =home/.agents/hooks/=, shared by every tool; the guard and the after-edit
-  hook learn which tool called them from =--tool=.
+- /Hooks/ : =guard_bash.py=, =after_edit.py=, =session_refresh.py= and
+  =compact_brief.py= in =home/.agents/hooks/=, shared by every tool; the
+  guard and the after-edit hook learn which tool called them from =--tool=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
   build commands allowed, =git push= denied (also as =git -C <dir> push=),
   =git reset --hard=, =git clean=, =git rebase= and =rm -rf= asked first,
@@ -126,13 +126,13 @@ There is one source, =home/.agents=, installed as =~/.agents=
 Nothing is edited in a tool's own folder: a change is made here and the
 installer runs again.
 
-| Agent       | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                |
-|-------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+----------------------------------------------------------------------|
-| Claude Code | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, plus SessionStart after compact or resume |
-| Codex       | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json= (approve in Codex)                             |
-| Gemini CLI  | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                            |
-| Copilot CLI | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                |
-| Cursor      | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                       |
+| Agent       | Global rules                                                    | Skills                                                      | Subagents                                   | Hooks                                                                                |
+|-------------+-----------------------------------------------------------------+-------------------------------------------------------------+---------------------------------------------+--------------------------------------------------------------------------------------|
+| Claude Code | =~/.claude/CLAUDE.md= imports =~/.agents/AGENTS.md=             | every skill linked in =~/.claude/skills=, synced copies off | =~/.claude/agents=                          | =~/.claude/settings.json=, with PreCompact, and SessionStart after compact or resume |
+| Codex       | =~/.codex/AGENTS.md= link                                       | reads =~/.agents/skills=                                    | =~/.codex/agents/*.toml=                    | =~/.codex/hooks.json= (approve in Codex)                                             |
+| Gemini CLI  | =~/.gemini/GEMINI.md= link; =context.fileName= adds =AGENTS.md= | reads =~/.agents/skills=                                    | =~/.gemini/agents/*.md=                     | =~/.gemini/settings.json=                                                            |
+| Copilot CLI | =~/.copilot/copilot-instructions.md= link                       | reads =~/.agents/skills=                                    | =~/.copilot/agents/*.agent.md=              | =~/.copilot/hooks/agents-global.json=                                                |
+| Cursor      | paste =~/.agents/AGENTS.md= into User Rules                     | reads =~/.agents/skills=                                    | reads =~/.claude/agents= (with Claude Code) | reads the Claude Code hooks (with Claude Code)                                       |
 
 - /Generated, not copied by hand/ : each tool's subagent file is rendered from
   the Claude Code source (TOML for Codex, Markdown for Gemini CLI, =.agent.md=
@@ -179,6 +179,7 @@ against it (events, matchers, tool names, timeouts).
 | =guard_bash.py=      | before a shell command                          | all five (Cursor through Claude Code's) | 10 s    |
 | =after_edit.py=      | after a file edit or write                      | all five (Cursor through Claude Code's) | 60 s    |
 | =session_refresh.py= | at session start after a compaction or a resume | Claude Code                             | 10 s    |
+| =compact_brief.py=   | before a compaction                             | Claude Code                             | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
@@ -192,13 +193,21 @@ lines of a C or C++ file that the edit changed (a newly written file whole).
 The session refresh reminds the agent that its picture of the code is a
 summary, prints the real branch, changes and last commits, lists the newest
 files of =.private/progress/= and =.private/handoff/=, and asks the agent to
-re-read the progress log.
+re-read the progress log. The compaction brief tells the summary what resuming
+needs: the task and its slug, the branch, the paths of the progress log and
+handoff, the current plan step, the decisions marked Review: pending, the files
+changed and the commands still needed with their last results; it fills in the
+branch, the uncommitted changes and the newest task notes itself.
 
 The hooks share one failure model:
 
 - /Never block on unreadable input/ : a payload that does not parse exits 0,
   so a broken payload never stops normal work. The session refresh never fails
   the session.
+- /Never block a compaction/ : exit 2 from a PreCompact hook blocks the
+  compaction, and one that recovers from a full context then fails the
+  request. The compaction brief always exits 0, and its command ends in
+  =|| true= because =python3= itself exits 2 when the script is missing.
 - /Block with exit 2/ : the reason goes to stderr, which the agent sees.
   Copilot CLI shows stderr only to the user, so the guard also prints a deny
   decision with the reason on stdout, and the after-edit hook sends its report
@@ -208,8 +217,9 @@ The hooks share one failure model:
   additional context in each tool's documented format.
 - /Finish inside the timeout/ : Claude Code drops all output of a hook that
   times out, so each hook bounds its own work below the configured timeout
-  (8 s for the notes listing and the git calls of the session refresh,
-  clang-format under 60 s).
+  (8 s for the notes listing and the git calls of the session refresh and of
+  the compaction brief, clang-format under 60 s); the brief also stays under
+  the 10,000 characters past which Claude Code cuts it.
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
   prompt never offers it.
@@ -237,8 +247,8 @@ mechanical rules are the Hard rules of [[file:AGENTS.md][AGENTS.md]]; the docstr
 - /Subagents/ : a role noun (=scout=, =gate-runner=, =reviewer=), equal to the
   file name.
 - /Hooks/ : snake case Python scripts named for their job (=guard_bash.py=,
-  =after_edit.py=, =session_refresh.py=); a hook that serves several tools
-  takes =--tool <name>=.
+  =after_edit.py=, =session_refresh.py=, =compact_brief.py=); a hook that
+  serves several tools takes =--tool <name>=.
 - /Docs/ : root hubs in upper case (=README.org=, =DESIGN.org=), the rest in
   hyphen case under =docs/=.
 - /Terms/ : one word per concept, as [[file:docs/glossary.org][docs/glossary.org]] names it.
