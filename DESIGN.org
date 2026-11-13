@@ -330,6 +330,7 @@ is designed but not merged yet.
 | =as-built-pictures=         | as-built-docs                                                                      | in a project, the skill's check 7 (a legend entry for each marker)                                                                                        |
 | =confirmed-audit-findings=  | code-audit                                                                         | in a project, the check that confirms each finding (a test, a reproduction or a refuting subagent)                                                        |
 | =no-agent-push=             | global rules (Agentic work, Git)                                                   | the guard in every tool (=tests/test_hooks.py=), Claude Code's deny rules, the Codex rules file; planned: onFailure block on the guard                    |
+| =main-commits-here=         | =AGENTS.md= (Hard rules)                                                           | the maintainer's review before every push                                                                                                                 |
 | =isolated-worktrees=        | global rules (Agentic work), isolated-work, parallel-agents, implement (section 4) | Claude Code asks before =git rebase=; planned: before =git -C <dir> rebase=, =git update-ref=, =git branch -D=                                            |
 | =no-ai-attribution=         | global rules (Git), =AGENTS.md= (Hard rules)                                       | Claude Code's empty attribution settings; planned: this repository's commit-msg hook (AI trailers, subject format)                                        |
 | =mit-license=               | =AGENTS.md= (Hard rules)                                                           | =tools/validate.py= (a =LICENSE.txt= in every skill folder)                                                                                               |
@@ -587,6 +588,18 @@ every change before it leaves the machine, and pushes.
 
 In: =home/.agents/hooks/guard_bash.py=, =adapters/claude/settings.json= (deny),
 =install.py= (Codex rules), =home/.agents/AGENTS.md= (Agentic work, Git).
+
+*** Commits may go straight on main in this repository
+:PROPERTIES:
+:CUSTOM_ID: main-commits-here
+:END:
+In dotagents, small commits may go straight on the local main branch, an
+exception to the global rule "work on a branch, never on main": nothing
+leaves the machine until the maintainer has reviewed it and pushed it.
+Parallel or risky work still runs in its own worktree and lands by rebase and
+fast-forward ([[#isolated-worktrees][isolated worktrees]]).
+
+In: =AGENTS.md= (Hard rules).
 
 *** Parallel and risky work is isolated in worktrees
 :PROPERTIES:
