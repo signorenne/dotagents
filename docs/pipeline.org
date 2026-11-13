@@ -172,13 +172,13 @@ and fast-forward keep the history linear).
 
 * Where a fresh session starts
 
-| After                                 | The next session                                    | Reads first                                  |
-|---------------------------------------+-----------------------------------------------------+----------------------------------------------|
-| spec                                  | runs implement on the spec path                     | the spec                                     |
-| session-close                         | runs implement on the spec from the named plan step | the handoff, then the progress log           |
-| a split approved by parallel-agents   | each agent starts at implement section 5            | its brief, with its approved plan steps      |
-| a compaction or a resume, Claude Code | continues                                           | what the session refresh lists, then the log |
-| a compaction, any other tool          | continues                                           | the progress log, when the maintainer asks   |
+| After                                          | The next session                                    | Reads first                                  |
+|------------------------------------------------+-----------------------------------------------------+----------------------------------------------|
+| spec                                           | runs implement on the spec path                     | the spec                                     |
+| session-close                                  | runs implement on the spec from the named plan step | the handoff, then the progress log           |
+| a split approved by parallel-agents            | each agent starts at implement section 5            | its brief, with its approved plan steps      |
+| a compaction or a resume, Claude Code or Codex | continues                                           | what the session refresh lists, then the log |
+| a compaction or a resume, the other tools      | continues                                           | the progress log, when the maintainer asks   |
 
 A resumed implement takes the slug from the branch or the log's file name,
 reads the newest handoff of that slug for its open questions and the commands
