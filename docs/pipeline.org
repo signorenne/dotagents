@@ -187,10 +187,10 @@ the log records as approved unless grounding changes it.
 In a worktree, the session runs inside the worktree; the spec and the notes
 stay in the main checkout's =.private/= and are passed by absolute path.
 
-Only Claude Code has a session start hook: after a compaction or a resume, the
-session refresh prints the real git state, lists the newest files of
-=.private/progress/= and =.private/handoff/=, and asks the agent to re-read the
-progress log. In the other tools, ask for that re-read.
+Claude Code and Codex run the session refresh after a compaction or a resume:
+it prints the real git state, lists the newest files of =.private/progress/=
+and =.private/handoff/=, and asks the agent to re-read the progress log and
+invoke its workflow skill again. In the other tools, ask for that re-read.
 
 * Who lands and pushes
 

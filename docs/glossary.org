@@ -25,7 +25,7 @@ coin a synonym in a local doc when this file already names the concept.
 | hook            | A script a tool runs on its own at an event (before a shell command, after an edit, at session start), outside the model.                                   |
 | guard           | =guard_bash.py=, the hook that blocks git gate bypasses and every push or publish (=git push=, =gh pr create= and the like) in every tool.                  |
 | after-edit hook | =after_edit.py=, the hook that flags em and en dashes in text just written and runs clang-format on the C and C++ lines an edit changed.                    |
-| session refresh | =session_refresh.py=, the Claude Code hook that prints the real git state and the newest progress and handoff files after a compaction or a resume.         |
+| session refresh | =session_refresh.py=, the Claude Code and Codex hook that prints the real git state and the newest progress and handoff files after a compaction or a resume.         |
 | adapter         | A settings fragment for one tool that the installer merges into that tool's settings; today =adapters/claude/settings.json=.                                |
 | bridge          | A tool-specific Markdown file (=CLAUDE.md=, =GEMINI.md=, =.github/copilot-instructions.md=) that points to =AGENTS.md= and holds no rule of its own.        |
 | install         | A run of =python3 install.py=: it copies the source to =~/.agents=, links or generates each detected tool's files, and is safe to repeat.                   |
