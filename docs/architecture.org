@@ -22,11 +22,11 @@ The diagram groups =home/.agents/= and =claude-ai/= as the shared source,
 which both programs read; the adapter feeds =install.py= only. What each
 program takes from each source:
 
-| Source             | =install.py=                                                                                                                     | =tools/build.py=                                                                                     |
-|--------------------+----------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------|
-| =home/.agents/=    | copies all of it to =~/.agents=                                                                                                  | zips the local skills named in the overrides and the project-setup templates                         |
-| =claude-ai/=       | copies the claude.ai set to =~/.agents/skills=; reads the overrides to turn off Claude Code's synced copy of each uploaded skill | zips the claude.ai set; reads the overrides for the local skills to zip and their short descriptions |
-| =adapters/claude/= | merges =settings.json= into =~/.claude/settings.json=                                                                            | does not read it                                                                                     |
+| Source             | =install.py=                                                                                                                     | =tools/build.py=                                                                                                                               |
+|--------------------+----------------------------------------------------------------------------------------------------------------------------------+------------------------------------------------------------------------------------------------------------------------------------------------|
+| =home/.agents/=    | copies all of it to =~/.agents=                                                                                                  | zips the local skills named in the overrides and the project-setup templates                                                                   |
+| =claude-ai/=       | copies the claude.ai set to =~/.agents/skills=; reads the overrides to turn off Claude Code's synced copy of each uploaded skill | zips the claude.ai set; reads the overrides for the local skills to zip and their short descriptions; packs =claude-ai/README.md= into the zip |
+| =adapters/claude/= | merges =settings.json= into =~/.claude/settings.json=                                                                            | does not read it                                                                                                                               |
 
 - =home/.agents/= is the installed source: the global rules (=AGENTS.md=), the
   18 local skills (=skills/=), the three subagents in Claude Code format
