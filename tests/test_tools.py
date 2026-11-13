@@ -49,12 +49,12 @@ class Tools(unittest.TestCase):
     def test_validate_holds_the_global_rules_under_the_session_hook_cap(self):
         rules = self.repo / "home/.agents/AGENTS.md"
         text = rules.read_text()
-        rules.write_text(text + "x" * (9000 - len(text)))
+        rules.write_text(text + "x" * (9500 - len(text)))
         self.assertEqual(self.run_tool("validate.py").returncode, 0)
-        rules.write_text(text + "x" * (9001 - len(text)))
+        rules.write_text(text + "x" * (9501 - len(text)))
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
-        self.assertIn("FAIL home/.agents/AGENTS.md: 9001 characters (limit 9000", result.stdout)
+        self.assertIn("FAIL home/.agents/AGENTS.md: 9501 characters (limit 9500", result.stdout)
 
     def test_validate_keeps_the_packs_in_step_with_their_sources(self):
         marketplace = self.repo / ".claude-plugin/marketplace.json"

@@ -30,7 +30,7 @@ docs/                         Org docs: docs map, architecture, workflow guide, 
 
 ## Where changes go
 
-- A rule for every agent and every chat: home/.agents/AGENTS.md (at most 9,000 characters, checked by tools/validate.py: the Claude Code pack injects it at session start, and the same text is pasted into claude.ai).
+- A rule for every agent and every chat: home/.agents/AGENTS.md (at most 9,500 characters, checked by tools/validate.py: the Claude Code pack injects it at session start, and the same text is pasted into claude.ai).
 - The method itself (lanes, the plan file, stops, review, checks): METHOD.org, then the skills that apply it.
 - A repo workflow (build, design, close, review...): a skill in home/.agents/skills/<name>/, listed in one pack of tools/build.py (PACKS); then python3 tools/build.py --marketplace.
 - A general skill also wanted in claude.ai chat: claude-ai/skills/<name>/. A local skill wanted there too: an entry in claude-ai/overrides.json, never a copy.

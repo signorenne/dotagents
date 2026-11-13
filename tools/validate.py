@@ -75,7 +75,7 @@ CLAUDE_AI_LIMIT = 200
 SKILL_BODY_LIMIT = 20000
 # The Claude Code pack injects the global rules through a SessionStart hook, whose output
 # Claude Code caps at 10,000 characters (over it the model sees a 2,000-character preview).
-GLOBAL_RULES_LIMIT = 9000
+GLOBAL_RULES_LIMIT = 9500
 SKILL_FIELDS = {"name", "description", "license"}
 AGENT_REQUIRED = {"name", "description", "tools", "model"}
 EFFORTS = {"low", "medium", "high", "xhigh", "max"}  # Claude Code's subagent effort levels

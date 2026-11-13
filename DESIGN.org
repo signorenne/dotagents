@@ -22,7 +22,7 @@ The global rules say how to work, a skill says how to do one kind of work, a
 subagent does one job in a fresh context, and a hook enforces what must not
 depend on the model remembering it.
 
-- /Global rules/ : =home/.agents/AGENTS.md=, at most 9,000 characters
+- /Global rules/ : =home/.agents/AGENTS.md=, at most 9,500 characters
   (=tools/validate.py=) because the Claude Code pack prints them from a
   session-start hook, whose output Claude Code caps at 10,000 characters, and
   the same text is pasted into claude.ai. They cover priorities, sufficiency,
@@ -551,6 +551,7 @@ failure hook's reminder.
 | =inline-build=              | =METHOD.org=                                                                   | none: the model only                                                                                                                                              |
 | =delegation-tiers=          | global rules (Agentic work), the fan-out skills                                | none: the model only                                                                                                                                              |
 | =terse-register=            | global rules (Output)                                                          | none: the model only                                                                                                                                              |
+| =one-shell-command=         | global rules (Agentic work)                                                    | none: the model only                                                                                                                                              |
 | =method-owner=              | =AGENTS.md= (Where changes go)                                                 | none: the model only                                                                                                                                              |
 | =fail-rules=                | =METHOD.org= (Measuring)                                                       | =tools/session_stats.py=; the counts when 10 changes of a lane have landed                                                                                        |
 | =learning-in-global-rules=  | global rules (Learning), tutor                                                 | none: the model only                                                                                                                                              |
@@ -559,7 +560,7 @@ failure hook's reminder.
 | =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                  | the reviewer's checklist question; the replay report in the plan file                                                                                             |
 | =installer-manifest=        | =AGENTS.md= (Where changes go)                                                 | =tests/test_install.py= (Descriptions, Manifest); the install and rollback proof                                                                                  |
 | =packs-and-personal-layer=  | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (the marketplace and packs match =tools/build.py=)                                                                                            |
-| =global-rules-size=         | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (at most 9,000 characters)                                                                                                                    |
+| =global-rules-size=         | =AGENTS.md= (Where changes go)                                                 | =tools/validate.py= (at most 9,500 characters)                                                                                                                    |
 | =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                           | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
 | =skills-from-real-runs=     | =docs/skill-authoring.org=                                                     | none: the model only                                                                                                                                              |
 | =light-scripts=             | =AGENTS.md= (Where changes go)                                                 | =tests/test_skill_scripts.py= (the cases that need Pillow skip without it)                                                                                        |
@@ -612,6 +613,22 @@ against 477 prompts. Replaces =stop-on-plan-change=.
 
 In: =METHOD.org= (Questions and stops), =home/.agents/AGENTS.md=
 (Agentic work), =home/.agents/skills/build/SKILL.md=.
+
+*** A shell call runs one plain command
+:PROPERTIES:
+:CUSTOM_ID: one-shell-command
+:END:
+A shell call runs one plain command, or a short chain of them: no
+multi-line script and no variable assignment in front of a command, since
+those wait for an approval every time (141 and about 40 of the 341
+hand-approved calls from 25 September to 8 November 2026); a longer script goes into
+a file in the scratch folder and runs as one command, and cleanup removes
+named files, never rm -rf where a narrower command exists. It takes the
+place of allow rules for read-only commands, which that count refuted:
+none of the 341 calls held only read-only parts. Accepted by the
+maintainer on 12 November 2026.
+
+In: =home/.agents/AGENTS.md= (Agentic work).
 
 *** Questions come in one batch, after an assumptions table
 :PROPERTIES:
@@ -818,13 +835,14 @@ the shared one.
 In: =tools/build.py= (PACKS), =packs/=, =.claude-plugin/marketplace.json=,
 =personal/=, =install.py= (=--personal=).
 
-*** The global rules stay under 9,000 characters
+*** The global rules stay under 9,500 characters
 :PROPERTIES:
 :CUSTOM_ID: global-rules-size
 :END:
 Checked by tools/validate.py, because the Claude Code pack prints them from
 a session-start hook capped at 10,000 characters. Replaces the 200-line
-limit.
+limit. Raised from 9,000 by the maintainer on 12 November 2026 to make room
+for =one-shell-command=.
 
 In: =tools/validate.py=, =AGENTS.md= (Where changes go).
 
