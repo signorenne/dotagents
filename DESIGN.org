@@ -262,16 +262,16 @@ against it (events, matchers, tool names, timeouts).
 
 * Hooks and their failure model
 
-| Hook                  | Runs                                          | Tools                                                                 | Timeout |
-|-----------------------+-----------------------------------------------+-----------------------------------------------------------------------+---------|
-| =guard_bash.py=       | before a shell command                        | all six (Cursor through Claude Code's)                                | 10 s    |
-| =after_edit.py=       | after a file edit or write                    | all six (Cursor through Claude Code's)                                | 60 s    |
-| =session_refresh.py=  | at session start: new, clear, compact, resume | Claude Code, Codex; at a start, JSON: Gemini CLI, Copilot CLI, Cursor | 10 s    |
-| =compact_brief.py=    | before a compaction                           | Claude Code                                                           | 10 s    |
-| =step_log.py=         | before the agent ends its turn                | Claude Code, Codex                                                    | 10 s    |
-| =context_nudge.py=    | after a shell command                         | Claude Code                                                           | 10 s    |
-| =claim_check.py=      | before the agent ends its turn                | Claude Code                                                           | 10 s    |
-| =repeated_failure.py= | after a shell command fails                   | Claude Code                                                           | 10 s    |
+| Hook                  | Runs                                          | Tools                                                                                                    | Timeout |
+|-----------------------+-----------------------------------------------+----------------------------------------------------------------------------------------------------------+---------|
+| =guard_bash.py=       | before a shell command                        | all six (Cursor through Claude Code's)                                                                   | 10 s    |
+| =after_edit.py=       | after a file edit or write                    | all six (Cursor through Claude Code's)                                                                   | 60 s    |
+| =session_refresh.py=  | at session start: new, clear, compact, resume | Claude Code, Codex; JSON: Gemini CLI (start, resume, clear), Copilot CLI (start, resume), Cursor (start) | 10 s    |
+| =compact_brief.py=    | before a compaction                           | Claude Code                                                                                              | 10 s    |
+| =step_log.py=         | before the agent ends its turn                | Claude Code, Codex                                                                                       | 10 s    |
+| =context_nudge.py=    | after a shell command                         | Claude Code                                                                                              | 10 s    |
+| =claim_check.py=      | before the agent ends its turn                | Claude Code                                                                                              | 10 s    |
+| =repeated_failure.py= | after a shell command fails                   | Claude Code                                                                                              | 10 s    |
 
 The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
@@ -424,33 +424,37 @@ an assumption worth stress testing, because it may be wrong and can go stale
 as models improve: its author dropped context resets once Opus 4.5 largely
 stopped showing the behavior they countered and the sprint structure once Opus
 4.6 could do the work without that decomposition, but kept the planner and the
-evaluator, which still added clear value (here spec and the reviewer play
+evaluator, which still added clear value (here design, the full lane's plan check and the reviewer play
 those parts). Re-examine this list when a new model becomes the default for a
 role, and change or retire a component when the observation named for it
-holds; the progress logs hold most of the evidence (each review finding with
-its disposition, each gate run with its result). This section records reasons,
+holds; the plan files and their logs hold most of the evidence (each review
+finding with its verdict, each gate run with its result). This section records reasons,
 not rules: a change that touches a rule that binds still follows that rule.
 
-- /Spec verification/ (spec step 5: a subagent that did not write the spec
-  paraphrases it, then checks every claim and gives a second reading of each
-  criterion) : assumes the writer misses its own errors (a wrong path or
-  symbol, an unverifiable claim, a criterion with two readings) and that a
-  reader who has only the spec finds where it is ambiguous. Revisit when,
-  over several specs, it finds nothing the writer had not already caught.
+- /Plan and design verification/ (design step 5 and build's full lane: a
+  subagent that did not write the document paraphrases it, then checks every
+  claim and gives a second reading of each criterion) : assumes the writer
+  misses its own errors (a wrong path or symbol, an unverifiable claim, a
+  criterion with two readings) and that a reader who has only the document
+  finds where it is ambiguous. Revisit when, over several plans, it finds
+  nothing the writer had not already caught.
 - /Reviewer/ (in Claude Code Opus at high effort, in a fresh context) :
   assumes the writer misses its own errors and the weak spots of its own
   tests, and that the strongest model, free of the writing context, finds
   them. Revisit when its findings on several branches are all minor or
   already caught by the gates: a cheaper model or effort, or a review only
   of changes across modules, would then do.
-- /The reviewer's second pass/ (after a fix that changed behavior or added or
-  changed a test) : assumes a fix made under review brings errors of its own
-  and that a new test needs its own attack. Revisit when second passes over
-  several fixes find nothing new.
+- /The reviewer's second pass/ (only at high risk, when a fix added a public
+  surface or the maintainer pinned a thorough review: =single-review-pass=) :
+  assumes a fix made under review brings errors of its own; elsewhere each
+  behavior-changing fix is proven by a test seen failing first instead. The
+  baseline found later-pass majors in 6 of about 21 changes; fail rule R
+  watches whether dropping the pass costs quality.
 - /scout/ (in Claude Code Sonnet) : assumes reading a whole area fills the
   main context and degrades the plan, and that a cheaper model maps it
-  reliably into a short cited brief. implement already skips it when the
-  spec's affected paths have not changed since the spec was checked. Revisit
+  reliably into a short cited brief. build calls it only for an unknown or
+  wide area, and reuses a code map whose paths have not changed since it was
+  checked. Revisit
   when plans made without it are no worse, or when its briefs miss owners or
   callers the plan then needs.
 - /gate-runner on a cheaper model/ (in Claude Code Haiku at low effort,
@@ -645,7 +649,8 @@ The implementer sees each test fail for the right reason, and check_step
 records the failing run; the reviewer names a wrong implementation that
 would still pass each new or changed test. A test a review fix adds is
 proven by a failing run and attacked again only when the risk is high or
-the fix added a public surface. An expected value changes only with cited
+the fix added a public surface; a change the maintainer pinned to no review
+has no reviewer attack, only its failing runs. An expected value changes only with cited
 evidence, and deleting, skipping or loosening a test needs the maintainer's
 approval, except the test of a behavior an approved plan removes.
 
@@ -682,8 +687,10 @@ In: =home/.agents/skills/build/=, =design/=, =close/=.
 :CUSTOM_ID: single-review-pass
 :END:
 A second reviewer pass, limited to the fixes, happens only when the risk is
-high or a fix added a public surface; every behavior-changing fix is proven
-by a test seen failing first. Revisit by fail rule R.
+high, a fix added a public surface or the maintainer pinned a thorough
+review for the change; every behavior-changing fix is proven by a test seen
+failing first. The maintainer can also pin no review for a change. Revisit
+by fail rule R.
 
 In: =METHOD.org= (Review and triage), =home/.agents/skills/build/SKILL.md=
 (section 7).

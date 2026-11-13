@@ -97,7 +97,7 @@ were not run.
   the real branch, changes and last commits, and a reminder that the agent's
   memory of the code is a summary). Gemini CLI, Copilot CLI and Cursor get
   the same refresh as JSON (Gemini CLI on a start, a resume or a clear;
-  Copilot CLI and Cursor at a session's start). Antigravity CLI has no such
+  Copilot CLI on a start or a resume; Cursor at a session's start). Antigravity CLI has no such
   hook here: ask the agent to run the build skill, which starts from
   plan_state.py.
 - Plan files and their logs, designs and handoffs live in =.private/= inside

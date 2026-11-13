@@ -75,7 +75,8 @@ once before it reaches any tool.
    format only, or where a tool lacks a feature, and then the difference is
    stated: only Claude Code and Codex get the session refresh after a
    compaction, because only they have a session start hook that fires then;
-   Gemini CLI, Copilot CLI and Cursor get it at a session's start.
+   Gemini CLI and Copilot CLI get it at a start and a resume, Cursor at a
+   start.
 6. Verified, not assumed. Nothing is called working, passing or done before a
    check ran. =tests/test_install.py= checks each generated hook file against
    the tool's documentation, and a behavior change is tested in a real session

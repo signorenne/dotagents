@@ -570,7 +570,14 @@ Session refresh (=session_refresh.py=):
    a slow git cannot leave them out; the excerpt, the listing and the git
    calls share 8 s, under the 10 s timeout past which Claude Code drops the
    output.
-5. Exit 0; its stdout joins the agent's context.
+5. Exit 0. In Claude Code and Codex its plain stdout joins the agent's
+   context. With =--tool gemini=, =copilot= or =cursor= (and on any Cursor
+   payload, which holds =workspace_roots=, whatever the flag says) the same
+   text goes out as that tool's JSON: =hookSpecificOutput.additionalContext=,
+   =additionalContext= or =additional_context=, and ={}= when there is
+   nothing to add or on an error. Copilot CLI's =new= source and Cursor's
+   missing source count as a start, and Cursor's first workspace root is the
+   working folder.
 
 Step log (=step_log.py=):
 

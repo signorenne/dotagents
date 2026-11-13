@@ -206,7 +206,8 @@ Three standard-library scripts in the build skill, each one call:
 
 The full lane runs the baseline (the narrow check and the tests that pin the
 unchanged behavior) on the base commit before the first step; the quick
-lane does not. A step ends when its check passes, and the work when the
+lane does not. A step ends when its check passes and its deliverables
+(docs, tests, examples, build lists) are in sync, and the work when the
 acceptance checks pass: nothing is polished after them, and anything worth
 more becomes a deferred line or a new plan. The narrow check runs per step, the full gates once on the
 last commit, through gate-runner.
@@ -233,7 +234,9 @@ last commit, through gate-runner.
   fact=, or the job's own row, such as a finding or a claim's verdict), no
   prose and no restatement of the brief, within the size limit. The caller
   reads the status first: partial or too-big re-splits the job, needs-confirm
-  goes to the caller's own check, blocked to its stop list.
+  goes to the caller's own check, blocked to its stop list. scout,
+  gate-runner and the reviewer keep their own fixed forms (the brief, the
+  verdict table, the findings), which their definitions state.
 - scout is called only when the area is unknown or wide; the quick lane reads
   its few files itself. gate-runner runs on the smallest model at low effort.
   The reviewer and every agent that judges (fact-checks, verdicts) run on the
