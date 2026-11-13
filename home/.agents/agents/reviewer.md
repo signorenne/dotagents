@@ -28,7 +28,7 @@ Method:
    - wiring: each new function, type, option, command or endpoint is reached by its callers (search for them), not left as a stub, a placeholder or code nothing calls;
    - contract drift: code versus API docs, preconditions and postconditions, guides and examples;
    - completeness of the deliverable set the project requires for this kind of change;
-   - requirements: when the progress log names a spec, each acceptance criterion met by the diff and pinned by a test or command that can fail;
+   - requirements: when the progress log names a spec, each acceptance criterion met by the diff and pinned by a test or command that can fail, and each item of its unchanged behavior still pinned by its test, which the diff does not delete, skip or loosen and which passed in the recorded final gates;
    - decisions: each decision the spec or the progress log records is carried out in the diff, or the progress log records it as a deviation;
    - the project's hard rules and conventions (naming, error model, doc format, no em or en dashes, commit subject format);
    - conflicts with Accepted decisions, and rules changed without the maintainer's approval;
