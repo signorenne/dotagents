@@ -242,18 +242,23 @@ themselves, with what each leaves and where, are in [[file:pipeline.org][docs/pi
    choice with decide, and has a subagent that did not write it check the
    spec (in Claude Code the general-purpose subagent, elsewhere reviewer).
 3. Implement, gates and review: a fresh session runs implement on the spec
-   file. implement grounds the plan with scout, takes the user's choices to
-   decide, writes each test first by trustworthy-tests, turns to
-   systematic-debugging after two failed fixes, runs the full gates through
-   gate-runner and the review through reviewer, and creates the worktree
-   through isolated-work when the plan's isolation was approved.
+   file. implement grounds the plan with scout (skipped when the spec records
+   the commit its check ran on and none of the spec's affected paths changed
+   since, as =git diff --quiet= shows) and its own reading of the files it
+   will touch, takes the user's choices to decide, writes each test first by
+   trustworthy-tests, turns to systematic-debugging after two failed fixes,
+   runs the full gates through gate-runner and the review through reviewer,
+   and creates the worktree through isolated-work when the plan's isolation
+   was approved.
 4. On request: gates and branch-review are the user's direct way to the same two
    subagents; implement calls the subagents itself, not these skills.
 5. Close: session-close writes the handoff that the next fresh session reads
    before resuming implement.
 6. Land and clean up: on the user's go, isolated-work rebases the branch,
    gates the rebased commit through gate-runner, fast-forwards the target and
-   removes the worktree and the branch.
+   removes the worktree and the branch. It skips the gate run only when the
+   rebase left the pinned commit unchanged and the progress log records the
+   full gates passing on a clean tree at that hash.
 
 decide is where every choice that belongs to the user is settled. Besides the
 callers drawn here, architecture-doc, mechanical-changes, parallel-agents,
@@ -300,8 +305,9 @@ The subagents these skills use:
   Code, elsewhere reviewer told that its target is the claim, not the branch
   diff).
 - mechanical-changes sends its review to reviewer. parallel-agents gates each
-  branch through isolated-work, which runs gate-runner on the rebased commit,
-  and reviews the merged result through implement's review.
+  branch through isolated-work, which runs gate-runner on the rebased commit
+  (unless the rebase left it unchanged and its pass is logged), and reviews
+  the merged result through implement's review.
 
 * The claude.ai skills
 
