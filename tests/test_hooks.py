@@ -1794,7 +1794,7 @@ class ClaimCheck(unittest.TestCase):
                          "<tool_use_error>String not found</tool_use_error>" if failed else "The file was updated.",
                          failed)
 
-    def tests(self, passed: bool = True, command: str = "python3 -m pytest -q", output: str = None) -> list:
+    def ran_tests(self, passed: bool = True, command: str = "python3 -m pytest -q", output: str = None) -> list:
         if output is None:
             output = "12 passed in 0.31s" if passed else "Exit code 1\nFAILED tests/test_app.py::test_x\n1 failed, 11 passed"
         return self.call("Bash", {"command": command, "description": "Run the tests"}, output, failed=not passed)
@@ -1835,7 +1835,7 @@ class ClaimCheck(unittest.TestCase):
     FAILED = "the last test runs failed"
 
     def test_a_passing_run_after_the_last_edit_supports_the_claim(self):
-        self.assert_lets_stop(self.check(self.transcript(self.tests(False), self.edit(), self.tests())))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(False), self.edit(), self.ran_tests())))
         for command, output in (
                 ("cd /w && timeout 600 python3 -m unittest discover -s tests 2>&1 | tail -3", "Ran 12 tests in 0.5s\n\nOK"),
                 ("go test ./...", "ok  \texample.com/app\t0.012s"), ("cargo test", "test result: ok. 5 passed; 0 failed"),
@@ -1843,12 +1843,12 @@ class ClaimCheck(unittest.TestCase):
                 ("ctest --test-dir build", "100% tests passed, 0 tests failed out of 2"),
                 ("./gradlew test", "BUILD SUCCESSFUL in 3s")):
             with self.subTest(command=command):
-                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.tests(True, command, output))))
+                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.ran_tests(True, command, output))))
 
     def test_a_run_only_before_the_last_edit_blocks_once(self):
         for tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
             with self.subTest(tool=tool):
-                transcript = self.transcript(self.tests(), self.edit(tool=tool))
+                transcript = self.transcript(self.ran_tests(), self.edit(tool=tool))
                 self.assert_blocks(self.check(transcript), self.BEFORE)
                 self.assert_lets_stop(self.check(transcript, stop_hook_active=True))  # continued once already
 
@@ -1858,17 +1858,17 @@ class ClaimCheck(unittest.TestCase):
         # The maintainer's decision of 29 October 2026: block when, after the last edit, no test run
         # came, whether or not a run came before it.
         for label, parts in (("edit only", (self.edit(),)),
-                             ("edit, then a quiet command", (self.edit(), self.tests(True, "git status --short", "")))):
+                             ("edit, then a quiet command", (self.edit(), self.ran_tests(True, "git status --short", "")))):
             with self.subTest(label=label):
                 transcript = self.transcript(*parts)
                 self.assert_blocks(self.check(transcript), self.NONE)
                 self.assert_lets_stop(self.check(transcript, stop_hook_active=True))  # continued once already
 
     def test_a_failing_run_blocks(self):
-        for parts in ((self.edit(), self.tests(False)), (self.tests(False),),
-                      (self.edit(), self.tests(False), self.tests(False)),
+        for parts in ((self.edit(), self.ran_tests(False)), (self.ran_tests(False),),
+                      (self.edit(), self.ran_tests(False), self.ran_tests(False)),
                       # a pipe into tail hides the exit status, not the runner's summary
-                      (self.edit(), self.tests(True, "python3 -m unittest 2>&1 | tail -3",
+                      (self.edit(), self.ran_tests(True, "python3 -m unittest 2>&1 | tail -3",
                                                "Ran 5 tests in 0.1s\n\nFAILED (failures=1)"))):
             with self.subTest(parts=len(parts)):
                 self.assert_blocks(self.check(self.transcript(*parts)), self.FAILED)
@@ -1888,7 +1888,7 @@ class ClaimCheck(unittest.TestCase):
                              "--- PASS: TestRetry (0.00s)\nPASS\nok  \texample.com/app\t0.012s"}
         for command, output in passing.items():
             with self.subTest(command=command):
-                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.tests(True, command, output))))
+                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.ran_tests(True, command, output))))
         # A pipe into tail hides the exit status; the summary still tells a failure.
         failing = {
             "python3 -m pytest | tail -2": "FAILED tests/test_a.py::test_x - assert 1 == 2\n"
@@ -1898,22 +1898,22 @@ class ClaimCheck(unittest.TestCase):
             "npx jest 2>&1 | tail -1": "Tests:       1 failed, 3 passed, 4 total"}
         for command, output in failing.items():
             with self.subTest(command=command):
-                self.assert_blocks(self.check(self.transcript(self.edit(), self.tests(True, command, output))),
+                self.assert_blocks(self.check(self.transcript(self.edit(), self.ran_tests(True, command, output))),
                                    self.FAILED)
         # The call failed but the runner's summary says the tests passed: a later command
         # of the chain failed, so the outcome is unknown and the stop goes through.
         chained = self.call("Bash", {"command": "python3 -m pytest -q && git diff --exit-code"},
                             "Exit code 1\n.....\n5 passed in 0.20s\ndiff --git a/x b/x", failed=True)
-        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), chained)))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), chained)))
 
     def test_the_last_run_after_the_last_edit_decides(self):
         # A later failing run wins over an earlier pass, and a later pass over an earlier
         # failure; a subagent call (outcome unknown) counts only when it comes last.
         gates = self.call("Agent", {"subagent_type": "gate-runner", "prompt": "Run the gates."}, "PASS")
-        for parts, blocks in (((self.edit(), self.tests(), self.tests(False)), True),
-                              ((self.edit(), self.tests(False), self.tests()), False),
-                              ((self.edit(), gates, self.tests(False)), True),
-                              ((self.edit(), self.tests(False), gates), False)):
+        for parts, blocks in (((self.edit(), self.ran_tests(), self.ran_tests(False)), True),
+                              ((self.edit(), self.ran_tests(False), self.ran_tests()), False),
+                              ((self.edit(), gates, self.ran_tests(False)), True),
+                              ((self.edit(), self.ran_tests(False), gates), False)):
             with self.subTest(parts=[record["message"]["content"][0].get("name") for part in parts
                                      for record in part[:1]], blocks=blocks):
                 result = self.check(self.transcript(*parts))
@@ -1925,20 +1925,20 @@ class ClaimCheck(unittest.TestCase):
                         "If the tests pass, merge it.", "Run the tests to make sure the tests pass.",
                         "The tests were not run after the last edit."):
             with self.subTest(message=message):
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), final=message), message))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), final=message), message))
 
     def test_claims_in_their_usual_words_are_checked(self):
         for message in ("All tests pass.", "Tests passed.", "The suite is green.", "189 tests OK",
                         "Gates: validate OK, 189 tests OK, build OK.", "The test suite passes.",
                         "All 12 tests are passing now.", "The hook tests pass."):
             with self.subTest(message=message):
-                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), final=message), message),
+                self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), final=message), message),
                                    self.BEFORE)
 
     def test_continued_or_without_the_flag_lets_the_stop_through(self):
         # Cursor runs Claude Code's Stop hooks with its own input (no stop_hook_active) and
         # no cap on follow-ups (cursor.com/docs/reference/third-party-hooks).
-        transcript = self.transcript(self.tests(), self.edit())
+        transcript = self.transcript(self.ran_tests(), self.edit())
         for fields in ({"stop_hook_active": True}, {"stop_hook_active": "false"}, {"stop_hook_active": None}):
             with self.subTest(fields=fields):
                 self.assert_lets_stop(self.check(transcript, **fields))
@@ -1950,11 +1950,11 @@ class ClaimCheck(unittest.TestCase):
 
     def test_a_lagging_or_unknown_transcript_lets_the_stop_through(self):
         cases = {
-            "final message not written yet": self.transcript(self.tests(), self.edit(), final=None),
-            "last text before the last call": self.transcript(self.said("Running the tests."), self.tests(),
+            "final message not written yet": self.transcript(self.ran_tests(), self.edit(), final=None),
+            "last text before the last call": self.transcript(self.said("Running the tests."), self.ran_tests(),
                                                               self.edit(), final=None),
-            "another final message": self.transcript(self.tests(), self.edit(), final="Something else."),
-            "no file edit to compare with": self.transcript(self.tests(True, "git status --short", "")),
+            "another final message": self.transcript(self.ran_tests(), self.edit(), final="Something else."),
+            "no file edit to compare with": self.transcript(self.ran_tests(True, "git status --short", "")),
         }
         codex = self.tmp / "rollout.jsonl"
         codex.write_text("".join(json.dumps(r) + "\n" for r in (
@@ -1979,7 +1979,7 @@ class ClaimCheck(unittest.TestCase):
                       str(empty), "", 5, None, ["a"], "bad\u0000path"]
         if os.geteuid() != 0:  # root reads a file of mode 0
             locked = self.tmp / "locked.jsonl"
-            locked.write_text(Path(self.transcript(self.tests(), self.edit())).read_text())
+            locked.write_text(Path(self.transcript(self.ran_tests(), self.edit())).read_text())
             locked.chmod(0)
             unreadable.append(str(locked))
         start = time.monotonic()
@@ -1996,7 +1996,7 @@ class ClaimCheck(unittest.TestCase):
         # 20 MB of other work: evidence older than the tail is not read, so it cannot
         # block; evidence in the tail still counts.
         filler = [record for index in range(2000) for record in self.said(f"note {index}: " + "x" * 10000)]
-        for parts, blocks in (((self.tests(), self.edit(), filler), False), ((filler, self.tests(), self.edit()), True)):
+        for parts, blocks in (((self.ran_tests(), self.edit(), filler), False), ((filler, self.ran_tests(), self.edit()), True)):
             with self.subTest(blocks=blocks):
                 transcript = self.transcript(*parts)
                 self.assertGreater(Path(transcript).stat().st_size, 20_000_000)
@@ -2019,7 +2019,7 @@ class ClaimCheck(unittest.TestCase):
                                          "Command running in background with ID: b1")),
                 ("no result", self.call("Bash", {"command": "python3 -m pytest"}, answered=False))):
             with self.subTest(label=label):
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), later)))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), later)))
         # A run started in the background before the last edit supports no claim about the edit: with
         # nothing after the edit, the claim blocks (the maintainer's decision of 29 October 2026).
         background = self.call("Bash", {"command": "python3 -m pytest", "run_in_background": True},
@@ -2037,20 +2037,20 @@ class ClaimCheck(unittest.TestCase):
         commit = {"command": "git commit -m 'feat: x'"}
         hooks_passed = self.call("Bash", commit, "pytest" + "." * 60 + "Passed\n[feat/x 1a2b3c4] feat: x\n"
                                  " 1 file changed, 2 insertions(+)")
-        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), hooks_passed)))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), hooks_passed)))
         for label, output in (("runner summary", "pytest" + "." * 60 + "Failed\n- hook id: pytest\n- exit code: 1\n\n"
                                                  "1 failed, 3 passed in 0.30s"),
                               ("pre-commit line", "ruff" + "." * 62 + "Failed\n- hook id: ruff\n- exit code: 1")):
             with self.subTest(failed=label):
                 hooks_failed = self.call("Bash", commit, output, failed=True)
-                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), hooks_failed)), self.FAILED)
+                self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), hooks_failed)), self.FAILED)
         shown = self.call("Bash", {"command": "cat test.log"}, "===== 4 passed in 0.21s =====")
-        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), shown)))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), shown)))
         for label, output in (("no runner output", "[feat/x 1a2b3c4] feat: x\n 1 file changed"),
                               ("hook skipped", "pytest" + "." * 41 + "(no files to check)Skipped\n[feat/x 1a2b3c4] x")):
             with self.subTest(quiet=label):
                 plain = self.call("Bash", commit, output)
-                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), plain)), self.BEFORE)
+                self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), plain)), self.BEFORE)
 
     def test_an_unknown_command_that_changes_files_is_an_edit_then_a_doubt(self):
         # pre-commit run --all-files may reformat a file and then run the tests: an edit,
@@ -2061,9 +2061,9 @@ class ClaimCheck(unittest.TestCase):
                 "bashEditDiff": {"changedFiles": ["/w/src/app.py"], "files": [], "moreFiles": 0}})
         reformat = changing("pre-commit run --all-files", "black" + "." * 63 + "Failed\n- files were modified by "
                             "this hook\npytest" + "." * 62 + "Passed", failed=True)
-        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), reformat)))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), reformat)))
         copied = changing("cp /tmp/app.py src/app.py", "")
-        self.assert_blocks(self.check(self.transcript(self.tests(), copied)), self.BEFORE)
+        self.assert_blocks(self.check(self.transcript(self.ran_tests(), copied)), self.BEFORE)
 
     def test_powershell_is_read_like_bash_and_an_mcp_tool_may_run_tests(self):
         # Claude Code's PowerShell tool takes its command in the same fields as Bash
@@ -2072,11 +2072,11 @@ class ClaimCheck(unittest.TestCase):
         # tools (Read, Grep...) run none.
         powershell = self.call("PowerShell", {"command": "python -m pytest"},
                                "Exit code 1\n1 failed, 2 passed in 0.20s", failed=True)
-        self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), powershell)), self.FAILED)
+        self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), powershell)), self.FAILED)
         mcp = self.call("mcp__ci__run_suite", {"suite": "unit"}, "ok")
-        self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), mcp)))
+        self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), mcp)))
         read = self.call("Read", {"file_path": "/w/src/app.py"}, "1\tx = 1")
-        self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), read)), self.BEFORE)
+        self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), read)), self.BEFORE)
 
     def test_a_launcher_s_own_options_come_before_the_program(self):
         # uv run's options that take a value (docs.astral.sh/uv/reference/cli, uv run) and
@@ -2089,7 +2089,7 @@ class ClaimCheck(unittest.TestCase):
                 self.assert_blocks(self.check(self.transcript(self.edit(), self.failing(command))), self.FAILED)
         for command in ("uv run --with pytest-cov python gen.py", "uv sync", "npx --yes prettier --write ."):
             with self.subTest(command=command):
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), self.failing(command))))
 
     def test_a_build_tool_runs_tests_only_through_a_target_named_so(self):
         # Option values (make -C, -f; ninja -C; mvn -pl; gradle -p, -x; just --justfile) and
@@ -2101,7 +2101,7 @@ class ClaimCheck(unittest.TestCase):
                         "make -f test.mk all", "just --justfile test.just build", "make -j 4", "make CHECK=1",
                         "ninja -t targets test"):
             with self.subTest(kind=3, command=command):
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), self.failing(command))))
         for command in ("make -C build check", "ninja -C build test", "cmake --build build --target test",
                         "cmake --build b -t check", "cmake --build b --target all check", "mvn -pl core verify",
                         "./gradlew -p app test", "make -j4 test", "make -j 4 check", "make test CC=clang",
@@ -2130,25 +2130,25 @@ class ClaimCheck(unittest.TestCase):
         for command in quiet:
             with self.subTest(kind=2, command=command):
                 later = self.call("Bash", {"command": command}, "")
-                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), later)), self.BEFORE)
+                self.assert_blocks(self.check(self.transcript(self.ran_tests(), self.edit(), later)), self.BEFORE)
         unknown = ("test -f setup.cfg", "python3 -c \"print('test')\"", "date", "sed -i s/a/b/ a.py", "npm install",
                    "python3 gen.py", "find . -name '*.js' -exec node {} \\;", "git checkout -b x", "sed -n -i 1p a.py",
                    "cd /w && python3 gen.py")
         for command in unknown:
             with self.subTest(kind=3, command=command):
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), self.failing(command))))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), self.failing(command))))
         # Runners the hook does not know (the second review's list) pass through as kind 3.
         for command in ("node --test", "uv run --with pytest-cov pytest", "xcodebuild test -scheme App",
                         "php artisan test", "bin/rails test", "hatch test", "pnpm exec vitest run", "gotestsum",
                         "yarn workspace app test"):
             with self.subTest(review=command):
                 later = self.call("Bash", {"command": command}, "done")
-                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), later)))
+                self.assert_lets_stop(self.check(self.transcript(self.ran_tests(), self.edit(), later)))
         # A failed known run decides unless a command of unknown kind follows it.
         for later, blocks in ((self.call("Bash", {"command": "date"}, "Thu"), False),
                               (self.call("Bash", {"command": "git status"}, ""), True)):
             with self.subTest(after_the_failure=later[0]["message"]["content"][0]["input"]["command"]):
-                result = self.check(self.transcript(self.edit(), self.tests(False), later))
+                result = self.check(self.transcript(self.edit(), self.ran_tests(False), later))
                 (self.assert_blocks(result, self.FAILED) if blocks else self.assert_lets_stop(result))
 
     def test_without_the_guard_the_stop_goes_through(self):
@@ -2157,7 +2157,7 @@ class ClaimCheck(unittest.TestCase):
         hooks = Path(tempfile.mkdtemp())
         self.addCleanup(shutil.rmtree, hooks)
         shutil.copy(HOOKS / "claim_check.py", hooks)
-        transcript = self.transcript(self.tests(), self.edit())
+        transcript = self.transcript(self.ran_tests(), self.edit())
         self.assert_blocks(self.check(transcript), self.BEFORE)  # with the guard next to it
         alone = subprocess.run([sys.executable, str(hooks / "claim_check.py")], capture_output=True, text=True,
                                timeout=20, check=False, input=json.dumps({
@@ -2182,20 +2182,20 @@ class ClaimCheck(unittest.TestCase):
         for label, later in (("changed file", shell("cp /tmp/app.py src/app.py", ["/w/src/app.py"])),
                              ("more files", shell("mv build/gen src/gen", [], more=3))):
             with self.subTest(label=label):
-                self.assert_blocks(self.check(self.transcript(self.tests(), later)), self.BEFORE)
+                self.assert_blocks(self.check(self.transcript(self.ran_tests(), later)), self.BEFORE)
         # A test run that changes files (snapshots) is a run; a command that changes nothing
         # is not an edit; a failed edit changed nothing.
         for label, parts in (
-                ("snapshot run", (self.tests(False), self.edit(),
+                ("snapshot run", (self.ran_tests(False), self.edit(),
                                   shell("python3 -m pytest --snapshot-update", ["/w/tests/snap.txt"], output="3 passed"))),
-                ("no change", (self.tests(), self.call("Bash", {"command": "ls src"}, "app.py"))),
-                ("failed edit", (self.tests(), self.edit(failed=True)))):
+                ("no change", (self.ran_tests(), self.call("Bash", {"command": "ls src"}, "app.py"))),
+                ("failed edit", (self.ran_tests(), self.edit(failed=True)))):
             with self.subTest(label=label):
                 self.assert_lets_stop(self.check(self.transcript(*parts)))
         # Task notes, temporary files and Claude Code's own files: no test reads them. The
         # scratchpad comes from scratchpad_dir, a common input field of every hook event,
         # Stop included (code.claude.com/docs/en/hooks, Common input fields, 2.1.257 or later).
-        notes = self.transcript(self.tests(), self.edit("/w/.private/progress/task.org"),
+        notes = self.transcript(self.ran_tests(), self.edit("/w/.private/progress/task.org"),
                                 self.edit(str(Path(tempfile.gettempdir()) / "s" / "notes.md"), tool="Write"),
                                 self.edit(str(Path.home() / ".claude/projects/p/memory/m.md"), tool="Write"),
                                 self.edit("/scratch/plan.md", tool="Write"),
