@@ -78,7 +78,7 @@ WRAPPERS = {
     "ionice": ("cnpPu", ("--class", "--classdata", "--pgid", "--pid", "--uid"), 0),
     "nice": ("n", ("--adjustment",), 0),
     "nohup": ("", (), 0),
-    "nsenter": ("GNStW", ("--net-socket", "--setgid", "--setuid", "--target", "--wdns"), 0),
+    "nsenter": ("NtW", ("--net-socket", "--target", "--wdns"), 0),
     # GNU parallel runs the command before its ::: arguments; a command given as one of
     # those arguments is a string and is not inspected.
     "parallel": ("aCdEIjJLnNPsS", (
@@ -128,6 +128,10 @@ WRAPPERS = {
     "xargs": ("adEILnPs", ("--arg-file", "--delimiter", "--max-args", "--max-chars",
                            "--max-procs", "--process-slot-var"), 0),
 }
+# Wrapper options whose value is optional: they take the next word as their value only
+# when it is a number (nsenter -S and -G, glued and optional in util-linux 2.42, a
+# separate uid or gid before it).
+NUMERIC_VALUES = {"nsenter": ("GS", ("--setgid", "--setuid"))}
 HOOK_RUNNERS = {"git", "pre-commit"}
 # find runs the command after each of these up to a ";" or "+" word.
 FIND_ACTIONS = {"-exec", "-execdir", "-ok", "-okdir"}
@@ -465,8 +469,10 @@ def rough_commands(text: str) -> list:
     return commands
 
 
-def skip_options(words: list, index: int, short_values: str, long_values) -> int:
-    """Return the index of the first operand after the options at words[index:]."""
+def skip_options(words: list, index: int, short_values: str, long_values, numeric=("", ())) -> int:
+    """Return the index of the first operand after the options at words[index:].
+    numeric holds the (short, long) options whose value is optional: glued, or the next
+    word when that is a number."""
     while index < len(words):
         word = words[index]
         if word == "--":
@@ -474,13 +480,14 @@ def skip_options(words: list, index: int, short_values: str, long_values) -> int
         if not word.startswith("-") or word == "-":
             return index
         index += 1
+        number_follows = index < len(words) and words[index].isdigit()
         if word.startswith("--"):
-            if "=" not in word and word in long_values:
+            if "=" not in word and (word in long_values or (word in numeric[1] and number_follows)):
                 index += 1
             continue
         for position, letter in enumerate(word[1:], start=2):
-            if letter in short_values:
-                if position == len(word):
+            if letter in short_values or letter in numeric[0]:
+                if position == len(word) and (letter in short_values or number_follows):
                     index += 1  # the value is the next word
                 break
     return index
@@ -504,7 +511,8 @@ def split_command(words: list) -> tuple:
             index = skip_options(words, index + 1, "", ())
         elif name in WRAPPERS:
             short_values, long_values, operands = WRAPPERS[name]
-            index = skip_options(words, index + 1, short_values, long_values)
+            index = skip_options(words, index + 1, short_values, long_values,
+                                 NUMERIC_VALUES.get(name, ("", ())))
             while name == "env" and index < len(words) and words[index] == "-":
                 index += 1
             index += operands

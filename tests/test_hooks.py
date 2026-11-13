@@ -521,6 +521,9 @@ class GuardBypassBattery(unittest.TestCase):
         "firejail --noprofile --net=none git push", "firejail -- git push", "unshare -r git push",
         "unshare --map-root-user --wd /tmp git push", "unshare -m --propagation private git push",
         "nsenter -t 1 -m git push", "nsenter --target 1 --mount -- git push", "nsenter -t 1 -S 0 -G 0 git push",
+        # util-linux 2.42: -S and -G take an optional glued value; older versions a separate one
+        "nsenter -t 1 -S git push", "nsenter -t 1 -U -G git push origin main", "nsenter --setuid git push",
+        "nsenter -t 1 -S0 git push", "nsenter --setuid=0 --setgid 0 git push",
         # ssh runs its words after the destination as one command line on the remote host
         "ssh host git push", "ssh -p 2222 user@host 'cd repo && git push -f'", "ssh host -t git push origin main",
         "ssh -o BatchMode=yes host gh pr create --fill", "ssh -i ~/.ssh/k -- host git push", "ssh host sudo git push",
