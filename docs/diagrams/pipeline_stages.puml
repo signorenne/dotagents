@@ -43,10 +43,7 @@ repeat
     :stop and report
     to the maintainer;
     note right
-      blocked: the changed approach failed, a
-      blocker or major finding on the second review
-      pass, or a SKIP or INCOMPLETE gate the code
-      cannot fix; the evidence in the progress log
+      the evidence in the progress log
       and the handoff
     end note
     end
