@@ -97,7 +97,7 @@ class Tools(unittest.TestCase):
         (empty / "prompt.md").write_text("---\nname: empty\n---\n\nHi.\n")
         odd = self.repo / "packs/method/evals/odd"
         (odd / "graders").mkdir(parents=True)
-        (odd / "prompt.md").write_text("---\nname: odd\nallowed_tools:\n  - Read\n  - Skill\n---\n\n")
+        (odd / "prompt.md").write_text("---\nname: odd\nallowed_tools:\n- Read\n- Skill\n---\n\n")
         (odd / "graders/c.md").write_text("---\ntype: tool_used\ntool: Skill\narm: sometimes\n"
                                          "input_match: '(?:[\\w-]+:)?build('\n---\n")
         (self.repo / "packs/method/evals/bare").mkdir()

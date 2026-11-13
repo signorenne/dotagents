@@ -500,7 +500,7 @@ def check_evals(errors: list) -> None:
         text = prompt.read_text(encoding="utf-8")
         meta, body = simple_frontmatter(text)
         # allowed_tools as a flow list or a block list: the text up to the next top-level key.
-        tools = re.search(r"^allowed_tools:(.*?)(?=^\S|^---)", text, re.M | re.S)
+        tools = re.search(r"^allowed_tools:(.*?)(?=^(?!- )\S|^---)", text, re.M | re.S)
         meta["allowed_tools"] = tools.group(1) if tools else ""
         for key in sorted(set(meta) - EVAL_CASE_KEYS):
             errors.append(f"{rel}/prompt.md: unknown key {key!r}")

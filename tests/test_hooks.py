@@ -1371,6 +1371,17 @@ class SessionRefresh(unittest.TestCase):
                                 check=False, env=env)
         self.assertTrue(json.loads(result.stdout)["additional_context"].startswith("Plan file excerpt"))
 
+    def test_a_claude_code_payload_still_gets_plain_text(self):
+        # Claude Code and Codex read plain stdout; only a Cursor payload switches to JSON.
+        repo, env = self.committed_repo()
+        write_plan(repo, "task")
+        worktree = linked_worktree(self, repo, env)
+        payload = {"session_id": "s", "transcript_path": "/tmp/t.jsonl", "cwd": str(worktree),
+                   "hook_event_name": "SessionStart", "source": "startup"}
+        result = subprocess.run([sys.executable, str(HOOKS / "session_refresh.py")], capture_output=True, text=True,
+                                input=json.dumps(payload), check=False, env=env)
+        self.assertTrue(result.stdout.startswith("Plan file excerpt: a map"), result.stdout)
+
     def test_without_the_build_skill_the_refresh_still_reports_git(self):
         repo, env = self.committed_repo()
         write_plan(repo, "task")
