@@ -997,6 +997,14 @@ class CompactBrief(unittest.TestCase):
         self.assertIn("- The workflow skill in use (such as implement or spec) and the section or step "
                       "of it that was running, so it is invoked again there.", result.stdout)
 
+    def test_keeps_the_users_unrecorded_constraints_and_what_is_blocked(self):
+        # A constraint the user stated in the chat (do not commit, an approach ruled out)
+        # lives nowhere else; a paraphrase can lose it, so it is kept word for word.
+        result = self.brief({"cwd": "/no/such/folder"})
+        self.assert_brief(result)
+        self.assertIn("- Each constraint the user stated in this session that no file records, word for "
+                      "word, and what is blocked and on what.", result.stdout)
+
     def test_long_state_stays_under_the_cap(self):
         repo, env = committed_repo(self)
         for index in range(60):
