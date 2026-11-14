@@ -107,12 +107,19 @@ GEMINI_HOOKS = {
 # Codex rules (experimental in Codex): a forbidden prefix_rule blocks a command that starts
 # with its pattern, without prompting. They hold even while Codex skips the hooks, which
 # it does until the user trusts them. A pattern part that is a list matches any of its words.
-# A prefix cannot see a flag, so gh repo create --push is left to the guard. gh: the guard
-# runs only read-only or local commands and a prefix cannot say "all but these", so the
-# rules forbid every other command of gh 2.100.0's tree (gh help, aliases included); a
-# command gh adds later is the guard's alone. gh api (not inspected) has no rule. The gh
-# commands that print the token get their own rules, as far as a prefix can say them:
-# gh auth status with the flag right after it, gh config get oauth_token without -h.
+# git: each command that publishes (push, subtree push, send-pack, http-push, lfs push, svn
+# dcommit, p4 submit, send-email). gh: the guard runs only read-only or local commands and
+# a prefix cannot say "all but these", so the rules forbid every other command of gh
+# 2.100.0's tree (gh help, aliases included), gh repo create and new whole, with or without
+# --push. The read-only or local commands have no rule (view, list, diff, status
+# and checks in any group, repo and gist clone, pr checkout, run watch and download,
+# release download, config and variable get, repo read-file and read-dir, ruleset check,
+# attestation verify, search, status, browse, completion, licenses, help), nor has gh api
+# (not inspected). The gh commands that print the token have their own rules, as far as a
+# prefix can say them: gh auth token and git-credential, gh auth status with -t or
+# --show-token right after it, gh config get oauth_token without -h. The guard alone covers
+# a gh command added later and the forms a prefix cannot see, such as a flag before the
+# subcommand (gh -R o/r pr create) or before the token flag (gh auth status -a -t).
 CODEX_RULES = (
     (["git", "push"], "git push publishes commits to a remote."),
     (["git", "subtree", "push"], "git subtree push publishes commits to a remote."),
