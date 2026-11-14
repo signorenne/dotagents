@@ -212,7 +212,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
               "\u00a0|\u200a|\u202f|\u2065|\u206a|\U000e0080|\u2028\n")
         write("home/.agents/skills/spec/extra.md", "<!-- a -->\n")
         write("claude-ai/skills/tutor/notes.org", "x\u202by\n<!-- not markdown -->\n")
-        write("docs/notes.md", "not loaded as instructions: \u200b <!-- c -->\n")
+        write("docs/notes.md", "not loaded as instructions: <!-- c -->\n")
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
         hidden = "invisible or bidirectional character"
@@ -266,6 +266,26 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             f"{more}:1:13: {hidden} U+2064", f"{more}:1:15: {hidden} U+3164",
             f"{more}:3:2: {hidden} U+200D", f"{more}:3:6: {hidden} U+200D", f"{more}:3:10: {hidden} U+FE0F",
             f"FAIL claude-ai/overrides.json:1:47: {hidden} U+2063",
+        ]))
+
+    def test_validate_reports_hidden_characters_in_every_text_file(self):
+        # Not only the instruction files: a zero width or bidirectional character in code,
+        # tests or docs is reported too (a bidirectional control can make code read
+        # differently from how it runs). The HTML comment check stays on the Markdown
+        # instruction files, so the comment in docs/notes.md passes.
+        (self.repo / "docs/notes.md").write_text("a\u200bb <!-- c -->\n", encoding="utf-8")
+        (self.repo / "tools/helper.py").write_text("x = 1  # a\u2067b\u2069\n", encoding="utf-8")
+        readme = self.repo / "README.org"
+        readme.write_text("zero\u200dwidth\n" + readme.read_text(encoding="utf-8"), encoding="utf-8")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        hidden = "invisible or bidirectional character"
+        reported = sorted(line for line in result.stdout.splitlines() if hidden in line or "HTML comment" in line)
+        self.assertEqual(reported, sorted([
+            f"FAIL docs/notes.md:1:2: {hidden} U+200B",
+            f"FAIL tools/helper.py:1:11: {hidden} U+2067",
+            f"FAIL tools/helper.py:1:13: {hidden} U+2069",
+            f"FAIL README.org:1:5: {hidden} U+200D",
         ]))
 
     def test_validate_reads_markdown_code_before_reporting_html_comments(self):

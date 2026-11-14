@@ -23,22 +23,23 @@ Checks:
 - no em dash or en dash in any text file git tracks or would track (every file
   outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
-- the files agents load as instructions (home/.agents/AGENTS.md, every text file of a
-  skill in either root, the subagents, the path rules, claude-ai/overrides.json, and the
+- no text file of the dash check holds a character a reader does not see but a model
+  reads: zero width (U+200B to U+200D, U+2060), bidirectional controls (U+061C, U+200E,
+  U+200F, U+202A to U+202E, U+2066 to U+2069), U+FEFF anywhere (a byte order mark too:
+  the files are plain UTF-8), the soft hyphen U+00AD, the invisible operators U+2061 to
+  U+2064, the Hangul filler U+3164, the variation selectors U+FE00 to U+FE0F and U+E0100
+  to U+E01EF, and the tags U+E0000 to U+E007F, except an emoji's own parts (U+FE0E or
+  U+FE0F right after a pictographic character, U+200D between two; tag sequences such as
+  subdivision flags are reported);
+- the Markdown files (.md, .md.template) agents load as instructions
+  (home/.agents/AGENTS.md, those of a skill in either root, the subagents, and the
   repository's AGENTS.md, CLAUDE.md, GEMINI.md and .github/copilot-instructions.md) hold
-  no character a reader does not see but a model reads: zero width (U+200B to U+200D,
-  U+2060), bidirectional controls (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to
-  U+2069), U+FEFF anywhere (a byte order mark too: the files are plain UTF-8), the soft
-  hyphen U+00AD, the invisible operators U+2061 to U+2064, the Hangul filler U+3164, the
-  variation selectors U+FE00 to U+FE0F and U+E0100 to U+E01EF, and the tags U+E0000 to
-  U+E007F, except an emoji's own parts (U+FE0E or U+FE0F right after a pictographic
-  character, U+200D between two; tag sequences such as subdivision flags are reported);
-  and the Markdown ones hold no HTML comment outside code (it hides text from a reader
-  of the rendered file, not from the model): code is a fenced block, indented 0 to 3
-  columns from its container (the margin, a blockquote, a list item), closed only by its
-  own character at least as many times or by a line that leaves the container, or a code
-  span on one line not opened by an escaped backtick; a code span over several lines and
-  an indented code block are not recognised, so a <!-- in them is reported;
+  no HTML comment outside code (it hides text from a reader of the rendered file, not
+  from the model): code is a fenced block, indented 0 to 3 columns from its container
+  (the margin, a blockquote, a list item), closed only by its own character at least as
+  many times or by a line that leaves the container, or a code span on one line not
+  opened by an escaped backtick; a code span over several lines and an indented code
+  block are not recognised, so a <!-- in them is reported;
 - the global instructions stay under 200 lines;
 - every Python file compiles;
 - every Org link in an Org file resolves: [[file:path]] names an existing file
@@ -82,8 +83,9 @@ ORG_HEADING = re.compile(r"^\*+[ \t]+(.*?)[ \t]*$", re.M)
 ORG_TAGS = re.compile(r"[ \t]+:([\w@#%]+:)+$")
 # Verbatim and code spans (=...=, ~...~) on one line: their text is not a link.
 ORG_VERBATIM = re.compile(r"(?<![^\s(\[{'\"-])([=~])(?=\S)[^\n]*?(?<=\S)\1(?=[\s.,:;!?)\]}'\"-]|$)", re.M)
-# Files and folders agents load as instructions, and the characters in them that a reader
-# does not see but a model reads (the context-file scan of Hermes Agent).
+# Files and folders agents load as instructions (their Markdown files hold no HTML comment),
+# and the characters a reader does not see but a model reads, reported in every text file
+# (the context-file scan of Hermes Agent, widened beyond the instruction files).
 INSTRUCTION_FILES = {HOME / "AGENTS.md", PATH_RULES, OVERRIDES, ROOT / "AGENTS.md", ROOT / "CLAUDE.md",
                      ROOT / "GEMINI.md", ROOT / ".github" / "copilot-instructions.md"}
 INSTRUCTION_FOLDERS = (HOME / "skills", ONLINE, HOME / "agents")
@@ -352,17 +354,14 @@ def emoji_part(line: str, index: int) -> bool:
     return pictographic(before) and pictographic(line[index + 1])
 
 
-def check_hidden_text(rel: Path, text: str, errors: list) -> None:
-    """Report each hidden character with its line, column and code point and, in Markdown,
-    each HTML comment outside code."""
+def check_hidden_characters(rel: Path, text: str, errors: list) -> None:
+    """Report each hidden character with its line, column and code point."""
     for number, line in enumerate(text.split("\n"), start=1):
         for match in HIDDEN_CHARACTER.finditer(line):
             if emoji_part(line, match.start()):
                 continue
             errors.append(f"{rel}:{number}:{match.start() + 1}: invisible or bidirectional character "
                           f"U+{ord(match.group()):04X}")
-    if rel.name.endswith(MARKDOWN_SUFFIXES):
-        check_html_comments(rel, text, errors)
 
 
 def strip_quotes(line: str, most: int = -1) -> tuple:
@@ -455,8 +454,9 @@ def main() -> int:
         rel = path.relative_to(ROOT)
         if path.suffix == ".org":
             check_org_links(path, text, org_cache, errors)
-        if instruction_file(path):
-            check_hidden_text(rel, text, errors)
+        check_hidden_characters(rel, text, errors)
+        if instruction_file(path) and path.name.endswith(MARKDOWN_SUFFIXES):
+            check_html_comments(rel, text, errors)
         for number, line in enumerate(text.splitlines(), start=1):
             if any(dash in line for dash in DASHES):
                 errors.append(f"{rel}:{number}: em or en dash")
