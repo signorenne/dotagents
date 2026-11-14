@@ -12,7 +12,7 @@ Goal: three documents that a person reads easily and can trust. They say how the
 
 - Keep facts in a notes file (.private/as-built/notes.md when .private/ is git-ignored, otherwise a scratch folder), one line each: id, area tag, statement, file:line. Write from the notes: they survive compaction and spare rereading the code.
 - Delegate code reading, one area per subagent that runs on the session's model, told to stay read-only and to return facts in that line format: in Claude Code the general-purpose subagent, elsewhere the tool's default general agent. Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
-- External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition.
+- External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition. External names are the names of external values and of the calls and events of a platform API the software uses.
 - Describe the software as built, without judging it: no bugs, suspicions, unused code or contract anomalies in the docs. Note each one in the notes file under "for the audit", with file:line, and hand the list over at the end.
 - Write one document and one section at a time.
 
@@ -44,11 +44,12 @@ The outline of each document with the purpose of each section, the vocabulary te
 
 ## 4. How to write
 
+- Word counts (the big picture's 300 words, the budgets of section 5) count prose words only: not headings, the header line, the vocabulary, tables, code blocks or image lines.
 - Header: one line with the commit, the versions and links to the sibling documents.
-- Section 1, Vocabulary: the 10 to 15 terms this document's reader needs first, one sentence each, in the order they first appear. A term shared with a sibling document is worded the same in both. Define any other term where it first appears.
-- Section 2, The big picture: what the software is for, then how it works in 3 to 6 numbered steps and one diagram, all within 300 words of its heading (the vocabulary before it does not count).
-- Every section after the big picture opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
-- One idea per sentence, split above about 25 words; one topic per paragraph, at most 5 sentences; active voice; one term per concept.
+- Section 1, Vocabulary: the 10 to 15 terms this document's reader needs first, one sentence each of at most 35 words, in the order they first appear. A term shared with a sibling document is worded the same in both. Define any other term where it first appears.
+- Section 2, The big picture: what the software is for, then how it works in 3 to 6 numbered steps and one diagram, all within 300 words of its heading.
+- Every section after the big picture, apart from those whose shape section 5 sets (the test index, the test cases, troubleshooting, the appendix), opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
+- One idea per sentence, split above about 25 words (a vocabulary entry excepted); one topic per paragraph, at most 5 sentences; active voice; one term per concept.
 - Numbers only where they explain something or the reader types or reads them. Tables only for lookups (items with several attributes, if-then rules), each introduced by a sentence.
 - Each fact has one home, and a sibling document links to it rather than repeating it, at most one cross-reference per paragraph (the header line excepted). The vocabulary and the external values are the exceptions: the knowledge base explains external values, the developer guide's appendix maps them to code.
 - Numbered, descriptive headings, so links stay stable.
@@ -62,7 +63,7 @@ Accuracy:
 
 ## 5. The documents
 
-Each word budget counts prose outside the vocabulary, tables, code blocks and image lines: the vocabulary's terms are as long as their shared wording needs. "About" allows 10 percent either way.
+Each word budget counts as section 4 says, and its "about" allows 10 percent either way.
 
 - Knowledge base, for technical non-developers, with no code identifiers except external names and log messages, about 2,500 to 3,500 words: vocabulary; the big picture with a context diagram; the core model (the mechanism the rest depends on) with its diagram; where the app appears; the screens, one picture each with numbered markers and a legend (element, what it shows, what you can do with it); one section per function (what it does, when it is available, what you see, which external values change, one example, and before and after pictures when it changes the screen); automatic behaviors (what is saved and restored, safety rules, language and units); reference lookups (external values with one computed contract example per mechanism, values per state); troubleshooting (symptom, cause, action).
 - Test guide, for testers, about 400 to 600 words before the test cases: vocabulary; how testing works (a bench diagram and the few rules every test relies on); setup (equipment, named starting states with a picture of each, and how to reach each); an index of tests by function; test cases in knowledge base order, each with one sentence of purpose, its starting state and a table of step, action, expected screen, expected external value, with a cropped picture of the expected screen where its look is what the step tests; what to record when a step fails. Every function and automatic behavior has a test, and tests check the current behavior.
@@ -70,7 +71,7 @@ Each word budget counts prose outside the vocabulary, tables, code blocks and im
 
 ## 6. Diagrams and pictures
 
-PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and comes at the start of the section it explains, right after the section's opening sentence. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
+PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and comes at the start of the section it explains, right after the opening that says what the section covers and why it matters. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
 
 Pictures of the UI come from the real app, never from a drawing of how it might look:
 
@@ -87,8 +88,8 @@ Run each check as a one-off command saved in the notes (the update runs them aga
 1. every external value in the code appears in the knowledge base and in the appendix, with one contract entry per direction that exists in the spec;
 2. the appendix matches the code both ways: every entry exists at the described commit, and every key, identifier and mapping the extraction commands find is listed;
 3. every relative link, image and anchor resolves, and a link text with a section number points to that section;
-4. no placeholders, TODOs or characters the project forbids, and no code identifiers in the knowledge base or test guide except external names (the contract's names, configuration and data file keys, and the platform API's call and event names) and log messages;
-5. readability: the big picture within 300 words of its heading; at most about 5 code identifiers per 100 words of prose outside the appendix; at most one cross-reference per paragraph, the header line excepted; no sentence over 35 words; every section after the vocabulary opens with prose; each document within its word budget, 10 percent either way, counted without the vocabulary, tables, code blocks and image lines;
+4. no placeholders, TODOs or characters the project forbids, and no code identifiers in the knowledge base or test guide except external names (Working rules) and log messages;
+5. readability: the big picture within 300 words of its heading; at most about 5 code identifiers per 100 words of prose outside the appendix; at most one cross-reference per paragraph, the header line excepted; no sentence over 35 words; every section after the vocabulary opens with prose; each document within its word budget, 10 percent either way (both counts as section 4 says);
 6. every diagram renders (exit code 0 and nothing on stderr) and has a title, and every class in a class diagram shows members;
 7. every picture exists, has its recipe in the notes or is marked as provided by the user, and has a legend with as many entries as it has markers.
 
