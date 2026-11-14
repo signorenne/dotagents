@@ -320,10 +320,14 @@ As of 14 November 2026:
   code-audit; it costs tokens on every run. (dropped as a recurring scan:
   =tools/validate.py= checks every Org link and anchor on each commit, and
   as-built-docs sync and code-audit cover the rest on request.)
-- [ ] A replay of past sessions' shell commands through the guard, to measure
+- [X] A replay of past sessions' shell commands through the guard, to measure
   how often it blocks a command it should let through (from the
-  best-of-Agent-Harnesses list); only on the maintainer's request. Adopted
-  on 13 November 2026, as part of the method: spec first.
+  best-of-Agent-Harnesses list). Adopted on 13 November 2026, as part of the
+  method: =tools/guard_replay.py= (96c5842; =GuardReplay= in
+  =tests/test_tools.py=) on the guard's new =decision()= (8bf50c0), and a
+  replay before each guard change lands ([[file:../DESIGN.org::#guard-replay][DESIGN.org#guard-replay]]). Its
+  first replay, of the =decision()= change, found 0 commands newly blocked
+  and 0 newly allowed among 75,060 distinct commands of 76,304 calls.
 - [ ] A review of a large diff split by file across several reviewer
   subagents, each with the rules for its files (from alibaba/open-code-review,
   whose benchmark is its authors' own); it costs more calls. Not now:
@@ -333,11 +337,20 @@ As of 14 November 2026:
 - [ ] A hook that enforces test-first editing (from TDD Guard); it costs a
   model call per edit. (dropped: implement records each test's failing run
   and the reviewer checks it and attacks the test.)
-- [ ] An A/B benchmark: the same tasks run with and without the method (the
+- [X] An A/B benchmark: the same tasks run with and without the method (the
   research pack proposed 20 tasks, three runs each), to show whether the
   method beats a plain agent. It costs real money, so it runs only on the
   maintainer's request. Adopted on 13 November 2026, as part of the method:
-  spec first, then a pilot before the full run.
+  the tooling, =tools/benchmark.py= (fee1128, 6690046, a1d56b0;
+  =Benchmark=, =BenchmarkRun= and =BenchmarkResults= in
+  =tests/test_tools.py=), and the rule that measures each version
+  ([[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]]); what it measures is in
+  [[file:evidence.org][docs/evidence.org]].
+- [ ] The benchmark's pilot: 5 tasks, two runs per arm, under a cap the
+  maintainer sets just before it starts; its summary goes to
+  [[file:evidence.org][docs/evidence.org]], labeled "pilot: not conclusive".
+- [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
+  before the first published version of METHOD.org.
 
 ** The method
 
@@ -346,7 +359,8 @@ As of 14 November 2026:
   and sensors, conformance, prior art), with dotagents' docs as its reference
   implementation. The maintainer decided on 13 November 2026 that it is
   normative and versioned, lives in this repository, and starts after the
-  work now in flight.
+  work now in flight. Its first published version waits for the
+  benchmark's full run ([[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]]).
 
 * Proposed rules
 
