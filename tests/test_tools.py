@@ -1305,6 +1305,10 @@ class BenchmarkRun(unittest.TestCase):
                 ("worktree list", {"fail": {"worktree list": bad}}, "worktree", "/testbed"),
                 ("worktree add", {**worktree, "fail": {"/home/agent/fix add -A": lock}}, "add", "/home/agent/fix"),
                 ("worktree log", {**worktree, "fail": {"log": bad}}, "log", "/home/agent/fix"),
+                ("worktree diff --quiet", {**worktree, "fail": {"/home/agent/fix diff --cached --quiet": bad}}, "diff",
+                 "/home/agent/fix"),
+                ("worktree diff", {**worktree, "fail": {"/home/agent/fix diff --cached --binary": bad}}, "diff",
+                 "/home/agent/fix"),
                 ("for-each-ref", {"fail": {"for-each-ref": bad}}, "for-each-ref", "/testbed"),
                 ("branch diff --quiet", {**branch, "fail": {"diff --quiet refs/heads/fix": bad}}, "diff", "/testbed"),
                 ("branch diff", {**branch, "fail": {"diff --binary refs/heads/fix": bad}}, "diff", "/testbed")):
