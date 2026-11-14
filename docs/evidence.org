@@ -41,8 +41,9 @@ agent needed the maintainer.
   issue, never writes code, and replies DONE when the agent reports the work
   finished or asks nothing. At most 6 replies a run.
 - Grading: the SWE-bench harness (=swebench= 5) runs the task's hidden tests
-  on the prediction, the change against the task's =base_commit= without the
-  files the hidden test patch touches (the same in both arms).
+  on the prediction, the change against the commit the task's image starts
+  on (its setup commit after =base_commit=, which the harness patches)
+  without the files the hidden test patch touches (the same in both arms).
 - Cost: the maintainer sets a cap before each run; each run gets an equal
   share, and each call is capped at what is left of it. Costs are the
   API-equivalent estimate Claude Code reports (=total_cost_usd=); signed in
@@ -73,7 +74,8 @@ agent needed the maintainer.
   =setuptools==68.0.0= in =pyproject.toml=. Each run checks that no commit
   after =base_commit= changes a file the task's gold patch or hidden test
   patch changes, so that pin passes; the smoke run, before this check,
-  stopped that task's runs as errors (Results).
+  stopped that task's runs as errors (Results). The prediction is taken
+  against the setup commit, so the pin is never counted as the agent's.
 - Runs go one at a time; a usage limit, an expired login or Ctrl-C stops
   the run; the next start goes on from the stopped run, which starts again
   from the beginning, and the stopped attempt's spend still counts against

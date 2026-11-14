@@ -372,6 +372,14 @@ As of 14 November 2026:
   with =FileNotFoundError=
   (=test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink= in
   =tests/test_tools.py=).
+- [X] The benchmark's prediction is the change against the commit the
+  image starts on (its setup commit), not against =base_commit=: the
+  harness applies it on that commit, so a setup commit's change (the
+  astropy pin, now accepted) never reaches a prediction, and an agent that
+  changes nothing leaves an empty one. Found on 14 November 2026 while
+  accepting the setup commit; fixed by the maintainer's decision that day
+  (=test_the_prediction_leaves_out_the_image_s_setup_commit= in
+  =tests/test_tools.py=).
 - [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
   before the first published version of METHOD.org.
 
