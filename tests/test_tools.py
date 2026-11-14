@@ -1303,6 +1303,8 @@ class BenchmarkRun(unittest.TestCase):
                 ("diff", {"trees": {"/testbed": self.FIX}, "fail": {"diff --cached --binary": bad}}, "diff",
                  "/testbed"),
                 ("worktree list", {"fail": {"worktree list": bad}}, "worktree", "/testbed"),
+                ("worktree list exit 1", {"fail": {"worktree list": [1, "error: unable to read worktrees"]}},
+                 "worktree", "/testbed"),
                 ("worktree add", {**worktree, "fail": {"/home/agent/fix add -A": lock}}, "add", "/home/agent/fix"),
                 ("worktree rev-parse", {**worktree, "fail": {"/home/agent/fix rev-parse": bad}}, "rev-parse",
                  "/home/agent/fix"),
@@ -1656,6 +1658,46 @@ class BenchmarkResults(unittest.TestCase):
                 self.assertEqual(result.returncode, exit_code, result.stdout + result.stderr)
                 grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
                 self.assertEqual(run_id in grades, bool(source))
+                summary = self.tool("summary", "--rundir", self.rundir)
+                self.assertEqual(self.table(summary.stdout, "method")[1:9], row)
+
+    def test_a_run_grades_json_does_not_hold_counts_as_no_report(self):
+        # grades.json holds the runs graded so far; a run that finished later has no entry,
+        # like a run the harness failed on has no report: both call for grading again.
+        self.assertEqual(self.grade().returncode, 0)
+        path = self.rundir / "grades.json"
+        grades = json.loads(path.read_text(encoding="utf-8"))
+        del grades[f"{self.ids[0]}.method.1"]
+        path.write_text(json.dumps(grades), encoding="utf-8")
+        summary = self.tool("summary", "--rundir", self.rundir)
+        # runs, errors, graded, empty or not applied, tests timed out, no report, resolved, rate
+        self.assertEqual(self.table(summary.stdout, "method")[1:9], ["4", "0", "3", "0", "0", "1", "3", "100%"])
+
+    def test_a_run_made_again_after_grade_counts_as_no_report_until_graded_again(self):
+        # Deleting a run's folder and running again gives a new prediction under the same id;
+        # the old grade would count a result the new run never had. A grade file written
+        # before grade recorded what it graded is still trusted.
+        run_id = f"{self.ids[0]}.method.1"
+        self.assertEqual(self.grade().returncode, 0)
+        path = self.rundir / "grades.json"
+        graded = path.read_text(encoding="utf-8")
+        # runs, errors, graded, empty or not applied, tests timed out, no report, resolved, rate
+        for label, prediction, legacy, row in (
+                ("new prediction", "diff --git a/x b/x\n+REGRESS\n", False, ["4", "0", "3", "0", "0", "1", "3", "100%"]),
+                ("prediction gone", None, False, ["4", "0", "3", "0", "0", "1", "3", "100%"]),
+                ("grade file without hashes", None, True, ["4", "0", "4", "0", "0", "0", "4", "100%"])):
+            with self.subTest(label=label):
+                folder = self.rundir / "runs" / run_id
+                (folder / "prediction.diff").write_text("diff --git a/x b/x\n+RESOLVE\n", encoding="utf-8")
+                grades = json.loads(graded)
+                if legacy:
+                    grades = {key: {name: value for name, value in grade.items() if name != "prediction_sha256"}
+                              for key, grade in grades.items()}
+                elif prediction is None:
+                    (folder / "prediction.diff").unlink()
+                else:
+                    (folder / "prediction.diff").write_text(prediction, encoding="utf-8")
+                path.write_text(json.dumps(grades), encoding="utf-8")
                 summary = self.tool("summary", "--rundir", self.rundir)
                 self.assertEqual(self.table(summary.stdout, "method")[1:9], row)
 

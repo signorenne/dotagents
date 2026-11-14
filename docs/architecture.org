@@ -790,7 +790,10 @@ them):
    =RUNDIR/grading/=, once per arm and repeat because the harness keys
    predictions by instance id, with a =docker= program that runs podman on
    its =PATH= for its cleanup, and writes =grades.json= (resolved,
-   regressions); =--gold= grades the reference patches into =gold.json=.
+   regressions, a hash of the prediction graded); =--gold= grades the
+   reference patches into =gold.json=.
 4. =summary= writes the per-arm and per-task Org tables that
    [[file:evidence.org][docs/evidence.org]] holds, metrics only, labeled "pilot: not conclusive"
-   below the full run of 20 tasks with three runs per arm.
+   below the full run of 20 tasks with three runs per arm; a run whose
+   prediction changed since its grade (made again) counts as without a
+   report until =grade= runs again.
