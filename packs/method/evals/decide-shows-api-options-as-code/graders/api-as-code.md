@@ -1,5 +1,4 @@
 ---
 type: regex
-target: trace
-pattern: '"preview"\s*:\s*"[^"]*(\(|::|->)'
+pattern: '```[\w+]*\n[\s\S]*?(\(|::|->)[\s\S]*?```'
 ---
