@@ -67,6 +67,9 @@ class Tools(unittest.TestCase):
         stale = self.repo / "packs/stale/.claude-plugin"
         stale.mkdir(parents=True)
         (stale / "plugin.json").write_text('{"name": "dotagents-stale"}\n')
+        scout = self.repo / "packs/method/agents/scout.md"
+        scout.write_text(scout.read_text() + "An edit in the copy.\n")
+        (self.repo / "packs/method/agents/stray.md").write_text("---\nname: stray\n---\n")
         skill = self.repo / "home/.agents/skills/new-one"
         skill.mkdir()
         (skill / "SKILL.md").write_text('---\nname: new-one\ndescription: "Does a new thing. Use when asked."\n'
@@ -86,8 +89,11 @@ class Tools(unittest.TestCase):
         for manifest in ("method", "craft"):
             self.assertIn(f"FAIL packs/{manifest}/.claude-plugin/plugin.json: missing or out of date; run python3 "
                           "tools/build.py --marketplace", lines)
-        self.assertIn("FAIL packs/stale/.claude-plugin/plugin.json: a manifest no pack names; run python3 "
-                      "tools/build.py --marketplace", lines)
+        self.assertIn("FAIL packs/method/agents/scout.md: missing or out of date; run python3 tools/build.py "
+                      "--marketplace", lines)
+        for stray in ("packs/stale/.claude-plugin/plugin.json", "packs/method/agents/stray.md"):
+            self.assertIn(f"FAIL {stray}: a generated file no pack names; run python3 tools/build.py --marketplace",
+                          lines)
         self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
         result = self.run_tool("validate.py")
         self.assertEqual([line for line in result.stdout.splitlines() if line.startswith("FAIL ")],
@@ -98,6 +104,9 @@ class Tools(unittest.TestCase):
         manifest = json.loads((self.repo / "packs/method/.claude-plugin/plugin.json").read_text())
         self.assertEqual(manifest["name"], "dotagents-method")
         self.assertIn("Craft skills", craft.read_text())
+        self.assertFalse(scout.is_symlink())
+        self.assertEqual(scout.read_text(), (self.repo / "home/.agents/agents/scout.md").read_text())
+        self.assertFalse((self.repo / "packs/method/agents/stray.md").exists())
 
     def test_validate_checks_eval_cases_without_running_them(self):
         case = self.repo / "packs/method/evals/broken"
@@ -206,12 +215,14 @@ class Tools(unittest.TestCase):
             baseline[name], limits[name] = 10 * k, 11 * k
             pad = 11 * k - size
             path.write_bytes(path.read_bytes() + b"x" * (pad % 2) + "è".encode() * (pad // 2))
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)  # the pack's subagent copy
         sizes.write_text(json.dumps(baseline))
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 0, result.stdout)  # exactly 10% more is allowed
         for name in limits:
             path = self.repo / name
             path.write_bytes(path.read_bytes() + "è".encode())  # one letter, two bytes over
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
         result = self.run_tool("validate.py")
         self.assertEqual(result.returncode, 1, result.stdout)
         for name, limit in limits.items():
@@ -364,6 +375,7 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             f"FAIL home/.agents/skills/project-setup/templates/AGENTS.md.template:1:1: {comment}",
             f"FAIL home/.agents/path-rules.json:1:34: {hidden} U+202C",
             f"FAIL home/.agents/agents/scout.md:{kept.count(chr(10)) + 3}:7: {hidden} U+2069",
+            f"FAIL packs/method/agents/scout.md:{kept.count(chr(10)) + 3}:7: {hidden} U+2069",  # its pack copy
             f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:7: {hidden} U+00AD",
             f"FAIL home/.agents/skills/hidden-text/SKILL.md:7:19: {comment}",
             f"FAIL home/.agents/skills/design/reference.txt:1:4: {hidden} U+E0041",

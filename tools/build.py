@@ -42,14 +42,15 @@ PACKS_DIR = ROOT / "packs"
 CLAUDE_FRAGMENT = ROOT / "adapters" / "claude" / "settings.json"
 PACK_VERSION = "1.0.0"
 OWNER = {"name": "Nicolò Plebani"}
-# Each pack is a Claude Code plugin rooted at packs/<pack>/, whose skills/, agents/, hooks
-# and AGENTS.md are relative links into home/.agents and claude-ai/skills: one source, no
-# copies. Its .claude-plugin/plugin.json (name, description, version, author) is a real
-# file, because a pack loaded from its folder (claude plugin eval packs/<pack>) resolves
-# only with one; the hooks stay in the marketplace entry. Installed from this folder as a
-# marketplace, a pack loads its linked skills and hooks in place but none of its linked
-# subagents (claude plugin details: Agents (0)); what an install from git keeps of links
-# that lead outside the pack is not verified.
+# Each pack is a Claude Code plugin rooted at packs/<pack>/, whose skills/, hooks and
+# AGENTS.md are relative links into home/.agents and claude-ai/skills. Its
+# .claude-plugin/plugin.json and the method pack's agents/*.md are real files generated
+# here (pack_files) and checked by tools/validate.py: a pack loaded in place (claude plugin
+# eval packs/<pack>, or a marketplace added from a local folder) resolves only with a
+# manifest and reads no subagent through a link (claude plugin details: Agents (0)). An
+# install from a git marketplace copies each link's target in (a clone served over HTTP
+# on 14 November 2026: Skills (9), Agents (3), Hooks (6)). The hooks stay in the
+# marketplace entry.
 # Every local skill belongs to exactly one pack and every claude.ai skill to the chat pack
 # (tools/validate.py checks it). The method pack also carries the subagents, the hooks and
 # the global rules, which a session-start hook prints (Claude Code loads no CLAUDE.md from
@@ -119,9 +120,6 @@ def pack_links() -> dict:
         else:
             for skill in pack["skills"]:
                 links[f"{folder}/skills/{skill}"] = f"../../../home/.agents/skills/{skill}"
-        if pack.get("agents"):
-            for agent in sorted(p.name for p in (HOME / "agents").glob("*.md")):
-                links[f"{folder}/agents/{agent}"] = f"../../../home/.agents/agents/{agent}"
         if pack.get("hooks"):
             links[f"{folder}/hooks"] = "../../home/.agents/hooks"
             links[f"{folder}/AGENTS.md"] = "../../home/.agents/AGENTS.md"
@@ -157,25 +155,41 @@ def marketplace_text() -> str:
     return json.dumps(marketplace(), indent=2, ensure_ascii=False) + "\n"
 
 
-def pack_manifests() -> dict:
-    """{manifest path relative to the repository: its text} for every pack."""
-    return {f"packs/{name}/.claude-plugin/plugin.json":
-            json.dumps({"name": f"dotagents-{name}", "description": pack["description"], "version": PACK_VERSION,
-                        "author": OWNER}, indent=2, ensure_ascii=False) + "\n"
-            for name, pack in PACKS.items()}
+GENERATED = ("*/.claude-plugin/plugin.json", "*/agents/*.md")
+
+
+def pack_files() -> dict:
+    """{generated file path relative to the repository: its text}: each pack's manifest, and
+    a copy of each subagent in a pack that carries them."""
+    files = {}
+    for name, pack in PACKS.items():
+        files[f"packs/{name}/.claude-plugin/plugin.json"] = json.dumps(
+            {"name": f"dotagents-{name}", "description": pack["description"], "version": PACK_VERSION,
+             "author": OWNER}, indent=2, ensure_ascii=False) + "\n"
+        if pack.get("agents"):
+            for agent in sorted((HOME / "agents").glob("*.md")):
+                files[f"packs/{name}/agents/{agent.name}"] = agent.read_text(encoding="utf-8")
+    return files
+
+
+def stray_pack_files(files: dict) -> list:
+    """Real files in a generated place of packs/ that pack_files() does not name."""
+    if not PACKS_DIR.is_dir():
+        return []
+    found = {path for pattern in GENERATED for path in PACKS_DIR.glob(pattern) if not path.is_symlink()}
+    return sorted(path for path in found if path.relative_to(ROOT).as_posix() not in files)
 
 
 def write_packs() -> None:
     """Write the marketplace and make packs/ hold exactly the links pack_links() names and
-    the manifests pack_manifests() names."""
+    the files pack_files() names."""
     MARKETPLACE.parent.mkdir(exist_ok=True)
     MARKETPLACE.write_text(marketplace_text(), encoding="utf-8")
     wanted = pack_links()
-    manifests = pack_manifests()
+    files = pack_files()
+    for path in stray_pack_files(files):
+        path.unlink()
     if PACKS_DIR.is_dir():
-        for path in PACKS_DIR.glob("*/.claude-plugin/plugin.json"):
-            if path.relative_to(ROOT).as_posix() not in manifests:
-                path.unlink()
         for path in sorted(PACKS_DIR.rglob("*"), reverse=True):
             rel = path.relative_to(ROOT).as_posix()
             if path.is_symlink() and wanted.get(rel) != os.readlink(path):
@@ -187,7 +201,7 @@ def write_packs() -> None:
         if not link.is_symlink():
             link.parent.mkdir(parents=True, exist_ok=True)
             link.symlink_to(target)
-    for rel, text in sorted(manifests.items()):
+    for rel, text in sorted(files.items()):
         path = ROOT / rel
         path.parent.mkdir(parents=True, exist_ok=True)
         path.write_text(text, encoding="utf-8")
@@ -196,7 +210,7 @@ def write_packs() -> None:
 def main(argv=None) -> int:
     if "--marketplace" in (sys.argv[1:] if argv is None else argv):
         write_packs()
-        print(f"wrote {MARKETPLACE.relative_to(ROOT)}, and the links and manifests in {PACKS_DIR.relative_to(ROOT)}/")
+        print(f"wrote {MARKETPLACE.relative_to(ROOT)}, and the links and generated files in {PACKS_DIR.relative_to(ROOT)}/")
         return 0
     overrides = json.loads(OVERRIDES.read_text(encoding="utf-8"))["skills"]
     for name, override in sorted(overrides.items()):

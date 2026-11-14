@@ -438,8 +438,8 @@ def check_html_comments(rel: Path, text: str, errors: list) -> None:
 
 
 def check_marketplace(errors: list) -> None:
-    """The committed Claude Code marketplace and each pack's manifest are what tools/build.py
-    writes, every path in it exists, and every skill sits in exactly one pack."""
+    """The committed Claude Code marketplace and each pack's links and generated files are what
+    tools/build.py writes, every path in it exists, and every skill sits in exactly one pack."""
     spec = importlib.util.spec_from_file_location("dotagents_build", ROOT / "tools" / "build.py")
     build = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(build)
@@ -456,16 +456,14 @@ def check_marketplace(errors: list) -> None:
             if path.is_symlink() and path.relative_to(ROOT).as_posix() not in wanted:
                 errors.append(f"{path.relative_to(ROOT)}: a link no pack names; run python3 tools/build.py "
                               "--marketplace")
-    manifests = build.pack_manifests()
-    for manifest, text in sorted(manifests.items()):
-        path = ROOT / manifest
+    files = build.pack_files()
+    for rel_path, text in sorted(files.items()):
+        path = ROOT / rel_path
         if path.is_symlink() or not path.is_file() or path.read_text(encoding="utf-8") != text:
-            errors.append(f"{manifest}: missing or out of date; run python3 tools/build.py --marketplace")
-    if build.PACKS_DIR.is_dir():
-        for path in sorted(build.PACKS_DIR.glob("*/.claude-plugin/plugin.json")):
-            if path.relative_to(ROOT).as_posix() not in manifests:
-                errors.append(f"{path.relative_to(ROOT)}: a manifest no pack names; run python3 tools/build.py "
-                              "--marketplace")
+            errors.append(f"{rel_path}: missing or out of date; run python3 tools/build.py --marketplace")
+    for path in build.stray_pack_files(files):
+        errors.append(f"{path.relative_to(ROOT)}: a generated file no pack names; run python3 tools/build.py "
+                      "--marketplace")
     packed = [Path(link).name for link in wanted if "/skills/" in link]
     for folder in skill_folders(HOME / "skills") + skill_folders(ONLINE):
         count = packed.count(folder.name)

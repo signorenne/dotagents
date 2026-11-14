@@ -20,7 +20,7 @@ claude-ai/overrides.json      local skills also uploaded to claude.ai, with thei
 adapters/claude/              Claude Code settings merged by the installer
 install.py                    installer: each tool described as data, a hash manifest for upgrade and --uninstall, the personal layer, generic targets
 personal/                     the maintainer's personal layer (install.py --personal personal)
-.claude-plugin/, packs/       the Claude Code marketplace and one folder per pack (links and its plugin.json), written by tools/build.py --marketplace
+.claude-plugin/, packs/       the Claude Code marketplace and one folder per pack (links and generated files), written by tools/build.py --marketplace
 tools/                        validate.py, build.py, session_stats.py (where session time and usage go), guard_replay.py (a guard change against past commands) and benchmark.py (the method's A/B benchmark)
 tests/                        unittest suites for hooks, installer, tools and skill scripts
 .githooks/commit-msg          this repository's commit message check (git config core.hooksPath .githooks enables it)
@@ -35,7 +35,7 @@ docs/                         Org docs: docs map, architecture, workflow guide, 
 - A repo workflow (build, design, close, review...): a skill in home/.agents/skills/<name>/, listed in one pack of tools/build.py (PACKS); then python3 tools/build.py --marketplace.
 - A general skill also wanted in claude.ai chat: claude-ai/skills/<name>/. A local skill wanted there too: an entry in claude-ai/overrides.json, never a copy.
 - A script a skill runs: home/.agents/skills/<name>/scripts/. It uses only the standard library plus at most one common package, and has tests in tests/test_skill_scripts.py that pass without that package.
-- A subagent: home/.agents/agents/<name>.md; per-tool formats come from install.py, never by hand.
+- A subagent: home/.agents/agents/<name>.md; per-tool formats come from install.py, never by hand; then python3 tools/build.py --marketplace refreshes the method pack's copy.
 - A hook: a script in home/.agents/hooks/ with tests in tests/test_hooks.py, registered for each tool in install.py and, for Claude Code, in adapters/claude/settings.json.
 - A new tool or a format change: a description in install.py (TOOL_DESCRIPTIONS), which the shared suite in tests/test_install.py (Descriptions) checks, plus tests for anything new in its format.
 - Something only the maintainer wants (an allow rule, a plugin switch, a personal line in the rules): personal/.
