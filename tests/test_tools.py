@@ -795,13 +795,23 @@ if argv[0] == "run":
     sys.exit(0)
 if argv[0] != "exec":
     sys.exit(0)
-index, passed = 1, {}
+index, passed, user = 1, {}, "root"
 while argv[index].startswith("-"):
     if argv[index] == "-e":  # -e NAME takes the value from podman's environment, -e NAME=VALUE gives it
         name, _, value = argv[index + 1].partition("=")
         passed[name] = value if "=" in argv[index + 1] else os.environ.get(name, "")
+    if argv[index] == "-u":
+        user = argv[index + 1]
     index += 2 if argv[index] in ("-u", "-w", "-e") else 1
 container, command = argv[index], argv[index + 1:]
+# A task image has no user agent until a run creates it (users: the containers that have it).
+if "useradd" in " ".join(command):
+    scenario["users"] = scenario.get("users", []) + [container]
+    with open(os.environ["BENCH_FAKE_SCENARIO"], "w") as handle:
+        json.dump(scenario, handle)
+elif user == "agent" and container not in scenario.get("users", []):
+    print("Error: unable to find user agent: no matching entries in passwd file", file=sys.stderr)
+    sys.exit(255)
 if command[0] == "claude":
     # interrupt_at: the agent call (1, 2...) at which the user presses Ctrl-C in the tool.
     scenario["agent_calls"] = scenario.get("agent_calls", 0) + 1
@@ -1027,6 +1037,29 @@ class BenchmarkRun(unittest.TestCase):
             self.assertNotIn("-v", argv)
             name = argv[argv.index("--name") + 1]
             self.assertEqual([call for call in podman if name in call][-1], ["rm", "-f", "-t", "0", name])
+
+    def test_dry_run_reports_a_non_empty_prediction_from_an_untouched_image(self):
+        # A run's prediction step, taken on the image before any agent: a change it finds
+        # there (a prediction base that does not match the image, files git add -A sweeps
+        # in) would ride in every run's prediction. The bare image has no user agent, so a
+        # git that ran as agent would fail and find nothing.
+        ident = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]["agent"]["instance_id"]
+        image = {"head": "4b48727", "after_base": {"4b48727": ["pyproject.toml"]}, "setup_diff": self.PIN,
+                 "branches": {"refs/heads/main": [100, ""]}}
+        stops = f"{ident} image: a run would stop: the untouched image gives a non-empty prediction from "
+        for label, scenario, line in (
+                ("setup commit only", {}, f"{ident} image: ok, commits after base_commit: 1, prediction: empty"),
+                ("untracked file", {"trees": {"/testbed": self.FIX}}, stops + "/testbed (src/widget.py)"),
+                ("branch", {"branches": {"refs/heads/main": [100, ""], "refs/heads/old": [50, self.OLD]}},
+                 stops + "branch refs/heads/old (src/old.py)")):
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario({**image, **scenario})
+                result = self.run_bench("--dry-run", tasks=self.one)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(line + "\n", result.stdout)
+                self.assertEqual(self.calls("claude"), [])
+                self.assertFalse(self.rundir.exists())
 
     def test_the_cap_stops_runs_before_the_total_passes_it(self):
         # A share of 1 (4 runs under 4): the first run overshoots to 3.5, its share used up
