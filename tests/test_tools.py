@@ -651,9 +651,11 @@ class GuardReplay(unittest.TestCase):
         old_guard = replay.load_guard(older, "guard_without_decision")
         self.assertFalse(hasattr(old_guard, "decision"))
         old, new = replay.verdict_of(old_guard), replay.verdict_of(replay.load_guard(ROOT / self.GUARD, "head"))
-        for command in battery.BLOCKED + battery.NEAR_MISSES:
+        # The battery parses; an unclosed quote takes the rough split in both.
+        for command in battery.BLOCKED + battery.NEAR_MISSES + ["git push 'origin"]:
             with self.subTest(command=command):
                 self.assertEqual(set(old(command)), set(new(command)))
+        self.assertTrue(old("git push 'origin"))
 
 
 class Benchmark(unittest.TestCase):
@@ -795,7 +797,7 @@ if command[0] == "claude":
 if "# dotagents probe" in " ".join(command):
     print("guard=%d" % scenario.get("probe_guard", 2))
     print("skills=%d" % scenario.get("skills", 2))
-    print("claude_md=@~/.agents/AGENTS.md")
+    print("claude_md=%s" % scenario.get("claude_md", "@~/.agents/AGENTS.md"))
 elif command[0] == "git":
     # trees: each worktree's change against base_commit; branches: {ref: [time, change]}.
     path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
@@ -1009,6 +1011,7 @@ class BenchmarkRun(unittest.TestCase):
         reply = {"result": "Go ahead.", "total_cost_usd": 0.01}
         for label, maintainer, agent_calls, stop in (
                 ("reply limit", [reply] * 10, 7, "reply limit"), ("done", [], 1, "DONE"),
+                ("done inside a reply", [{"result": "Not DONE yet: add a test.", "total_cost_usd": 0.01}], 2, "DONE"),
                 ("no result", [None], 1, "DONE"),
                 ("budget stop", [{"subtype": "error_max_budget_usd", "is_error": True, "total_cost_usd": 0.02}], 1,
                  "DONE")):
@@ -1024,13 +1027,19 @@ class BenchmarkRun(unittest.TestCase):
                 self.assertEqual(len(record["maintainer"]), min(agent_calls, 6))
 
     def test_a_failed_probe_is_an_error_not_a_run(self):
-        self.set_scenario({"probe_guard": 0})
-        result = self.run_bench(tasks=self.one)
-        self.assertEqual(result.returncode, 0, result.stderr)
-        containers = [call["container"] for call in self.calls("claude", "agent")]
-        self.assertEqual([name.split(".")[1] for name in containers], ["plain"])
-        method = next(record for record in self.records().values() if record["arm"] == "method")
-        self.assertEqual((method["stop"], method["probe"]["passed"], method["calls"]), ("error", False, []))
+        # The guard lets a push through, a skill is missing, or CLAUDE.md lost its import.
+        for label, scenario in (("guard", {"probe_guard": 0}), ("skills", {"skills": 1}),
+                                ("rules", {"claude_md": "# empty"})):
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario(scenario)
+                rundir = self.folder / f"probe-{label}"
+                result = self.run_bench(tasks=self.one, rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                containers = [call["container"] for call in self.calls("claude", "agent")]
+                self.assertEqual([name.split(".")[1] for name in containers], ["plain"])
+                method = next(record for record in self.records(rundir).values() if record["arm"] == "method")
+                self.assertEqual((method["stop"], method["probe"]["passed"], method["calls"]), ("error", False, []))
 
     NOTES = ("diff --git a/.private/progress/fix.org b/.private/progress/fix.org\nnew file mode 100644\n"
              "--- /dev/null\n+++ b/.private/progress/fix.org\n@@ -0,0 +1 @@\n+notes\n")
@@ -1191,7 +1200,11 @@ class BenchmarkRun(unittest.TestCase):
 
 # A fake SWE-bench Python: -c (the import check) passes; -m swebench.harness.run_evaluation
 # logs its call and writes a report per instance, resolved when the patch holds RESOLVE and
-# with a failing PASS_TO_PASS test when it holds REGRESS. Duplicate instance ids exit 3.
+# with a failing PASS_TO_PASS test when it holds REGRESS. Like swebench 5.0.2, it writes no
+# report for an empty patch (dropped before evaluation), nor for one that does not apply
+# (UNAPPLIABLE: it logs ">>>>> Patch Apply Failed" in run_instance.log), nor when the tests
+# time out (HANG: "Timeout error" in test_output.txt), nor when it fails (CRASH). Duplicate
+# instance ids exit 3.
 FAKE_HARNESS = r'''
 import json, os, shutil, sys
 from pathlib import Path
@@ -1222,8 +1235,18 @@ else:
         sys.exit(3)
 for ident in ids:
     folder = Path("logs/run_evaluation") / run_id / model / ident
-    folder.mkdir(parents=True, exist_ok=True)
     patch = patches[ident]
+    if not patch:
+        continue
+    folder.mkdir(parents=True, exist_ok=True)
+    if "UNAPPLIABLE" in patch:
+        (folder / "run_instance.log").write_text(">>>>> Patch Apply Failed:\nerror: patch failed: x:1\n")
+        continue
+    if "HANG" in patch:
+        (folder / "test_output.txt").write_text("running...\n\nTimeout error: 1800 seconds exceeded.")
+        continue
+    if "CRASH" in patch:
+        continue
     failing = ["test_old"] if "REGRESS" in patch else []
     (folder / "report.json").write_text(json.dumps({ident: {
         "patch_exists": bool(patch), "patch_successfully_applied": bool(patch), "resolved": "RESOLVE" in patch,
@@ -1239,7 +1262,9 @@ class BenchmarkResults(unittest.TestCase):
 
     setUp_dataset, tool, select = Benchmark.setUp, Benchmark.tool, Benchmark.select
     TOOL = Benchmark.TOOL
-    AGENT_COSTS = {"method": [1.0, 2.0, 3.0, 4.0], "plain": [0.5, 1.0, 1.5, 0.0]}
+    # Skewed, so a mean and a median differ.
+    AGENT_COSTS = {"method": [1.0, 1.0, 1.0, 9.0], "plain": [0.5, 0.5, 2.0, 0.0]}
+    TURNS, MINUTES = [10, 10, 10, 30], [1, 1, 1, 9]
 
     def setUp(self):
         self.setUp_dataset()
@@ -1257,8 +1282,9 @@ class BenchmarkResults(unittest.TestCase):
                     number = (repeat - 1) * 2 + index
                     error = arm == "plain" and number == 3
                     cost = self.AGENT_COSTS[arm][number]
-                    calls = [] if error else [{"result": "TRANSCRIPT-TEXT: ran git push", "num_turns": 10 + number,
-                                               "duration_ms": 60000 * (number + 1), "total_cost_usd": cost}]
+                    calls = [] if error else [{"result": "TRANSCRIPT-TEXT: ran git push",
+                                               "num_turns": self.TURNS[number],
+                                               "duration_ms": 60000 * self.MINUTES[number], "total_cost_usd": cost}]
                     # One reply, then DONE (which is not a reply).
                     replies = ([{"reply": "TRANSCRIPT-REPLY", "cost": 0.01}, {"reply": "DONE", "cost": 0.0}]
                                if arm == "method" else [])
@@ -1322,6 +1348,27 @@ class BenchmarkResults(unittest.TestCase):
             self.assertEqual((grade["resolved"], grade["regressions"]),
                              (True, []) if arm == "method" else (False, ["test_old"]), run_id)
 
+    def test_grade_counts_empty_and_unapplied_patches_and_reports_harness_failures(self):
+        empty, unapplied, crashed = (f"{self.ids[0]}.method.1", f"{self.ids[1]}.method.1", f"{self.ids[0]}.method.2")
+        hung = f"{self.ids[1]}.plain.1"
+        for run_id, patch in ((empty, ""), (unapplied, "diff --git a/x b/x\n+UNAPPLIABLE\n"),
+                              (crashed, "diff --git a/x b/x\n+CRASH\n"), (hung, "diff --git a/x b/x\n+HANG\n")):
+            (self.rundir / "runs" / run_id / "prediction.diff").write_text(patch, encoding="utf-8")
+        result = self.grade()
+        self.assertEqual(result.returncode, 1, result.stdout)  # a run the harness did not report on
+        self.assertIn(crashed, result.stderr)
+        grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
+        self.assertEqual({run_id: (grades[run_id]["graded"], grades[run_id]["resolved"], grades[run_id]["outcome"])
+                          for run_id in (empty, unapplied, crashed, hung)},
+                         {empty: (True, False, "empty prediction"), unapplied: (True, False, "patch did not apply"),
+                          crashed: (False, False, "no report"), hung: (True, False, "tests timed out")})
+        self.assertNotIn(hung, result.stderr)  # a timeout is the patch's failure, not the harness's
+        # Empty and unapplied predictions are failures to resolve; a harness failure stays
+        # apart, outside the rate: 1 resolved of 3 graded, not of the 4 that reached the agent.
+        summary = self.tool("summary", "--rundir", self.rundir)
+        self.assertEqual(self.table(summary.stdout, "method")[3:8], ["3", "2", "1", "1", "33%"])
+        self.assertEqual(self.table(summary.stdout, "plain")[3:8], ["3", "0", "0", "0", "0%"])
+
     def test_grade_needs_podman_s_socket(self):
         result = self.grade(env={**self.env, "DOCKER_HOST": f"unix://{self.folder / 'no.sock'}"})
         self.assertEqual(result.returncode, 1, result.stdout)
@@ -1339,17 +1386,17 @@ class BenchmarkResults(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         text = org.read_text(encoding="utf-8")
         self.assertIn("pilot: not conclusive", text)  # 2 tasks and 2 runs per arm, under the full run's
-        self.assertEqual(self.table(text, "arm")[:6],
-                         ["arm", "runs", "errors", "graded", "resolved", "resolved rate"])
+        self.assertEqual(self.table(text, "arm")[:8], ["arm", "runs", "errors", "graded", "empty or not applied",
+                                                         "no report", "resolved", "resolved rate"])
         # Medians over the runs that reached the agent, totals over all runs.
         self.assertEqual(self.table(text, "method"),
-                         ["method", "4", "0", "4", "4", "100%", "2.50", "10.00", "0.01", "0.04", "11.5", "2.5", "0",
-                          "1.0", "3", "2.01", "DONE 4"])  # spends 2.01, 3.01 and 4.01 pass the share of 2
+                         ["method", "4", "0", "4", "0", "0", "4", "100%", "1.00", "12.00", "0.01", "0.04", "10.0", "1.0", "0",
+                          "1.0", "1", "7.01", "DONE 4"])  # 9.01 passes the share of 2
         self.assertEqual(self.table(text, "plain"),
-                         ["plain", "4", "1", "3", "0", "0%", "1.00", "3.00", "0.00", "0.00", "11.0", "2.0", "3",
+                         ["plain", "4", "1", "3", "0", "0", "0", "0%", "0.50", "3.00", "0.00", "0.00", "10.0", "1.0", "3",
                           "0.0", "0", "0.00", "DONE 3, error 1"])
-        self.assertEqual(self.table(text, self.ids[0]), [self.ids[0], "2/2", "2.00", "0/2", "1.00"])
-        self.assertEqual(self.table(text, self.ids[1]), [self.ids[1], "2/2", "3.00", "0/2", "1.00"])
+        self.assertEqual(self.table(text, self.ids[0]), [self.ids[0], "2/2", "1.00", "0/2", "1.25"])
+        self.assertEqual(self.table(text, self.ids[1]), [self.ids[1], "2/2", "5.00", "0/1", "0.50"])  # its setup error never reached the agent
         for transcript in ("TRANSCRIPT", "git push"):
             self.assertNotIn(transcript, text)
 
@@ -1357,7 +1404,7 @@ class BenchmarkResults(unittest.TestCase):
         result = self.tool("summary", "--rundir", self.rundir)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("not graded", result.stdout)
-        self.assertEqual(self.table(result.stdout, "method")[3:6], ["0", "-", "-"])
+        self.assertEqual(self.table(result.stdout, "method")[3:8], ["-"] * 5)
 
 
 if __name__ == "__main__":

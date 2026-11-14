@@ -66,11 +66,15 @@ grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, s
         The harness keys predictions by instance id, so each arm and repeat is graded in a
         call of its own; runs that never reached the agent are not graded. RUNDIR/grades.json
         holds per run whether it is resolved and which PASS_TO_PASS tests failed
-        (regressions). With --gold it grades the reference patches of the tasks (RUNDIR's
-        tasks.json, or --tasks) into RUNDIR/gold.json instead.
+        (regressions). The harness writes no report for an empty patch, one that does not
+        apply, or one whose tests time out: each counts as graded and unresolved. A run it failed on otherwise has no
+        grade, and grade exits 1 naming it (grade again to retry). With --gold it grades the
+        reference patches of the tasks (RUNDIR's tasks.json, or --tasks) into
+        RUNDIR/gold.json instead.
 
-summary writes per arm the runs, errors, resolved rate, median and total cost (agent and
-        maintainer apart), median turns, minutes and replies, runs with regressions, runs
+summary writes per arm the runs, errors, graded runs (empty or unapplied predictions
+        among them), runs without a report, the resolved rate over the graded runs, median
+        and total cost (agent and maintainer apart), median turns, minutes and replies, runs with regressions, runs
         over their share and the stop reasons, then per task both arms side by side: an Org
         fragment of metrics only, no transcript or command text, to --org or stdout. It is
         labeled "pilot: not conclusive" below the full run of DESIGN.org's method-measured
@@ -735,8 +739,15 @@ def docker_host() -> str:
     return os.environ.get("DOCKER_HOST") or f"unix://{runtime}/podman/podman.sock"
 
 
+APPLY_FAILED = ">>>>> Patch Apply Failed"  # swebench.harness.constants.APPLY_PATCH_FAIL
+TIMED_OUT = "Timeout error:"  # what run_evaluation adds to test_output.txt when the tests time out
+
+
 def harness(python: Path, grading: Path, env: dict, run_id: str, predictions: str, model: str, ids: list) -> dict:
-    """Run the SWE-bench harness from grading/ and read back each instance's report."""
+    """Run the SWE-bench harness from grading/ and read back each instance's grade: its
+    report, or, without one, a patch that did not apply or tests that timed out (the
+    harness logs either and writes no report), both unresolved, or "no report", a harness
+    failure that is not graded."""
     logs = grading / "logs" / "run_evaluation" / run_id
     shutil.rmtree(logs, ignore_errors=True)  # the harness skips instances it already reported
     argv = [str(python), "-m", "swebench.harness.run_evaluation", "--dataset_name", "dataset.jsonl",
@@ -746,12 +757,23 @@ def harness(python: Path, grading: Path, env: dict, run_id: str, predictions: st
         subprocess.run(argv, cwd=grading, env=env, stdout=log, stderr=subprocess.STDOUT, check=False)
     reports = {}
     for ident in ids:
+        folder = logs / model / ident
         try:
-            report = json.loads((logs / model / ident / "report.json").read_text(encoding="utf-8"))[ident]
+            report = json.loads((folder / "report.json").read_text(encoding="utf-8"))[ident]
         except (OSError, ValueError, KeyError):
+            logs_of = {}
+            for name in ("run_instance.log", "test_output.txt"):
+                try:
+                    logs_of[name] = (folder / name).read_text(encoding="utf-8", errors="replace")
+                except OSError:
+                    logs_of[name] = ""
+            outcome = ("patch did not apply" if APPLY_FAILED in logs_of["run_instance.log"] else
+                       "tests timed out" if TIMED_OUT in logs_of["test_output.txt"] else "no report")
+            reports[ident] = {"graded": outcome != "no report", "resolved": False, "regressions": [],
+                              "outcome": outcome}
             continue
         status = report.get("tests_status") or {}
-        reports[ident] = {"graded": True, "resolved": report.get("resolved") is True,
+        reports[ident] = {"graded": True, "outcome": "report", "resolved": report.get("resolved") is True,
                           "patch_applied": report.get("patch_successfully_applied") is True,
                           "regressions": sorted((status.get("PASS_TO_PASS") or {}).get("failure") or []),
                           "fail_to_pass_failed": sorted((status.get("FAIL_TO_PASS") or {}).get("failure") or [])}
@@ -782,12 +804,11 @@ def grade(args) -> int:
         env["PATH"] = f"{shim.parent}{os.pathsep}{env.get('PATH', '')}"
     if args.gold:
         ids = [task["agent"]["instance_id"] for task in tasks]
-        reports = harness(python, grading, env, f"{rundir.name}-gold", "gold", "gold", ids)
-        gold = {ident: reports.get(ident, {"graded": False, "resolved": False}) for ident in ids}
+        gold = harness(python, grading, env, f"{rundir.name}-gold", "gold", "gold", ids)
         write_json(rundir / "gold.json", gold)
         print(f"gold: {sum(value['resolved'] for value in gold.values())} of {len(gold)} resolved "
               f"({rundir / 'gold.json'})")
-        return 0
+        return unreported(gold, grading)
     # The harness keys predictions by instance id: one call per arm and repeat.
     groups = {}
     for path in sorted((rundir / "runs").glob("*/record.json")):
@@ -799,18 +820,35 @@ def grade(args) -> int:
     grades = {}
     for (arm, repeat), runs in sorted(groups.items()):
         model = f"{arm}-{repeat}"
+        # The harness drops an empty patch unreported: it resolves nothing.
+        submitted = {ident: run for ident, run in runs.items() if run[1].strip()}
+        for run_id, patch in runs.values():
+            if not patch.strip():
+                grades[run_id] = {"graded": True, "resolved": False, "outcome": "empty prediction", "regressions": []}
+        if not submitted:
+            continue
         predictions = grading / f"predictions-{model}.jsonl"
         predictions.write_text("".join(json.dumps({"instance_id": ident, "model_name_or_path": model,
                                                    "model_patch": patch}) + "\n"
-                                       for ident, (_, patch) in sorted(runs.items())), encoding="utf-8")
-        reports = harness(python, grading, env, f"{rundir.name}-{model}", predictions.name, model, sorted(runs))
-        for ident, (run_id, _) in runs.items():
-            grades[run_id] = reports.get(ident, {"graded": False, "resolved": False, "regressions": []})
+                                       for ident, (_, patch) in sorted(submitted.items())), encoding="utf-8")
+        reports = harness(python, grading, env, f"{rundir.name}-{model}", predictions.name, model, sorted(submitted))
+        for ident, (run_id, _) in submitted.items():
+            grades[run_id] = reports[ident]
     write_json(rundir / "grades.json", grades)
     for arm in sorted({run_id.split(".")[-2] for run_id in grades}):
         mine = [value for run_id, value in grades.items() if run_id.split(".")[-2] == arm]
         print(f"{arm}: {sum(value['resolved'] for value in mine)} of {len(mine)} resolved")
     print(f"grades: {rundir / 'grades.json'}")
+    return unreported(grades, grading)
+
+
+def unreported(grades: dict, grading: Path) -> int:
+    """1, naming them, when the harness failed on some runs; 0 otherwise."""
+    missing = sorted(name for name, value in grades.items() if not value["graded"])
+    if missing:
+        print(f"no report for {len(missing)} (a harness failure; its logs are in {grading}): "
+              f"{', '.join(missing)}; grade again to retry", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -843,15 +881,20 @@ def replies_of(record: dict) -> int:
 def arm_row(arm: str, records: list, grades, share: float) -> list:
     mine = [record for record in records if record["arm"] == arm]
     reached = [record for record in mine if record.get("calls")]
-    graded = [grades[record["run"]] for record in mine
-              if grades is not None and grades.get(record["run"], {}).get("graded")]
+    known = grades is not None
+    # Graded: a report, an empty prediction or a patch that did not apply (both unresolved);
+    # a run the harness failed on is counted apart, outside the rate.
+    graded = [grades[record["run"]] for record in reached if known and grades.get(record["run"], {}).get("graded")]
     resolved = sum(1 for value in graded if value["resolved"])
+    failed = sum(1 for value in graded if value.get("outcome") in ("empty prediction", "patch did not apply"))
     stops = {}
     for record in mine:
         stops[record["stop"]] = stops.get(record["stop"], 0) + 1
     over = [record["spend"] - share for record in mine if record["spend"] > share + 1e-9]
-    return [arm, str(len(mine)), str(sum(1 for record in mine if record["stop"] == "error")), str(len(graded)),
-            str(resolved) if graded else "-", f"{100 * resolved / len(graded):.0f}%" if graded else "-",
+    return [arm, str(len(mine)), str(sum(1 for record in mine if record["stop"] == "error")),
+            str(len(graded)) if known else "-", str(failed) if known else "-",
+            str(len(reached) - len(graded)) if known else "-", str(resolved) if known else "-",
+            f"{100 * resolved / len(graded):.0f}%" if graded else "-",
             median([record["agent_cost"] for record in reached], ".2f"),
             f"{sum(record['agent_cost'] for record in mine):.2f}",
             median([record["maintainer_cost"] for record in reached], ".2f"),
@@ -859,7 +902,7 @@ def arm_row(arm: str, records: list, grades, share: float) -> list:
             median([sum(call.get("num_turns") or 0 for call in record["calls"]) for record in reached], ".1f"),
             median([sum(call.get("duration_ms") or 0 for call in record["calls"]) / 60000 for record in reached],
                    ".1f"),
-            str(sum(1 for value in graded if value.get("regressions"))) if graded else "-",
+            str(sum(1 for value in graded if value.get("regressions"))) if known else "-",
             median([replies_of(record) for record in reached], ".1f"),
             str(len(over)), f"{max(over, default=0):.2f}",
             ", ".join(f"{stop} {count}" for stop, count in sorted(stops.items(), key=lambda item: (-item[1], item[0])))]
@@ -879,7 +922,8 @@ def summary(args) -> int:
              f"{len(tasks)} tasks, {runs} runs per arm, model {plan['model']}, maintainer "
              f"{plan['maintainer_model']}, cap {plan['cap_usd']:.2f}, share {plan['share']:.2f}"
              + ("; not graded." if grades is None else "."), ""]
-    lines += org_table([["arm", "runs", "errors", "graded", "resolved", "resolved rate", "median agent cost",
+    lines += org_table([["arm", "runs", "errors", "graded", "empty or not applied", "no report", "resolved",
+                         "resolved rate", "median agent cost",
                          "total agent cost", "median maintainer cost", "total maintainer cost", "median turns",
                          "median minutes", "runs with regressions", "median replies", "runs over share",
                          "max over share", "stops"]]
@@ -888,10 +932,12 @@ def summary(args) -> int:
     for ident in tasks:
         row = [ident]
         for arm in arms:
-            mine = [record for record in records if record["instance_id"] == ident and record["arm"] == arm]
-            resolved = sum(1 for record in mine if (grades or {}).get(record["run"], {}).get("resolved"))
-            row += [f"{resolved if grades is not None else '-'}/{len(mine)}",
-                    median([record["agent_cost"] for record in mine if record.get("calls")], ".2f")]
+            reached = [record for record in records
+                       if record["instance_id"] == ident and record["arm"] == arm and record.get("calls")]
+            graded = [grades[record["run"]] for record in reached
+                      if grades is not None and grades.get(record["run"], {}).get("graded")]
+            row += [f"{sum(1 for value in graded if value['resolved'])}/{len(graded)}" if grades is not None else "-",
+                    median([record["agent_cost"] for record in reached], ".2f")]
         rows.append(row)
     lines += [""] + org_table(rows)
     text = "\n".join(lines) + "\n"
