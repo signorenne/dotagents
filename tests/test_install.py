@@ -568,15 +568,25 @@ class Install(unittest.TestCase):
         default.write_text('prefix_rule(pattern = ["gh", "pr", "view"], decision = "prompt")\n')
         self.install("--tools", "codex")
         self.assertEqual(default.read_text(), 'prefix_rule(pattern = ["gh", "pr", "view"], decision = "prompt")\n')
-        forbidden = set()
+        forbidden, token_rules = set(), set()
         for fields in self.codex_rules():
             self.assertEqual(set(fields), {"pattern", "decision", "justification"})
             self.assertEqual(fields["decision"], "forbidden")
-            self.assertIn("maintainer", fields["justification"])
             prefixes = [[]]
             for part in fields["pattern"]:
                 prefixes = [p + [word] for p in prefixes for word in (part if isinstance(part, list) else [part])]
             forbidden |= {" ".join(p) for p in prefixes}
+            # A rule says why and what to do instead: a token stays out of the session, the
+            # rest is the maintainer's to publish.
+            if "prints the authentication token" in fields["justification"]:
+                self.assertIn("ask the user to run any command that needs the token", fields["justification"])
+                self.assertNotIn("maintainer", fields["justification"])
+                token_rules |= {" ".join(p) for p in prefixes}
+            else:
+                self.assertIn("maintainer", fields["justification"])
+        self.assertEqual(token_rules, {"gh auth token", "gh auth git-credential", "gh config get oauth_token",
+                                       *(f"gh auth status {flag}" for flag in
+                                         ("-t", "--show-token", "-at", "-ta", "-t=true", "--show-token=true"))})
         self.assertEqual({p for p in forbidden if p.startswith("git ")},
                          {"git push", "git subtree push", "git send-pack", "git http-push", "git lfs push",
                           "git svn dcommit", "git p4 submit", "git send-email"})
@@ -585,20 +595,27 @@ class Install(unittest.TestCase):
         # aliases included (gh help, 13 Nov 2026); a command gh adds later is the guard's.
         def forbids(command):
             return any(command == prefix or command.startswith(prefix + " ") for prefix in forbidden)
-        for command in ("gh pr create", "gh pr new", "gh pr merge 1", "gh pr checkout 1", "gh pr co 1",
-                        "gh pr comment 1", "gh pr ready 1", "gh issue create", "gh issue new", "gh issue close 1",
-                        "gh release create v1", "gh release upload v1 a", "gh release download v1",
-                        "gh repo create x", "gh repo new x", "gh repo sync", "gh repo fork", "gh repo autolink create",
-                        "gh gist create a", "gh gist new a", "gh label clone o/r", "gh workflow run ci",
-                        "gh secret set X", "gh variable get X", "gh auth login", "gh cs create", "gh codespace ports",
-                        "gh ext install x", "gh completion -s bash"):
+        for command in ("gh pr create", "gh pr new", "gh pr merge 1", "gh pr comment 1", "gh pr ready 1",
+                        "gh issue create", "gh issue new", "gh issue close 1", "gh release create v1",
+                        "gh release upload v1 a", "gh release delete v1", "gh repo create x", "gh repo new x",
+                        "gh repo sync", "gh repo fork", "gh repo autolink create", "gh gist create a", "gh gist new a",
+                        "gh label clone o/r", "gh workflow run ci", "gh secret set X", "gh variable set X",
+                        "gh config set editor vim", "gh auth login", "gh cs create", "gh codespace ports",
+                        "gh ext install x", "gh run rerun 7", "gh attestation download a", "gh copilot",
+                        "gh preview prompter", "gh auth token", "gh auth git-credential get", "gh auth status -t",
+                        "gh auth status --show-token", "gh auth status -at", "gh config get oauth_token"):
             with self.subTest(command=command):
                 self.assertTrue(forbids(command))
+        # Read or local commands (the maintainer's decision on D-v) have no rule.
         for command in ("gh pr view 1", "gh pr list", "gh pr ls", "gh pr diff 1", "gh pr checks 1", "gh pr status",
                         "gh issue list", "gh issue view 1", "gh run view 1 --log", "gh repo view",
                         "gh repo clone o/r", "gh gist clone a", "gh repo license view mit", "gh repo autolink list",
-                        "gh auth status", "gh search issues x", "gh status", "gh browse -n", "gh api repos/o/r",
-                        "gh --version", "gh cs list"):
+                        "gh auth status", "gh auth status -a", "gh search issues x", "gh status", "gh browse -n",
+                        "gh browse", "gh api repos/o/r", "gh --version", "gh cs list", "gh pr checkout 1",
+                        "gh pr co 1", "gh run watch 7", "gh run download 7", "gh release download v1",
+                        "gh config get editor", "gh variable get X", "gh repo read-file a", "gh repo read-dir a",
+                        "gh ruleset check", "gh rs check", "gh attestation verify a", "gh at verify a",
+                        "gh completion -s bash", "gh licenses"):
             with self.subTest(command=command):
                 self.assertFalse(forbids(command))
 
@@ -609,7 +626,9 @@ class Install(unittest.TestCase):
         env = {**os.environ, "HOME": str(self.home), "CODEX_HOME": str(self.home / ".codex")}
         cases = {("git", "push", "--force", "origin", "main"): "forbidden", ("gh", "pr", "new"): "forbidden",
                  ("gh", "repo", "sync"): "forbidden", ("gh", "pr", "comment", "7", "--body", "x"): "forbidden",
-                 ("git", "send-email", "a.patch"): "forbidden", ("gh", "pr", "checkout", "7"): "forbidden",
+                 ("git", "send-email", "a.patch"): "forbidden", ("gh", "pr", "checkout", "7"): None,
+                 ("gh", "release", "download", "v1"): None, ("gh", "auth", "token"): "forbidden",
+                 ("gh", "auth", "status", "-t"): "forbidden", ("gh", "auth", "status"): None,
                  ("gh", "label", "clone", "o/r"): "forbidden", ("git", "status"): None,
                  ("gh", "pr", "view", "7"): None, ("gh", "issue", "list"): None,
                  ("gh", "run", "view", "7", "--log"): None, ("gh", "repo", "clone", "o/r"): None}
