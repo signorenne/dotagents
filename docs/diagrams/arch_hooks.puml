@@ -12,6 +12,8 @@ participant "session_refresh.py" as refresh
 participant "progress_check.py" as progress
 participant "git" as git
 collections ".private/" as notes
+participant "claim_check.py" as claim
+participant "transcript" as transcript
 
 == Claude Code: before a compaction ==
 tool -> brief : payload (cwd, trigger)
@@ -51,12 +53,18 @@ else nothing wrong
   edit --> tool : exit 0, notice if reformatted
 end
 
-== Claude Code and Codex: when the agent ends its turn ==
+== When the agent ends its turn: Claude Code and Codex (progress check), Claude Code (claim check) ==
 tool -> progress : payload (cwd, stop_hook_active)
 progress -> git : branch <type>/<slug>,\nits own commits
 progress -> notes : progress/<slug>.*
 opt not yet continued, and a commit\nnewer than the log or not in it
   progress --> tool : block once: record each\nstep, its commit and check
+end
+tool -> claim : payload (last message,\ntranscript path)
+claim -> transcript : last 4 MB
+claim -> claim : sort calls after\nthe last edit\n(guard's parser)
+opt not yet continued, a "tests pass"\nclaim, and no passing run\nafter the last edit
+  claim --> tool : block once: run the\ntests or say they were not
 end
 
 legend right
