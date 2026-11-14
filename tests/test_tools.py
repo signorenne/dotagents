@@ -1308,7 +1308,7 @@ run_id, predictions = option("--run_id"), option("--predictions_path")
 with open(option("--dataset_name")) as handle:
     dataset = [json.loads(line) for line in handle]
 with open(os.environ["BENCH_FAKE_LOG"], "a") as handle:
-    handle.write(json.dumps({"program": "harness", "argv": args, "cwd": os.getcwd(), "ids": ids,
+    handle.write(json.dumps({"program": "harness", "python": sys.argv[0], "argv": args, "cwd": os.getcwd(), "ids": ids,
                              "docker_host": os.environ.get("DOCKER_HOST"), "docker": shutil.which("docker"),
                              "dataset_fields": sorted(dataset[0])}) + "\n")
 if predictions == "gold":
@@ -1460,6 +1460,18 @@ class BenchmarkResults(unittest.TestCase):
         self.assertEqual(self.table(summary.stdout, "method")[3:9], ["3", "2", "0", "1", "1", "33%"])
         # plain: one report, one timeout, and the run whose output only quotes a timeout.
         self.assertEqual(self.table(summary.stdout, "plain")[3:9], ["2", "0", "1", "1", "0", "0%"])
+
+    def test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink(self):
+        # The harness runs in RUNDIR/grading/, so a relative path must still reach the
+        # Python; a venv's python is a symlink that must not be resolved, or it loses the venv.
+        (self.folder / "bin" / "venv-python").symlink_to("swebench-python")
+        result = subprocess.run([sys.executable, "-B", str(self.TOOL), "grade", "--rundir", str(self.rundir),
+                                 "--swebench-python", "bin/venv-python"], cwd=self.folder, env=self.env,
+                                capture_output=True, text=True, check=False)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = self.harness_calls()
+        self.assertEqual(len(calls), 4)
+        self.assertEqual({call["python"] for call in calls}, {str(self.folder.resolve() / "bin" / "venv-python")})
 
     def test_grade_needs_podman_s_socket(self):
         result = self.grade(env={**self.env, "DOCKER_HOST": f"unix://{self.folder / 'no.sock'}"})

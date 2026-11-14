@@ -838,7 +838,8 @@ def grade(args) -> int:
     if host.startswith("unix://") and not Path(host[len("unix://"):]).exists():
         raise Failure(f"no Docker API at {host}: start podman's (podman system service --time=0 {host} &, or "
                       f"systemctl --user start podman.socket) and set DOCKER_HOST to it")
-    python = Path(args.swebench_python)
+    # The harness runs in grading/; resolve() would follow a venv's python symlink out of the venv.
+    python = Path(args.swebench_python).absolute()
     if run_program([str(python), "-c", "import swebench"], "check the SWE-bench Python").returncode:
         raise Failure(f"{python} cannot import swebench: make a Python 3.10 or later virtual environment and "
                       f"pip install swebench in it")

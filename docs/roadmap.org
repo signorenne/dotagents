@@ -366,10 +366,12 @@ As of 14 November 2026:
   Accepted by the maintainer on 14 November 2026, with the item above
   (=test_dry_run_checks_each_image_with_podman_only= in
   =tests/test_tools.py=).
-- [ ] =grade= turns a relative =--swebench-python= into an absolute path
+- [X] =grade= turns a relative =--swebench-python= into an absolute path
   (=Path.absolute()=, not =resolve()=, since a venv's =python= is a
   symlink): the harness runs in =RUNDIR/grading/=, so a relative one fails
-  with =FileNotFoundError=.
+  with =FileNotFoundError=
+  (=test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink= in
+  =tests/test_tools.py=).
 - [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
   before the first published version of METHOD.org.
 
