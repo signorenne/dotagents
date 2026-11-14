@@ -23,11 +23,11 @@ rules that bind; [[file:../CONTRIBUTING.org][CONTRIBUTING.org]] owns the workflo
 
 * Status
 
-As of 13 November 2026:
+As of 14 November 2026:
 
 - [X] One source in =home/.agents=, installed as =~/.agents=, with the global
-  rules, the local skills, the claude.ai set, three subagents, six hooks and
-  the path rules.
+  rules, the local skills, the claude.ai set, three subagents, seven hooks
+  and the path rules.
 - [X] The installer for Claude Code, Codex, Gemini CLI, Antigravity CLI,
   Copilot CLI and Cursor, with backups, a dry run, an audit and idempotent
   reruns.
@@ -39,14 +39,15 @@ As of 13 November 2026:
   Pillow) and on macOS (Python 3.12).
 - [X] claude.ai: the global rules are pasted and the skill zips uploaded by
   hand, from =dist/claude-ai/=.
-- [X] No agent pushes or publishes: in every tool the guard blocks every
-  form of =git push= and git's other ways to publish, and runs only the
-  read-only =gh= commands, also behind the wrappers it follows
-  (=tests/test_hooks.py=; [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]] lists
-  them). The Claude Code settings deny =git push=, and the Codex rules
-  forbid the same git commands and every command of gh 2.100.0 that writes,
-  except =gh api= (=tests/test_install.py=). What the guard does not inspect is
-  under Open.
+- [X] No agent pushes or publishes: in every tool the guard blocks every form of
+  =git push= and git's other ways to publish, and runs only the =gh=
+  commands that read or work locally, also behind the wrappers it follows
+  (=tests/test_hooks.py=;
+  [[file:../DESIGN.org::*Hooks and their failure model][DESIGN.org, Hooks and their failure model]]
+  lists them). The Claude Code settings deny =git push=, and the Codex rules
+  forbid the same git commands and every command of gh 2.100.0 that is not
+  read or local, except =gh api= (=tests/test_install.py=). What the guard
+  does not inspect is under Open.
 
 * Open
 
@@ -66,8 +67,53 @@ As of 13 November 2026:
   holds the push, publish and gate bypass forms the guard must block and the
   near misses it must let through; the forms it found passing were fixed
   (de3a625, then c6041a0, 5dfc8bd, 8e83455, 9594429, ba4d183 and 6b2f021).
-- [X] The guard runs only the read-only =gh= commands and blocks every other
-  one, so a write command gh adds later is blocked too (7ee6891).
+- [X] The guard runs only the =gh= commands that read or work locally and
+  blocks every other one, so a write command gh adds later is blocked too
+  (7ee6891); since the maintainer's decision of 13 November 2026 these
+  include =pr checkout=, =run watch= and =download=, =release download=,
+  =config= and =variable get=, =repo read-file= and =read-dir=,
+  =ruleset check=, =attestation verify=, =browse=, =completion= and
+  =licenses=. A flag other than =-R= or =--repo= before a subcommand makes
+  the command unknown, and the token prints are blocked: =gh auth token=,
+  =gh auth git-credential=, =gh auth status= with =-t= or =--show-token=,
+  =gh config get oauth_token= (c03461b, c3d94e2). The Codex rules forbid
+  the token prints a prefix can say (c03461b).
+- [X] The claim check (=claim_check.py=, on =Stop= in Claude Code) sends the
+  agent back once when its final message says the tests pass and the
+  transcript shows no passing test run after its last edit (96ed6a4, then
+  299b41f, 16fbee6, 3936692, 3a7859b, 3676b8f, 3da5d53, 23c575e, 0086935,
+  55bc7c8, 1b3173a and 1ea845b; =ClaimCheck= in =tests/test_hooks.py=).
+  Untested against a real Claude Code transcript: its records were read
+  from the documentation and memory, not from a session file.
+- [ ] A claim check for Codex: Codex documents =transcript_path=, but says
+  its format "isn't a stable interface for hooks", and its records differ
+  from Claude Code's, so the hook would let every Codex stop through.
+- [ ] With gh as git's credential helper (=gh auth setup-git=),
+  =git credential fill= prints the token; the guard lets it through, since
+  it blocks the token prints of =gh= only.
+- [ ] The guard's Claude Code entry matches =Bash= only
+  (=adapters/claude/settings.json=), so a command run through the
+  PowerShell tool skips the guard. The tools reference (read 14 November
+  2026) says hooks that inspect shell commands should match
+  =Bash|PowerShell=. The tool is on by default on Windows and opt-in on
+  Linux, macOS and WSL; on Windows with Git Bash installed, the adapter's
+  =Bash= deny rules turn it off for the session unless
+  =CLAUDE_CODE_USE_POWERSHELL_TOOL= is =1=, so the gap is open on Windows
+  without Git Bash and wherever the tool is turned on by that variable.
+- [ ] The option tables of gradle, maven, rake, just and task in
+  =claim_check.py= (which words are option values, not targets) come from
+  their manuals as remembered, not checked: none is installed here. Those
+  of make, ninja and =cmake --build= were read from their help.
+- [ ] Decisions of the claim check and the hidden-text check that wait for the
+  maintainer's review (numbered as in that work's progress log): what counts
+  as an edit and as a run, and that edits of task notes, temporary files,
+  the scratchpad and =~/.claude= do not count (D-6); a script or build
+  target named test, gate, check or verify counts as a test run (D-9); an
+  emoji's own selector and joiner pass the hidden-text check, while keycaps
+  and tag sequences are reported (D-10); a build whose targets name no test
+  is of unknown kind (D-11); PowerShell commands are read like Bash ones,
+  and any =mcp__= tool after the last edit is a run of unknown outcome
+  (D-12).
 - [X] The progress check (=progress_check.py=, on =Stop= in Claude Code and
   Codex) sends the agent back once when its task branch has a commit that the
   progress log does not name or that is newer than the log; after a rebase,
@@ -215,6 +261,15 @@ As of 13 November 2026:
   clone enables it (224d6a8, 609e893; =CommitMsg= in =tests/test_tools.py=).
 - [X] =tools/validate.py= checks that every Org link reaches its file and its
   =CUSTOM_ID= or heading (ff35833).
+- [X] =tools/validate.py='s hidden-text check reports characters a reader does
+  not see but a model reads, and HTML comments outside code in Markdown, in
+  the files agents load as instructions, =claude-ai/overrides.json= among
+  them (071d52a, then 42ce253, 36047a9, ccb8672, 5cc5032 and 6148254; tests
+  in =tests/test_tools.py=).
+- [ ] Proposal: the hidden-text check could read every tracked text file,
+  not only the instruction files, so a raw zero width or bidirectional
+  character in code or tests is caught too; one reached =tools/validate.py=
+  and its test before 42ce253 wrote them as escapes.
 - [ ] Untested: whether Codex's sandbox lets an agent in a linked worktree
   write its progress log in the main checkout's =.private/=, which lies
   outside the worktree.
