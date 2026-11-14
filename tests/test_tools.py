@@ -1400,6 +1400,40 @@ class BenchmarkResults(unittest.TestCase):
         for transcript in ("TRANSCRIPT", "git push"):
             self.assertNotIn(transcript, text)
 
+    def test_summary_counts_interrupted_attempts_and_runs_not_made(self):
+        (self.rundir / "interrupted.jsonl").write_text(
+            json.dumps({"run": f"{self.ids[0]}.method.1", "stop": "usage limit", "spend": 0.5}) + "\n",
+            encoding="utf-8")
+        (self.rundir / "not-made.json").write_text(json.dumps(["x.method.3", "x.plain.3"]), encoding="utf-8")
+        result = self.tool("summary", "--rundir", self.rundir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        # 12.04 (method) + 3.00 (plain) in finished runs, 0.50 in the interrupted attempt.
+        self.assertIn("Spent 15.54 in all: 15.04 in finished runs and 0.50 in interrupted attempts (1); "
+                      "planned runs not made: 2.", result.stdout)
+
+    def test_summary_calls_a_run_full_only_when_every_planned_run_finished(self):
+        def summarize(arms: list, missing: int = 0) -> str:
+            rundir = self.folder / f"full-{len(arms)}-{missing}"
+            tasks = [f"t{index}" for index in range(20)]
+            (rundir / "runs").mkdir(parents=True)
+            (rundir / "plan.json").write_text(json.dumps({
+                "tasks": tasks, "arms": arms, "runs": 3, "cap_usd": 120, "share": 1.0, "model": "m",
+                "maintainer_model": "s"}), encoding="utf-8")
+            planned = [f"{task}.{arm}.{repeat}" for task in tasks for arm in arms for repeat in (1, 2, 3)]
+            for run_id in planned[missing:]:
+                task, arm, repeat = run_id.split(".")
+                (rundir / "runs" / run_id).mkdir()
+                (rundir / "runs" / run_id / "record.json").write_text(json.dumps({
+                    "run": run_id, "instance_id": task, "arm": arm, "repeat": int(repeat), "finished": True,
+                    "stop": "DONE", "calls": [{"num_turns": 1}], "maintainer": [], "agent_cost": 0.5,
+                    "maintainer_cost": 0.0, "spend": 0.5}), encoding="utf-8")
+            result = self.tool("summary", "--rundir", rundir)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            return result.stdout.splitlines()[0]
+        self.assertEqual(summarize(["method", "plain"]), "full run.")
+        self.assertIn("pilot: not conclusive", summarize(["method", "plain"], missing=1))  # cut by the cap
+        self.assertIn("pilot: not conclusive", summarize(["method"]))  # one arm compares nothing
+
     def test_summary_without_grades_says_so(self):
         result = self.tool("summary", "--rundir", self.rundir)
         self.assertEqual(result.returncode, 0, result.stderr)

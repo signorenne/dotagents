@@ -77,8 +77,10 @@ summary writes per arm the runs, errors, graded runs (empty or unapplied predict
         and total cost (agent and maintainer apart), median turns, minutes and replies, runs with regressions, runs
         over their share and the stop reasons, then per task both arms side by side: an Org
         fragment of metrics only, no transcript or command text, to --org or stdout. It is
-        labeled "pilot: not conclusive" below the full run of DESIGN.org's method-measured
-        rule (20 tasks, 3 runs per arm).
+        labeled "pilot: not conclusive" unless both arms finished every run of a plan as
+        large as the full run of DESIGN.org's method-measured rule (20 tasks, 3 runs per
+        arm). It also gives the total spend, the interrupted attempts' share of it and the
+        runs the cap left unmade.
 
 Standard library only. Exit: 0 done, 1 a step failed (reported), 2 usage error.
 """
@@ -916,12 +918,26 @@ def summary(args) -> int:
                if record.get("finished")]
     grades = read_json(rundir / "grades.json", "the grades") if (rundir / "grades.json").exists() else None
     tasks, runs, arms = plan["tasks"], plan["runs"], plan["arms"]
-    full = len(tasks) >= FULL_TASKS and runs >= FULL_RUNS
+    # Full only when both arms finished every planned run of a plan as large as the rule's.
+    reached = {record["run"] for record in records if record.get("calls")}
+    full = (len(tasks) >= FULL_TASKS and runs >= FULL_RUNS and set(arms) == set(ARMS)
+            and all(f"{task}.{arm}.{repeat}" in reached
+                    for task in tasks for arm in arms for repeat in range(1, runs + 1)))
+    path = rundir / "interrupted.jsonl"
+    attempts = [json.loads(line) for line in (path.read_text(encoding="utf-8").splitlines() if path.exists() else [])
+                if line.strip()]
+    not_made = read_json(rundir / "not-made.json", "the runs not made") if (rundir / "not-made.json").exists() else []
+    finished_spend = sum(record["spend"] for record in records)
+    attempts_spend = sum(attempt["spend"] for attempt in attempts)
     lines = [("full run" if full else
-              f"pilot: not conclusive (fewer than {FULL_TASKS} tasks or {FULL_RUNS} runs per arm)") + ".", "",
+              f"pilot: not conclusive (fewer than {FULL_TASKS} tasks or {FULL_RUNS} runs per arm finished in "
+              f"both arms)") + ".", "",
              f"{len(tasks)} tasks, {runs} runs per arm, model {plan['model']}, maintainer "
              f"{plan['maintainer_model']}, cap {plan['cap_usd']:.2f}, share {plan['share']:.2f}"
-             + ("; not graded." if grades is None else "."), ""]
+             + ("; not graded." if grades is None else "."),
+             f"Spent {finished_spend + attempts_spend:.2f} in all: {finished_spend:.2f} in finished runs and "
+             f"{attempts_spend:.2f} in interrupted attempts ({len(attempts)}); planned runs not made: "
+             f"{len(not_made)}.", ""]
     lines += org_table([["arm", "runs", "errors", "graded", "empty or not applied", "no report", "resolved",
                          "resolved rate", "median agent cost",
                          "total agent cost", "median maintainer cost", "total maintainer cost", "median turns",
