@@ -301,14 +301,12 @@ As of 14 November 2026:
   =docs-md/= and =docs-org/=). Requested by the maintainer on 14 November
   2026 after a run on a client repository; decided by the maintainer that
   day: no glossary or file-system doc (the as-built-docs guides carry both),
-  the Claude, Gemini and "chatgpt" bridges (Copilot CLI and Cursor then load
-  the rules twice, and Gemini CLI may too), the AI disclaimer only on
-  request, the set scaled to the repository kind, the maintainer's style
-  rules as editable defaults, and no real-session test (the maintainer
-  reruns setup on that repository). The agent's readings, to confirm:
-  "chatgpt" as Copilot's =.github/copilot-instructions.md= (Codex reads
-  =AGENTS.md= natively and has no bridge), and a repository's own
-  convention winning over a default.
+  the Claude, Gemini and Copilot bridges, always (Copilot CLI and Cursor
+  then load the rules twice, and Gemini CLI may too; Codex reads
+  =AGENTS.md= natively and needs none), the AI disclaimer only on request,
+  the set scaled to the repository kind, the maintainer's style rules as
+  editable defaults over which a repository's own convention wins, and no
+  real-session test (the maintainer reruns setup on that repository).
 - [ ] First real runs of the new =as-built-docs= on ATC and ASM.
 - [ ] First real run of =code-audit=.
 - [ ] An on-request script for trigger tests (requests that should and should
