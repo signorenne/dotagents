@@ -10,7 +10,8 @@ it writes them down.
 | Kit file | Goes to | Required |
 |---|---|---|
 | AGENTS.md.template | AGENTS.md at the repository root | yes |
-| docs-md/ or docs-org/ | the project's docs folder (decisions, agent-workflows) | yes, in the project's prose format |
+| root-md/ or root-org/ | the repository root (VISION, DESIGN, STYLE_GUIDE, CONTRIBUTING, AI_DISCLAIMER) | yes, in the project's prose format; STYLE_GUIDE only with code, AI_DISCLAIMER only on request |
+| docs-md/ or docs-org/ | the project's docs folder (README as the docs map, writing, decisions, agent-workflows) | yes, in the project's prose format |
 | gitignore-snippet.txt | appended to .gitignore | yes |
 | bridges/CLAUDE.md.template | CLAUDE.md at the repository root | yes |
 | bridges/GEMINI.md.template | GEMINI.md at the repository root | yes |
@@ -23,7 +24,7 @@ it writes them down.
 1. Replace every <FILL: ...> marker with verified facts, or delete the line. Check: grep -rn "<FILL" finds nothing.
 2. Validation commands: run each command once before writing it down.
 3. Hard rules: keep only rules whose absence would make an agent err; keep AGENTS.md under about 200 lines.
-4. Link decisions and agent-workflows from AGENTS.md and from the docs index, if the project has one.
+4. Link every doc of the set from AGENTS.md's First load, and register each, with every doc the project already had, in the docs map. A template names other docs by file name: write each as a link with its real path, and drop the mention of a doc the project does not get.
 5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot and Cursor), with a CLAUDE.md bridge next to it for Claude Code, which reads AGENTS.md files by itself only in a project without a CLAUDE.md.
 
 ## Why the bridges

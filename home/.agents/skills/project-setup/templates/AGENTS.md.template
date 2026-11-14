@@ -13,8 +13,11 @@ reference.
 
 For any task, read this file, then only the docs the task needs:
 
-- <FILL: architecture or design doc> for structure and boundaries.
-- <FILL: style guide> for code style and API documentation rules.
+- <FILL: docs/README.md or doc/README.org>, the docs map: its role matrix says which docs a role loads, and its registry lists every doc.
+- <FILL: VISION> for the direction and its non-goals, <FILL: DESIGN> for how the public surface should feel.
+- <FILL: an architecture doc, such as the as-built developer guide, or delete this line> for structure and boundaries.
+- <FILL: STYLE_GUIDE> for code style and API documentation rules.
+- <FILL: CONTRIBUTING> for the workflow, the gates and commit messages, <FILL: the writing guide> for prose style.
 - <FILL: docs/agent-workflows.md or doc/agent-workflows.org> for multi-step workflows (spec, component change, bug fix, review, handoff).
 - <FILL: docs/decisions.md or doc/decisions.org> for decisions: an Accepted entry binds the work.
 
