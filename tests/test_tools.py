@@ -1189,5 +1189,176 @@ class BenchmarkRun(unittest.TestCase):
         self.assertEqual(len([record for record in self.records().values() if record["finished"]]), 4)
 
 
+# A fake SWE-bench Python: -c (the import check) passes; -m swebench.harness.run_evaluation
+# logs its call and writes a report per instance, resolved when the patch holds RESOLVE and
+# with a failing PASS_TO_PASS test when it holds REGRESS. Duplicate instance ids exit 3.
+FAKE_HARNESS = r'''
+import json, os, shutil, sys
+from pathlib import Path
+args = sys.argv[1:]
+if args[:1] == ["-c"]:
+    sys.exit(0)
+def option(name):
+    return args[args.index(name) + 1]
+ids = []
+for word in args[args.index("--instance_ids") + 1:]:
+    if word.startswith("--"):
+        break
+    ids.append(word)
+run_id, predictions = option("--run_id"), option("--predictions_path")
+with open(option("--dataset_name")) as handle:
+    dataset = [json.loads(line) for line in handle]
+with open(os.environ["BENCH_FAKE_LOG"], "a") as handle:
+    handle.write(json.dumps({"program": "harness", "argv": args, "cwd": os.getcwd(), "ids": ids,
+                             "docker_host": os.environ.get("DOCKER_HOST"), "docker": shutil.which("docker"),
+                             "dataset_fields": sorted(dataset[0])}) + "\n")
+if predictions == "gold":
+    model, patches = "gold", {ident: "RESOLVE" for ident in ids}
+else:
+    with open(predictions) as handle:
+        rows = [json.loads(line) for line in handle]
+    model, patches = rows[0]["model_name_or_path"], {row["instance_id"]: row["model_patch"] for row in rows}
+    if len(patches) != len(rows):
+        sys.exit(3)
+for ident in ids:
+    folder = Path("logs/run_evaluation") / run_id / model / ident
+    folder.mkdir(parents=True, exist_ok=True)
+    patch = patches[ident]
+    failing = ["test_old"] if "REGRESS" in patch else []
+    (folder / "report.json").write_text(json.dumps({ident: {
+        "patch_exists": bool(patch), "patch_successfully_applied": bool(patch), "resolved": "RESOLVE" in patch,
+        "tests_status": {"FAIL_TO_PASS": {"success": [], "failure": []},
+                         "PASS_TO_PASS": {"success": [], "failure": failing}}}}))
+'''
+
+
+class BenchmarkResults(unittest.TestCase):
+    """benchmark.py grade (against FAKE_HARNESS) and summary, on a synthetic run folder:
+    2 tasks x 2 arms x 2 runs; the method's patches resolve, the plain arm's regress, and the
+    plain arm's fourth run is a setup error that never reached the agent."""
+
+    setUp_dataset, tool, select = Benchmark.setUp, Benchmark.tool, Benchmark.select
+    TOOL = Benchmark.TOOL
+    AGENT_COSTS = {"method": [1.0, 2.0, 3.0, 4.0], "plain": [0.5, 1.0, 1.5, 0.0]}
+
+    def setUp(self):
+        self.setUp_dataset()
+        tasks = self.select(2, 5)["tasks"]
+        self.ids = [task["agent"]["instance_id"] for task in tasks]
+        self.rundir = self.folder / "run"
+        (self.rundir / "runs").mkdir(parents=True)
+        (self.rundir / "tasks.json").write_text(json.dumps({"tasks": tasks}), encoding="utf-8")
+        (self.rundir / "plan.json").write_text(json.dumps({
+            "tasks": self.ids, "arms": ["method", "plain"], "runs": 2, "cap_usd": 16, "share": 2.0,
+            "model": "claude-opus-5-5", "maintainer_model": "claude-sonnet-5-5"}), encoding="utf-8")
+        for repeat in (1, 2):
+            for index, ident in enumerate(self.ids):
+                for arm in ("method", "plain"):
+                    number = (repeat - 1) * 2 + index
+                    error = arm == "plain" and number == 3
+                    cost = self.AGENT_COSTS[arm][number]
+                    calls = [] if error else [{"result": "TRANSCRIPT-TEXT: ran git push", "num_turns": 10 + number,
+                                               "duration_ms": 60000 * (number + 1), "total_cost_usd": cost}]
+                    # One reply, then DONE (which is not a reply).
+                    replies = ([{"reply": "TRANSCRIPT-REPLY", "cost": 0.01}, {"reply": "DONE", "cost": 0.0}]
+                               if arm == "method" else [])
+                    run_id = f"{ident}.{arm}.{repeat}"
+                    folder = self.rundir / "runs" / run_id
+                    folder.mkdir()
+                    (folder / "record.json").write_text(json.dumps({
+                        "run": run_id, "instance_id": ident, "arm": arm, "repeat": repeat, "finished": True,
+                        "stop": "error" if error else "DONE", "calls": calls, "maintainer": replies,
+                        "agent_cost": cost, "maintainer_cost": sum(entry["cost"] for entry in replies),
+                        "spend": cost + sum(entry["cost"] for entry in replies)}), encoding="utf-8")
+                    if not error:
+                        (folder / "prediction.diff").write_text(
+                            f"diff --git a/x b/x\n+{'RESOLVE' if arm == 'method' else 'REGRESS'}\n", encoding="utf-8")
+        programs = self.folder / "bin"
+        programs.mkdir()
+        self.python = programs / "swebench-python"
+        self.python.write_text(f"#!{sys.executable}\n{FAKE_HARNESS}", encoding="utf-8")
+        self.python.chmod(0o755)
+        self.socket = self.folder / "podman.sock"
+        self.socket.write_text("", encoding="utf-8")
+        self.log = self.folder / "calls.jsonl"
+        self.env = {**os.environ, "PATH": str(programs), "DOCKER_HOST": f"unix://{self.socket}",
+                    "BENCH_FAKE_LOG": str(self.log)}
+
+    def harness_calls(self) -> list:
+        return [json.loads(line) for line in self.log.read_text(encoding="utf-8").splitlines()]
+
+    def grade(self, *extra, env=None) -> subprocess.CompletedProcess:
+        return self.tool("grade", "--rundir", self.rundir, "--swebench-python", self.python, *extra,
+                         env=env or self.env)
+
+    def test_grade_gold_grades_the_reference_patches(self):
+        result = self.grade("--gold")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        [call] = self.harness_calls()
+        self.assertEqual(call["argv"][call["argv"].index("--predictions_path") + 1], "gold")
+        self.assertEqual(sorted(call["ids"]), sorted(self.ids))
+        self.assertIn("patch", call["dataset_fields"])  # the gold patch comes from the dataset
+        # From RUNDIR/grading, through podman's socket, with a docker program for the cleanup.
+        self.assertEqual(Path(call["cwd"]), (self.rundir / "grading").resolve())
+        self.assertEqual(call["docker_host"], f"unix://{self.socket}")
+        self.assertTrue(call["docker"] and Path(call["docker"]).read_text().endswith('exec podman "$@"\n'))
+        gold = json.loads((self.rundir / "gold.json").read_text(encoding="utf-8"))
+        self.assertEqual({ident: gold[ident]["resolved"] for ident in self.ids}, dict.fromkeys(self.ids, True))
+        self.assertIn("gold: 2 of 2 resolved", result.stdout)
+
+    def test_grade_calls_the_harness_once_per_arm_and_repeat(self):
+        result = self.grade()
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        calls = self.harness_calls()
+        self.assertEqual(len(calls), 4)  # the harness keys predictions by instance id
+        for call in calls:
+            self.assertEqual(len(call["ids"]), len(set(call["ids"])))
+        graded = sorted(ident for call in calls for ident in call["ids"])
+        self.assertEqual(len(graded), 7)  # the setup error never reached the agent
+        grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
+        self.assertEqual(len(grades), 7)
+        for run_id, grade in grades.items():
+            arm = run_id.split(".")[1]
+            self.assertEqual((grade["resolved"], grade["regressions"]),
+                             (True, []) if arm == "method" else (False, ["test_old"]), run_id)
+
+    def test_grade_needs_podman_s_socket(self):
+        result = self.grade(env={**self.env, "DOCKER_HOST": f"unix://{self.folder / 'no.sock'}"})
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("podman system service", result.stderr)
+        self.assertFalse(self.log.exists())
+
+    def table(self, text: str, first: str) -> list:
+        line = next(line for line in text.splitlines() if line.startswith(f"| {first} "))
+        return [cell.strip() for cell in line.strip("|").split("|")]
+
+    def test_summary_gives_medians_per_arm_and_no_transcript(self):
+        self.grade()
+        org = self.folder / "summary.org"
+        result = self.tool("summary", "--rundir", self.rundir, "--org", org)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        text = org.read_text(encoding="utf-8")
+        self.assertIn("pilot: not conclusive", text)  # 2 tasks and 2 runs per arm, under the full run's
+        self.assertEqual(self.table(text, "arm")[:6],
+                         ["arm", "runs", "errors", "graded", "resolved", "resolved rate"])
+        # Medians over the runs that reached the agent, totals over all runs.
+        self.assertEqual(self.table(text, "method"),
+                         ["method", "4", "0", "4", "4", "100%", "2.50", "10.00", "0.01", "0.04", "11.5", "2.5", "0",
+                          "1.0", "3", "2.01", "DONE 4"])  # spends 2.01, 3.01 and 4.01 pass the share of 2
+        self.assertEqual(self.table(text, "plain"),
+                         ["plain", "4", "1", "3", "0", "0%", "1.00", "3.00", "0.00", "0.00", "11.0", "2.0", "3",
+                          "0.0", "0", "0.00", "DONE 3, error 1"])
+        self.assertEqual(self.table(text, self.ids[0]), [self.ids[0], "2/2", "2.00", "0/2", "1.00"])
+        self.assertEqual(self.table(text, self.ids[1]), [self.ids[1], "2/2", "3.00", "0/2", "1.00"])
+        for transcript in ("TRANSCRIPT", "git push"):
+            self.assertNotIn(transcript, text)
+
+    def test_summary_without_grades_says_so(self):
+        result = self.tool("summary", "--rundir", self.rundir)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("not graded", result.stdout)
+        self.assertEqual(self.table(result.stdout, "method")[3:6], ["0", "-", "-"])
+
+
 if __name__ == "__main__":
     unittest.main()

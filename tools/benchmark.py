@@ -10,6 +10,8 @@ Usage:
                                  --maintainer-model MODEL --cap-usd TOTAL --out RUNDIR
                                  [--dry-run] [--method-home DIR] [--credentials FILE]
                                  [--hooks-python DIR]
+  python3 tools/benchmark.py grade --rundir RUNDIR --swebench-python PY [--gold] [--tasks TASKS]
+  python3 tools/benchmark.py summary --rundir RUNDIR [--org FILE]
 
 select  reads the dataset (JSON lines exported from SWE-bench/SWE-bench_Verified, test
         split), keeps the two longest difficulty buckets ("1-4 hours", ">4 hours"), and
@@ -55,6 +57,24 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         stopped attempt's spend still counts against the cap. Run again on the same RUNDIR to
         go on: finished runs, errors included, are not run again (delete a run's folder to
         run it again). --dry-run prints the plan and the prerequisites and starts nothing.
+
+grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
+        with PY, a Python 3.10 or later environment holding the swebench package, from
+        RUNDIR/grading/, so its logs stay there, through the Docker API in DOCKER_HOST
+        (default podman's socket under XDG_RUNTIME_DIR); when no docker program is on PATH,
+        one that runs podman is put there, since the harness stops its containers with it.
+        The harness keys predictions by instance id, so each arm and repeat is graded in a
+        call of its own; runs that never reached the agent are not graded. RUNDIR/grades.json
+        holds per run whether it is resolved and which PASS_TO_PASS tests failed
+        (regressions). With --gold it grades the reference patches of the tasks (RUNDIR's
+        tasks.json, or --tasks) into RUNDIR/gold.json instead.
+
+summary writes per arm the runs, errors, resolved rate, median and total cost (agent and
+        maintainer apart), median turns, minutes and replies, runs with regressions, runs
+        over their share and the stop reasons, then per task both arms side by side: an Org
+        fragment of metrics only, no transcript or command text, to --org or stdout. It is
+        labeled "pilot: not conclusive" below the full run of DESIGN.org's method-measured
+        rule (20 tasks, 3 runs per arm).
 
 Standard library only. Exit: 0 done, 1 a step failed (reported), 2 usage error.
 """
@@ -708,6 +728,181 @@ def run(args) -> int:
     return 0
 
 
+# grade
+
+def docker_host() -> str:
+    runtime = os.environ.get("XDG_RUNTIME_DIR") or f"/run/user/{os.getuid()}"
+    return os.environ.get("DOCKER_HOST") or f"unix://{runtime}/podman/podman.sock"
+
+
+def harness(python: Path, grading: Path, env: dict, run_id: str, predictions: str, model: str, ids: list) -> dict:
+    """Run the SWE-bench harness from grading/ and read back each instance's report."""
+    logs = grading / "logs" / "run_evaluation" / run_id
+    shutil.rmtree(logs, ignore_errors=True)  # the harness skips instances it already reported
+    argv = [str(python), "-m", "swebench.harness.run_evaluation", "--dataset_name", "dataset.jsonl",
+            "--predictions_path", predictions, "--run_id", run_id, "--instance_ids", *ids,
+            "--max_workers", "2", "--timeout", "1800"]
+    with open(grading / f"{run_id}.log", "w", encoding="utf-8") as log:
+        subprocess.run(argv, cwd=grading, env=env, stdout=log, stderr=subprocess.STDOUT, check=False)
+    reports = {}
+    for ident in ids:
+        try:
+            report = json.loads((logs / model / ident / "report.json").read_text(encoding="utf-8"))[ident]
+        except (OSError, ValueError, KeyError):
+            continue
+        status = report.get("tests_status") or {}
+        reports[ident] = {"graded": True, "resolved": report.get("resolved") is True,
+                          "patch_applied": report.get("patch_successfully_applied") is True,
+                          "regressions": sorted((status.get("PASS_TO_PASS") or {}).get("failure") or []),
+                          "fail_to_pass_failed": sorted((status.get("FAIL_TO_PASS") or {}).get("failure") or [])}
+    return reports
+
+
+def grade(args) -> int:
+    rundir = Path(args.rundir)
+    tasks = load_tasks(Path(args.tasks) if args.tasks else rundir / "tasks.json")
+    host = docker_host()
+    if host.startswith("unix://") and not Path(host[len("unix://"):]).exists():
+        raise Failure(f"no Docker API at {host}: start podman's (podman system service --time=0 {host} &, or "
+                      f"systemctl --user start podman.socket) and set DOCKER_HOST to it")
+    python = Path(args.swebench_python)
+    if run_program([str(python), "-c", "import swebench"], "check the SWE-bench Python").returncode:
+        raise Failure(f"{python} cannot import swebench: make a Python 3.10 or later virtual environment and "
+                      f"pip install swebench in it")
+    grading = rundir / "grading"
+    grading.mkdir(parents=True, exist_ok=True)
+    (grading / "dataset.jsonl").write_text(
+        "".join(json.dumps({**task["agent"], **task["grading"]}) + "\n" for task in tasks), encoding="utf-8")
+    env = {**os.environ, "DOCKER_HOST": host}
+    if not shutil.which("docker"):  # the harness stops and removes its containers with the docker program
+        shim = grading / "bin" / "docker"
+        shim.parent.mkdir(exist_ok=True)
+        shim.write_text('#!/bin/sh\nexec podman "$@"\n', encoding="utf-8")
+        shim.chmod(0o755)
+        env["PATH"] = f"{shim.parent}{os.pathsep}{env.get('PATH', '')}"
+    if args.gold:
+        ids = [task["agent"]["instance_id"] for task in tasks]
+        reports = harness(python, grading, env, f"{rundir.name}-gold", "gold", "gold", ids)
+        gold = {ident: reports.get(ident, {"graded": False, "resolved": False}) for ident in ids}
+        write_json(rundir / "gold.json", gold)
+        print(f"gold: {sum(value['resolved'] for value in gold.values())} of {len(gold)} resolved "
+              f"({rundir / 'gold.json'})")
+        return 0
+    # The harness keys predictions by instance id: one call per arm and repeat.
+    groups = {}
+    for path in sorted((rundir / "runs").glob("*/record.json")):
+        record = read_json(path, "a run record")
+        prediction = path.parent / "prediction.diff"
+        if record.get("finished") and record.get("calls") and prediction.exists():
+            groups.setdefault((record["arm"], record["repeat"]), {})[record["instance_id"]] = (
+                record["run"], prediction.read_text(encoding="utf-8"))
+    grades = {}
+    for (arm, repeat), runs in sorted(groups.items()):
+        model = f"{arm}-{repeat}"
+        predictions = grading / f"predictions-{model}.jsonl"
+        predictions.write_text("".join(json.dumps({"instance_id": ident, "model_name_or_path": model,
+                                                   "model_patch": patch}) + "\n"
+                                       for ident, (_, patch) in sorted(runs.items())), encoding="utf-8")
+        reports = harness(python, grading, env, f"{rundir.name}-{model}", predictions.name, model, sorted(runs))
+        for ident, (run_id, _) in runs.items():
+            grades[run_id] = reports.get(ident, {"graded": False, "resolved": False, "regressions": []})
+    write_json(rundir / "grades.json", grades)
+    for arm in sorted({run_id.split(".")[-2] for run_id in grades}):
+        mine = [value for run_id, value in grades.items() if run_id.split(".")[-2] == arm]
+        print(f"{arm}: {sum(value['resolved'] for value in mine)} of {len(mine)} resolved")
+    print(f"grades: {rundir / 'grades.json'}")
+    return 0
+
+
+# summary
+
+FULL_TASKS, FULL_RUNS = 20, 3  # the full run DESIGN.org's method-measured rule asks for
+
+
+def median(values: list, form: str) -> str:
+    ordered = sorted(values)
+    if not ordered:
+        return "-"
+    middle = len(ordered) // 2
+    value = ordered[middle] if len(ordered) % 2 else (ordered[middle - 1] + ordered[middle]) / 2
+    return format(value, form)
+
+
+def org_table(rows: list) -> list:
+    widths = [max(len(row[column]) for row in rows) for column in range(len(rows[0]))]
+    line = lambda row: "| " + " | ".join(cell.ljust(width) for cell, width in zip(row, widths)) + " |"  # noqa: E731
+    return [line(rows[0]), "|-" + "-+-".join("-" * width for width in widths) + "-|"] + [line(row) for row in rows[1:]]
+
+
+def replies_of(record: dict) -> int:
+    return sum(1 for entry in record.get("maintainer", [])
+               if isinstance(entry.get("reply"), str) and entry["reply"].strip()
+               and not DONE_REPLY.fullmatch(entry["reply"].strip()))
+
+
+def arm_row(arm: str, records: list, grades, share: float) -> list:
+    mine = [record for record in records if record["arm"] == arm]
+    reached = [record for record in mine if record.get("calls")]
+    graded = [grades[record["run"]] for record in mine
+              if grades is not None and grades.get(record["run"], {}).get("graded")]
+    resolved = sum(1 for value in graded if value["resolved"])
+    stops = {}
+    for record in mine:
+        stops[record["stop"]] = stops.get(record["stop"], 0) + 1
+    over = [record["spend"] - share for record in mine if record["spend"] > share + 1e-9]
+    return [arm, str(len(mine)), str(sum(1 for record in mine if record["stop"] == "error")), str(len(graded)),
+            str(resolved) if graded else "-", f"{100 * resolved / len(graded):.0f}%" if graded else "-",
+            median([record["agent_cost"] for record in reached], ".2f"),
+            f"{sum(record['agent_cost'] for record in mine):.2f}",
+            median([record["maintainer_cost"] for record in reached], ".2f"),
+            f"{sum(record['maintainer_cost'] for record in mine):.2f}",
+            median([sum(call.get("num_turns") or 0 for call in record["calls"]) for record in reached], ".1f"),
+            median([sum(call.get("duration_ms") or 0 for call in record["calls"]) / 60000 for record in reached],
+                   ".1f"),
+            str(sum(1 for value in graded if value.get("regressions"))) if graded else "-",
+            median([replies_of(record) for record in reached], ".1f"),
+            str(len(over)), f"{max(over, default=0):.2f}",
+            ", ".join(f"{stop} {count}" for stop, count in sorted(stops.items(), key=lambda item: (-item[1], item[0])))]
+
+
+def summary(args) -> int:
+    rundir = Path(args.rundir)
+    plan = read_json(rundir / "plan.json", "the plan")
+    records = [record for record in (read_json(path, "a run record")
+                                     for path in sorted((rundir / "runs").glob("*/record.json")))
+               if record.get("finished")]
+    grades = read_json(rundir / "grades.json", "the grades") if (rundir / "grades.json").exists() else None
+    tasks, runs, arms = plan["tasks"], plan["runs"], plan["arms"]
+    full = len(tasks) >= FULL_TASKS and runs >= FULL_RUNS
+    lines = [("full run" if full else
+              f"pilot: not conclusive (fewer than {FULL_TASKS} tasks or {FULL_RUNS} runs per arm)") + ".", "",
+             f"{len(tasks)} tasks, {runs} runs per arm, model {plan['model']}, maintainer "
+             f"{plan['maintainer_model']}, cap {plan['cap_usd']:.2f}, share {plan['share']:.2f}"
+             + ("; not graded." if grades is None else "."), ""]
+    lines += org_table([["arm", "runs", "errors", "graded", "resolved", "resolved rate", "median agent cost",
+                         "total agent cost", "median maintainer cost", "total maintainer cost", "median turns",
+                         "median minutes", "runs with regressions", "median replies", "runs over share",
+                         "max over share", "stops"]]
+                       + [arm_row(arm, records, grades, plan["share"]) for arm in arms])
+    rows = [["task"] + [f"{arm} {what}" for arm in arms for what in ("resolved", "median agent cost")]]
+    for ident in tasks:
+        row = [ident]
+        for arm in arms:
+            mine = [record for record in records if record["instance_id"] == ident and record["arm"] == arm]
+            resolved = sum(1 for record in mine if (grades or {}).get(record["run"], {}).get("resolved"))
+            row += [f"{resolved if grades is not None else '-'}/{len(mine)}",
+                    median([record["agent_cost"] for record in mine if record.get("calls")], ".2f")]
+        rows.append(row)
+    lines += [""] + org_table(rows)
+    text = "\n".join(lines) + "\n"
+    if args.org:
+        Path(args.org).write_text(text, encoding="utf-8")
+        print(f"summary: {args.org}")
+    else:
+        print(text, end="")
+    return 0
+
+
 def parser() -> argparse.ArgumentParser:
     main_parser = argparse.ArgumentParser(description="A/B benchmark of the nexenne method.")
     commands = main_parser.add_subparsers(dest="command", required=True)
@@ -730,6 +925,16 @@ def parser() -> argparse.ArgumentParser:
     runner.add_argument("--credentials", default=str(Path.home() / ".claude" / ".credentials.json"))
     runner.add_argument("--hooks-python")
     runner.set_defaults(handler=run)
+    grader = commands.add_parser("grade", help="grade the runs, or the gold patches, with the SWE-bench harness")
+    grader.add_argument("--rundir", required=True)
+    grader.add_argument("--swebench-python", required=True)
+    grader.add_argument("--gold", action="store_true")
+    grader.add_argument("--tasks")
+    grader.set_defaults(handler=grade)
+    summarizer = commands.add_parser("summary", help="summarize the runs per arm")
+    summarizer.add_argument("--rundir", required=True)
+    summarizer.add_argument("--org")
+    summarizer.set_defaults(handler=summary)
     return main_parser
 
 
