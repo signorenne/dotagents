@@ -380,6 +380,13 @@ As of 14 November 2026:
   accepting the setup commit; fixed by the maintainer's decision that day
   (=test_the_prediction_leaves_out_the_image_s_setup_commit= in
   =tests/test_tools.py=).
+- [ ] The benchmark's =--dry-run= also takes each untouched image's
+  prediction (the run's own prediction step, before any agent) and reports
+  a non-empty one as a run that would stop, so a prediction base that does
+  not match an image, or untracked files that =git add -A= would sweep in,
+  shows on new tasks before any spend; the 5 pilot images give an empty
+  one. Accepted by the maintainer on 14 November 2026, for a session before
+  the full run.
 - [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
   before the first published version of METHOD.org.
 
