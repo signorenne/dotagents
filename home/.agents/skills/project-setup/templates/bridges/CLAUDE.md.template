@@ -1,7 +1,8 @@
 @AGENTS.md
 
+Claude Code bridge. AGENTS.md is the canonical agent guide for this repository;
+update it there and do not copy rules into this file.
+
 ## Claude Code only
 
-<FILL: notes that apply only to Claude Code, or delete this file. Claude Code reads
-AGENTS.md by itself when no CLAUDE.md exists, so this bridge is needed only for
-Claude-specific additions.>
+<FILL: notes that apply only to Claude Code, or delete this section.>

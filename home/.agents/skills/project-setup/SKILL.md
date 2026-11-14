@@ -14,15 +14,15 @@ Collect, citing files: languages, build system and its exact commands, test runn
 
 ## 2. Decide the open points with the user
 
-Use the decide skill only for what the repository does not answer, typically: where docs go and in which format when it is mixed, whether to add the GEMINI.md bridge (needed when contributors use Gemini CLI without context.fileName including AGENTS.md), and whether project skills are wanted now. Then list the files you will create or change, each with its source template, and wait for the user's go.
+Use the decide skill only for what the repository does not answer, typically: where docs go and in which format when it is mixed, and whether project skills are wanted now. Then list the files you will create or change, each with its source template, and wait for the user's go.
 
 ## 3. AGENTS.md
 
 - If AGENTS.md exists: audit it against templates/AGENTS.md.template. Propose only missing sections and wrong facts as a minimal diff; never rewrite it wholesale. Keep the project's voice.
 - If it does not exist: draft it from the template, filling each section from the survey. Keep it under about 200 lines; a line belongs there only if removing it would cause an agent to make a mistake.
 - Validation commands: run each command once (delegate to gate-runner when output is long). Keep only commands that worked; mark any you could not run as "not verified" and tell the user.
-- If CLAUDE.md or GEMINI.md duplicates rules, propose replacing it with its bridge from templates/bridges/ (which imports AGENTS.md), or deleting CLAUDE.md when it holds no Claude-only notes: Claude Code reads AGENTS.md only when there is no CLAUDE.md, so a CLAUDE.md that merely mentions AGENTS.md leaves it without the rules. Remove duplicated rules from copilot instructions (Copilot reads AGENTS.md).
-- If step 2 chose the GEMINI.md bridge, create GEMINI.md from templates/bridges/GEMINI.md.template. Create CLAUDE.md from templates/bridges/CLAUDE.md.template only for notes that apply to Claude Code alone (Claude Code reads AGENTS.md by itself when there is no CLAUDE.md). With a CLAUDE.md, check that nested AGENTS.md files still reach Claude Code (/memory lists what it loaded) and give a folder whose AGENTS.md does not load a CLAUDE.md that imports it.
+- If CLAUDE.md, GEMINI.md or .github/copilot-instructions.md duplicates rules or does not point to AGENTS.md, propose replacing it with its bridge from templates/bridges/, keeping its notes for that tool alone below the pointer: Claude Code reads AGENTS.md only when there is no CLAUDE.md, so a CLAUDE.md that merely mentions AGENTS.md without importing it leaves it without the rules.
+- Create the three bridges when missing, without asking: CLAUDE.md from templates/bridges/CLAUDE.md.template, GEMINI.md from templates/bridges/GEMINI.md.template and .github/copilot-instructions.md from templates/bridges/copilot-instructions.md.template. Every tool then reaches AGENTS.md without per-machine settings (Copilot CLI and Cursor, which also read CLAUDE.md, load the rules twice, and Gemini CLI may too where its context.fileName also names AGENTS.md; that cost is accepted). Codex needs none: AGENTS.md is its own file. With a CLAUDE.md, Claude Code no longer reads nested AGENTS.md files by itself: check what it loaded (/memory) and give each folder whose AGENTS.md it does not load a CLAUDE.md that imports it.
 
 ## 4. Decision log and workflows
 

@@ -12,8 +12,9 @@ it writes them down.
 | AGENTS.md.template | AGENTS.md at the repository root | yes |
 | docs-md/ or docs-org/ | the project's docs folder (decisions, agent-workflows) | yes, in the project's prose format |
 | gitignore-snippet.txt | appended to .gitignore | yes |
-| bridges/GEMINI.md.template | GEMINI.md, only if contributors use Gemini CLI without context.fileName including AGENTS.md | no |
-| bridges/CLAUDE.md.template | CLAUDE.md, only for notes that apply to Claude Code alone | no |
+| bridges/CLAUDE.md.template | CLAUDE.md at the repository root | yes |
+| bridges/GEMINI.md.template | GEMINI.md at the repository root | yes |
+| bridges/copilot-instructions.md.template | .github/copilot-instructions.md | yes |
 | claude/settings.json | .claude/settings.json, for fewer permission prompts | no |
 | project-skill/SKILL.md.template | .agents/skills/<name>/SKILL.md, plus the symlink .claude/skills/<name> | no |
 
@@ -23,11 +24,15 @@ it writes them down.
 2. Validation commands: run each command once before writing it down.
 3. Hard rules: keep only rules whose absence would make an agent err; keep AGENTS.md under about 200 lines.
 4. Link decisions and agent-workflows from AGENTS.md and from the docs index, if the project has one.
-5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot and Cursor; Claude Code reads AGENTS.md files only in a project without a CLAUDE.md).
+5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot and Cursor), with a CLAUDE.md bridge next to it for Claude Code, which reads AGENTS.md files by itself only in a project without a CLAUDE.md.
 
-## Why AGENTS.md alone
+## Why the bridges
 
-Claude Code (when no CLAUDE.md exists), Codex, Copilot and Cursor read AGENTS.md
-natively; Gemini CLI reads it when its context.fileName setting includes AGENTS.md.
-Bridges help only people without that setting, and every extra bridge makes Copilot CLI and
-Cursor, which also read CLAUDE.md, load the same rules twice.
+AGENTS.md is the single source. Codex, Copilot and Cursor read it natively;
+Claude Code reads it only when no CLAUDE.md exists, and Gemini CLI only when its
+context.fileName setting includes AGENTS.md. CLAUDE.md and GEMINI.md only import
+AGENTS.md, and .github/copilot-instructions.md only points to it, so every tool
+reaches the same rules on any machine, without per-machine settings, and each
+bridge has room for notes one tool alone needs. The cost: Copilot CLI and Cursor,
+which also read CLAUDE.md, load the rules twice, and Gemini CLI may too where its
+context.fileName also names AGENTS.md (the dotagents installer sets it so).

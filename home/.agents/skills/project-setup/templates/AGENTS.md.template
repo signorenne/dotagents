@@ -1,8 +1,8 @@
 # <FILL: project name> agent guide
 
 This is the canonical guide for AI agents and human contributors working in this
-repository. Every coding agent reads it (Claude Code, Codex, Copilot and Cursor
-natively; Gemini CLI through its context.fileName setting or a GEMINI.md bridge).
+repository. Every coding agent reads it, natively or through a bridge that
+points here (CLAUDE.md, GEMINI.md, .github/copilot-instructions.md).
 Keep it the single source: tool-specific files point here and never copy rules.
 Deeper explanations live in the linked docs; this file is the floor, not the full
 reference.

@@ -228,10 +228,14 @@ demand.
    =~/.copilot/copilot-instructions.md=, and a paste
    in Cursor's User Rules and in claude.ai's instructions.
 2. Project rules: the repository's own =AGENTS.md=. Claude Code reads it by
-   itself only when the repository has no =CLAUDE.md=, so project-setup
-   creates a =CLAUDE.md= (a bridge that imports =AGENTS.md=) only for notes
-   that apply to Claude Code alone, and proposes replacing a =CLAUDE.md= that
-   duplicates rules with that bridge, or deleting it.
+   itself only when the repository has no =CLAUDE.md=, and Gemini CLI only
+   when its settings name it, so project-setup always creates the bridges
+   =CLAUDE.md= and =GEMINI.md=, which import =AGENTS.md=, and
+   =.github/copilot-instructions.md=, which points to it (Copilot CLI and
+   Cursor, which also read =CLAUDE.md=, then load the rules twice, and Gemini
+   CLI may too, since the installer adds =AGENTS.md= to its
+   =context.fileName=), and proposes replacing a bridge that duplicates rules
+   with its template.
 3. Skill descriptions. Only each skill's name and description are listed at
    the start. The body of a =SKILL.md= loads when a request matches its
    description or the user names it; files next to it (templates, scripts,
