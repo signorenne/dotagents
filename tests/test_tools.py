@@ -819,18 +819,26 @@ if "# dotagents probe" in " ".join(command):
     print("skills=%d" % scenario.get("skills", 2))
     print("claude_md=%s" % scenario.get("claude_md", "@~/.agents/AGENTS.md"))
 elif command[0] == "git":
-    # trees: each worktree's change against base_commit; branches: {ref: [time, change]}.
+    # trees: each worktree's change against base_commit; branches: {ref: [time, change]};
+    # after_base: {commit: [the files it changes against base_commit]}, the image's own.
     path = command[command.index("-C") + 1] if "-C" in command else "/testbed"
     trees = scenario.get("trees", {"/testbed": scenario.get("diff", "")})
     branches = scenario.get("branches", {})
+    after_base = scenario.get("after_base", {})
     def visible(text):  # git's exclude pathspec for the notes
         if ":(exclude).private" not in command:
             return text
         return "".join(section for section in re.split(r"(?m)^(?=diff --git )", text)
                        if not section.startswith("diff --git a/.private/"))
     refs = [word for word in command if word in branches]
+    commits = [word for word in command if word in after_base]
     if "rev-list" in command:
-        print(scenario.get("after_base", ""))
+        print("\n".join(after_base))
+    elif "diff" in command and commits:
+        files = after_base[commits[0]]
+        if "--quiet" in command:
+            sys.exit(1 if files else 0)
+        sys.stdout.write("".join(name + ("\0" if "-z" in command else "\n") for name in files))
     elif "worktree" in command:
         print("\n".join("worktree " + tree for tree in trees))
     elif "for-each-ref" in command:
@@ -1060,6 +1068,37 @@ class BenchmarkRun(unittest.TestCase):
                 self.assertEqual([name.split(".")[1] for name in containers], ["plain"])
                 method = next(record for record in self.records(rundir).values() if record["arm"] == "method")
                 self.assertEqual((method["stop"], method["probe"]["passed"], method["calls"]), ("error", False, []))
+
+    def test_a_commit_after_base_may_change_only_files_no_hidden_patch_changes(self):
+        # A SWE-bench setup commit may pin the environment (astropy-13398's pins setuptools
+        # in pyproject.toml); one that changes a file of the gold patch or of the hidden test
+        # patch may hold the fix or the tests, so the run stops before the agent starts.
+        task = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]
+        task["grading"]["patch"] = ("diff --git a/src/widget.py b/src/widget.py\n--- a/src/widget.py\n"
+                                    "+++ b/src/widget.py\n@@ -1 +1 @@\n-a\n+b\n")
+        test_path = task["grading"]["test_patch"].split(" b/", 1)[1].split("\n", 1)[0]
+        tasks = self.folder / "gold-paths.json"
+        tasks.write_text(json.dumps({"tasks": [task]}), encoding="utf-8")
+        for label, files, touched in (("pin", ["pyproject.toml"], None),
+                                      ("gold", ["pyproject.toml", "src/widget.py"], "src/widget.py"),
+                                      ("test", [test_path], test_path)):
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario({"after_base": {"4b48727": files}})
+                rundir = self.folder / f"after-base-{label}"
+                result = self.run_bench(tasks=tasks, arms="plain", rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                [record] = self.records(rundir).values()
+                agent = self.calls("claude", "agent")
+                if touched is None:
+                    self.assertEqual((record["stop"], record["error"]), ("DONE", None))
+                    self.assertEqual(record["commits_after_base"], ["4b48727"])
+                    self.assertEqual(len(agent), 1)
+                else:
+                    self.assertEqual((record["stop"], record["calls"], agent), ("error", [], []))
+                    self.assertIn("4b48727", record["error"])
+                    self.assertIn(touched, record["error"])
+                    self.assertNotIn("pyproject.toml", record["error"])
 
     NOTES = ("diff --git a/.private/progress/fix.org b/.private/progress/fix.org\nnew file mode 100644\n"
              "--- /dev/null\n+++ b/.private/progress/fix.org\n@@ -0,0 +1 @@\n+notes\n")

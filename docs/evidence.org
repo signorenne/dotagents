@@ -70,9 +70,10 @@ agent needed the maintainer.
   share, and the summary counts the runs that did.
 - The SWE-bench images add a setup commit after =base_commit=, empty in
   four of the five pilot images; in =astropy__astropy-13398='s it pins
-  =setuptools==68.0.0= in =pyproject.toml=. Each run checks that every
-  commit after =base_commit= keeps its tree, so that task's runs stop as
-  errors before the agent starts (Results).
+  =setuptools==68.0.0= in =pyproject.toml=. Each run checks that no commit
+  after =base_commit= changes a file the task's gold patch or hidden test
+  patch changes, so that pin passes; the smoke run, before this check,
+  stopped that task's runs as errors (Results).
 - Runs go one at a time; a usage limit, an expired login or Ctrl-C stops
   the run; the next start goes on from the stopped run, which starts again
   from the beginning, and the stopped attempt's spend still counts against

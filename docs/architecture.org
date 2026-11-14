@@ -759,7 +759,9 @@ them):
 2. =run= runs each task in each arm R times, one run at a time, in an
    interleaved order. A run starts the task's image with podman, the user
    =agent= owning =/testbed= and the host's =claude= bound read-only, and
-   checks that every commit after =base_commit= keeps its tree. The method
+   checks that no commit after =base_commit= changes a file the task's gold
+   patch or hidden test patch changes (a setup commit may pin the
+   environment); a commit that does makes the run an error. The method
    arm gets the installed method copied in (=settings.json= reduced to the
    keys =install.py= writes, its hooks on a standalone Python bound at
    =/opt/dotagents-python=) and a probe that its guard blocks a push; a

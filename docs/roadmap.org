@@ -351,13 +351,15 @@ As of 14 November 2026:
 - [ ] The benchmark's pilot: 5 tasks, two runs per arm, under a cap the
   maintainer sets just before it starts; its summary goes to
   [[file:evidence.org][docs/evidence.org]], labeled "pilot: not conclusive".
-- [ ] The benchmark's run accepts a commit after =base_commit= that touches
+- [X] The benchmark's run accepts a commit after =base_commit= that touches
   none of the files the task's gold patch or hidden test patch changes, so
   a SWE-bench setup commit that pins the environment passes (in
   =astropy__astropy-13398='s image it pins setuptools in =pyproject.toml=,
   and the smoke run stopped both its runs); its docstring stops calling the
   setup commit empty. Accepted by the maintainer on 14 November 2026, over
-  trusting the SWE-bench author, swapping the task, or leaving it.
+  trusting the SWE-bench author, swapping the task, or leaving it
+  (=test_a_commit_after_base_may_change_only_files_no_hidden_patch_changes=
+  in =tests/test_tools.py=).
 - [ ] The benchmark's =--dry-run= also opens each task's image and runs the
   check of the commits after =base_commit=, with podman only and no API
   cost, so a task that would stop shows before any run spends money.
