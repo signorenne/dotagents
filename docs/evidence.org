@@ -30,7 +30,7 @@ agent needed the maintainer.
   plugins, hooks, MCP servers and custom agents. Both run the same main
   model (Opus 5.5) at effort high, with every permission inside the
   container, the task's own image as the boundary, and WebFetch and
-  WebSearch off, so neither arm can look up the upstream fix.
+  WebSearch off.
 - Prompt: the problem statement, then "Resolve this issue in the repository
   in the current folder. Do not push or open pull requests. When you need
   the maintainer, ask and stop: the maintainer answers your messages." It
@@ -62,15 +62,24 @@ agent needed the maintainer.
   maintainer's personal settings (model, theme); the rest is the installed
   method as it is.
 - WebFetch and WebSearch are off in both arms, so the method's research
-  steps cannot run.
+  steps cannot run; but both arms have a shell with network access, so
+  either could fetch a later release or the upstream repository that holds
+  the fix. Each run's record keeps every call's result for a check, and
+  only commits reachable from a ref are checked against =base_commit=.
 - =--max-budget-usd= checks a client-side estimate: a run can pass its
   share, and the summary counts the runs that did.
 - The SWE-bench images add an empty setup commit after =base_commit=; each
   run checks that every commit after it keeps =base_commit='s tree.
-- Runs go one at a time; a usage limit or an expired login stops the run,
-  which then resumes where it stopped.
+- Runs go one at a time; a usage limit, an expired login or Ctrl-C stops
+  the run, which then resumes where it stopped, and the stopped attempt's
+  spend still counts against the cap.
 
 * Results
 
-None yet: the reference-patch check, the smoke run and the pilot are
-recorded here when they finish.
+- Reference patches, 14 November 2026: the gold patches of the 5 pilot
+  tasks (seed 20261114: =astropy__astropy-13398=, =django__django-13344=,
+  =pytest-dev__pytest-10356=, =sympy__sympy-13852=, =pydata__xarray-3993=)
+  resolved 5 of 5 through the harness and podman, so grading works on these
+  tasks.
+- Pilot: not run yet; it waits for a cap the maintainer sets just before it
+  starts. Its summary goes here, labeled "pilot: not conclusive".
