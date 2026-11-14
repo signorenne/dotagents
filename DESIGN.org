@@ -277,23 +277,25 @@ the new hashes). The claim check runs at the same moment, in Claude Code
 only: when the agent's final message says the tests pass ("all tests pass",
 "189 tests OK", "the suite is green", but not a hedged "should pass"), it
 reads the end of the session's transcript and sends the agent back once, to
-run the tests or say they were not run after its last edit, when a known
-test run is there and, after the last file edit, either nothing but commands
-that certainly run no tests came, or the last known run failed and no
-command of unknown kind followed it. It sorts each shell command after the
-edit, split with the guard's shell parser, into three kinds (the
+run the tests or say they were not run after its last edit, when after the
+last file edit nothing but commands that certainly run no tests came,
+whether or not a test ran before that edit, or when the last known run
+failed and no command of unknown kind followed it. It sorts each shell
+command, split with the guard's shell parser, into three kinds (the
 maintainer's rule): a known test run (a test runner, or a script or build
 target named test, gate, check or verify, also behind wrappers, launchers
-and =bash -c=), judged by its runner's summary lines; a quiet command
-(=git status=, =add=, =commit=, =diff=, =log=, =show=, =restore= or =stash=,
-=cat=, =ls=, =grep=, =find=, =sed -n= and the like), which counts as a run
-only when its output shows a runner's summary, as =git commit= running the
-tests in its hooks does; and anything else, which may have run tests, so its
-outcome is unknown. An unknown command that changes files counts as an edit
-and then as such a run; PowerShell commands are read like Bash ones; a
-subagent or an MCP tool counts as a run of unknown outcome too. Edits of
-task notes (=.private/=), temporary files, the scratchpad and =~/.claude= do
-not count. The repeated
+and =bash -c=), judged by its runner's summary lines and, when none
+matches, by the call's exit status; a quiet command (=git status=, =add=,
+=commit=, =diff=, =log=, =show=, =restore= or =stash=, =cat=, =ls=, =grep=,
+=find=, =sed -n= and the like), which counts as a run only when its output
+shows a runner's summary, as =git commit= running the tests in its hooks
+does; and anything else, which may have run tests, so its outcome is
+unknown. A quiet or unknown command whose result records changed files
+counts as an edit (a known test run's changed files do not), and an unknown
+one then also as a run of unknown outcome; PowerShell commands are read
+like Bash ones; a subagent or an MCP tool counts as a run of unknown
+outcome too. Edits of task notes (=.private/=), temporary files, the
+scratchpad and =~/.claude= do not count. The repeated
 failure hook counts each failing shell command per session, by its command
 and its whole error with each word that holds a digit masked after the first
 line (timings, counts, addresses and temporary names change between runs);
