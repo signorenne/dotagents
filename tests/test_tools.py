@@ -229,6 +229,113 @@ Verbatim is not a link: write =[[file:...]]= links, or ~[[#id]]~.
             f"FAIL claude-ai/skills/tutor/notes.org:1:2: {hidden} U+202B",
         ]))
 
+    def test_validate_reports_selectors_fillers_and_hidden_operators_but_not_emoji(self):
+        # Also hidden: the variation selectors U+FE00 to U+FE0F and U+E0100 to U+E01EF (they
+        # can carry bytes after a visible character), the Arabic letter mark U+061C, the
+        # invisible operators U+2061 to U+2064 and the Hangul filler U+3164; in
+        # claude-ai/overrides.json too (its descriptions reach claude.ai). An emoji's own
+        # parts pass: U+FE0E or U+FE0F right after a pictographic character, and U+200D
+        # joining two (after a presentation selector or a skin tone too).
+        (self.repo / "home/.agents/skills/spec/more.txt").write_text(
+            "\ufe00|\ufe0f|\U000e0100|\U000e01ef|\u061c|\u2061|\u2064|\u3164\n"
+            "\U0001F468\u200d\U0001F469\u200d\U0001F467 \u26a0\ufe0f \U0001F3F3\ufe0f\u200d\U0001F308 "
+            "\U0001F469\U0001F3FD\u200d\U0001F4BB \u2764\ufe0e\n"
+            "a\u200db \U0001F600\u200d \U0001F600\ufe0f\ufe0f\n", encoding="utf-8")
+        (self.repo / "claude-ai/overrides.json").write_text(
+            '{"skills": {"decide": {"description": "Settles\u2063 a choice."}}}\n', encoding="utf-8")
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        hidden = "invisible or bidirectional character"
+        reported = sorted(line for line in result.stdout.splitlines() if hidden in line)
+        more = "FAIL home/.agents/skills/spec/more.txt"
+        self.assertEqual(reported, sorted([
+            f"{more}:1:1: {hidden} U+FE00", f"{more}:1:3: {hidden} U+FE0F", f"{more}:1:5: {hidden} U+E0100",
+            f"{more}:1:7: {hidden} U+E01EF", f"{more}:1:9: {hidden} U+061C", f"{more}:1:11: {hidden} U+2061",
+            f"{more}:1:13: {hidden} U+2064", f"{more}:1:15: {hidden} U+3164",
+            f"{more}:3:2: {hidden} U+200D", f"{more}:3:6: {hidden} U+200D", f"{more}:3:10: {hidden} U+FE0F",
+            f"FAIL claude-ai/overrides.json:1:47: {hidden} U+2063",
+        ]))
+
+    def test_validate_reads_markdown_code_before_reporting_html_comments(self):
+        # CommonMark: a fence may sit in a list item (indented by the item, or right after
+        # its marker) or in a blockquote, and closes only with its own character, at least as
+        # many times, and nothing after it; a code span shows its text. A <!-- there is
+        # shown as code, not hidden: only the two bare comments are reported.
+        (self.repo / "home/.agents/skills/spec/fenced.md").write_text(
+            "- item\n"
+            "    - nested\n"
+            "      ```html\n"
+            "      <!-- in a nested list fence -->\n"
+            "      ```\n"
+            "- ```\n"
+            "  <!-- in a fence opened on the item line -->\n"
+            "  ```\n"
+            "> ```\n"
+            "> <!-- in a quoted fence -->\n"
+            "> ```\n"
+            "Inline `<!-- code -->` and ``a `<!--` b`` are shown.\n"
+            "But <!-- this --> is hidden.\n"
+            "~~~\n"
+            "```\n"
+            "<!-- a backtick line does not close a tilde fence -->\n"
+            "~~~\n"
+            "````\n"
+            "~~~~\n"
+            "```\n"
+            "<!-- nor a tilde line or a shorter run a backtick fence -->\n"
+            "```` x\n"
+            "<!-- nor a fence line with text after it -->\n"
+            "````\n"
+            "```not a fence``` <!-- after a code span -->\n", encoding="utf-8")
+        result = self.run_tool("validate.py")
+        comment = "HTML comment in a Markdown instruction file"
+        self.assertEqual(sorted(line for line in result.stdout.splitlines() if comment in line), [
+            f"FAIL home/.agents/skills/spec/fenced.md:13:5: {comment}",
+            f"FAIL home/.agents/skills/spec/fenced.md:25:19: {comment}",
+        ])
+
+    def test_validate_does_not_let_a_false_fence_hide_an_html_comment(self):
+        # The second review's cases, rebuilt from its description: a fence is indented 0 to 3
+        # spaces from its container (4 at the top level make indented code, not a fence); a
+        # fence in a blockquote or a list item ends with the container, when a line has no
+        # ">" or less indentation than the item; a backslash before a backtick escapes it, so
+        # no code span starts there. In each, a comment a reader would not see is reported.
+        (self.repo / "home/.agents/skills/spec/false-fences.md").write_text(
+            "    ```\n"
+            "<!-- a: after indented code, not inside a fence -->\n"
+            "    ```\n"
+            "> ```\n"
+            "> quoted code\n"
+            "left the quote <!-- b -->\n"
+            "- item\n"
+            "  ```\n"
+            "  code in the item\n"
+            "back at the margin <!-- c -->\n"
+            "\\`<!-- d -->\\` is no code span\n"
+            "- item\n"
+            "\n"
+            "  ```\n"
+            "\n"
+            "  <!-- inside the item's fence, after a blank line -->\n"
+            "  ```\n"
+            "```\n"
+            "    ```\n"
+            "<!-- inside: a closing run indented 4 columns does not close the fence -->\n"
+            "```\n"
+            # Five or more spaces after a list marker: the item's content starts one column
+            # after the marker, so the rest is indented code, not a fence (the third review).
+            "-     ```\n"
+            "  <!-- e: after the item's indented code -->\n", encoding="utf-8")
+        result = self.run_tool("validate.py")
+        comment = "HTML comment in a Markdown instruction file"
+        self.assertEqual(sorted(line for line in result.stdout.splitlines() if comment in line), sorted([
+            f"FAIL home/.agents/skills/spec/false-fences.md:2:1: {comment}",
+            f"FAIL home/.agents/skills/spec/false-fences.md:6:16: {comment}",
+            f"FAIL home/.agents/skills/spec/false-fences.md:10:20: {comment}",
+            f"FAIL home/.agents/skills/spec/false-fences.md:11:3: {comment}",
+            f"FAIL home/.agents/skills/spec/false-fences.md:23:3: {comment}",
+        ]))
+
     def test_validate_checks_subagent_effort_and_turn_limit(self):
         # Claude Code's effort levels are low, medium, high, xhigh and max; maxTurns is a
         # positive whole number (code.claude.com/docs/en/sub-agents).

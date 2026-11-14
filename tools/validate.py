@@ -24,13 +24,21 @@ Checks:
   outside .git, dist and __pycache__ when git is missing; never .private);
 - no unfilled <FILL: ...> marker outside the project templates;
 - the files agents load as instructions (home/.agents/AGENTS.md, every text file of a
-  skill in either root, the subagents, the path rules, and the repository's AGENTS.md,
-  CLAUDE.md, GEMINI.md and .github/copilot-instructions.md) hold no character a reader
-  does not see but a model reads: zero width (U+200B to U+200D, U+2060), bidirectional
-  controls (U+200E, U+200F, U+202A to U+202E, U+2066 to U+2069), U+FEFF anywhere (a
-  byte order mark too: the files are plain UTF-8), the soft hyphen U+00AD and the tags
-  U+E0000 to U+E007F; and the Markdown ones hold no HTML comment outside fenced code
-  (it hides text from a reader of the rendered file, not from the model);
+  skill in either root, the subagents, the path rules, claude-ai/overrides.json, and the
+  repository's AGENTS.md, CLAUDE.md, GEMINI.md and .github/copilot-instructions.md) hold
+  no character a reader does not see but a model reads: zero width (U+200B to U+200D,
+  U+2060), bidirectional controls (U+061C, U+200E, U+200F, U+202A to U+202E, U+2066 to
+  U+2069), U+FEFF anywhere (a byte order mark too: the files are plain UTF-8), the soft
+  hyphen U+00AD, the invisible operators U+2061 to U+2064, the Hangul filler U+3164, the
+  variation selectors U+FE00 to U+FE0F and U+E0100 to U+E01EF, and the tags U+E0000 to
+  U+E007F, except an emoji's own parts (U+FE0E or U+FE0F right after a pictographic
+  character, U+200D between two; tag sequences such as subdivision flags are reported);
+  and the Markdown ones hold no HTML comment outside code (it hides text from a reader
+  of the rendered file, not from the model): code is a fenced block, indented 0 to 3
+  columns from its container (the margin, a blockquote, a list item), closed only by its
+  own character at least as many times or by a line that leaves the container, or a code
+  span on one line not opened by an escaped backtick; a code span over several lines and
+  an indented code block are not recognised, so a <!-- in them is reported;
 - the global instructions stay under 200 lines;
 - every Python file compiles;
 - every Org link in an Org file resolves: [[file:path]] names an existing file
@@ -45,6 +53,7 @@ import os
 import re
 import subprocess
 import sys
+import unicodedata
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -75,12 +84,23 @@ ORG_TAGS = re.compile(r"[ \t]+:([\w@#%]+:)+$")
 ORG_VERBATIM = re.compile(r"(?<![^\s(\[{'\"-])([=~])(?=\S)[^\n]*?(?<=\S)\1(?=[\s.,:;!?)\]}'\"-]|$)", re.M)
 # Files and folders agents load as instructions, and the characters in them that a reader
 # does not see but a model reads (the context-file scan of Hermes Agent).
-INSTRUCTION_FILES = {HOME / "AGENTS.md", PATH_RULES, ROOT / "AGENTS.md", ROOT / "CLAUDE.md", ROOT / "GEMINI.md",
-                     ROOT / ".github" / "copilot-instructions.md"}
+INSTRUCTION_FILES = {HOME / "AGENTS.md", PATH_RULES, OVERRIDES, ROOT / "AGENTS.md", ROOT / "CLAUDE.md",
+                     ROOT / "GEMINI.md", ROOT / ".github" / "copilot-instructions.md"}
 INSTRUCTION_FOLDERS = (HOME / "skills", ONLINE, HOME / "agents")
-HIDDEN_CHARACTER = re.compile("[\u00ad\u200b-\u200f\u202a-\u202e\u2060\u2066-\u2069\ufeff\U000e0000-\U000e007f]")
+HIDDEN_CHARACTER = re.compile("[\u00ad\u061c\u200b-\u200f\u202a-\u202e\u2060-\u2064\u2066-\u2069\u3164"
+                              "\ufe00-\ufe0f\ufeff\U000e0000-\U000e007f\U000e0100-\U000e01ef]")
+# An emoji's own parts: a presentation selector right after a pictographic character, and
+# the zero width joiner between two (after a selector or a skin tone too).
+PRESENTATION_SELECTORS = "\ufe0e\ufe0f"
+ZERO_WIDTH_JOINER = "\u200d"
 MARKDOWN_SUFFIXES = (".md", ".md.template")
-FENCE = re.compile(r"^ {0,3}(`{3,}|~{3,})")
+# Markdown containers and code (CommonMark): a blockquote marker, a list item marker, a
+# fence run with what follows it, and a code span on one line (a run of backticks not
+# escaped by a backslash, its text, and a run of the same length).
+QUOTE_MARKER = re.compile(r"[ ]{0,3}>[ ]?")
+LIST_MARKER = re.compile(r"([-*+]|\d{1,9}[.)])([ \t]+|$)")
+FENCE_RUN = re.compile(r"(`{3,}|~{3,})(.*)$")
+CODE_SPAN = re.compile(r"(?<![\\`])(`+)(?!`).+?(?<!`)\1(?!`)")
 
 
 def frontmatter(path: Path) -> tuple[dict, str]:
@@ -313,24 +333,105 @@ def instruction_file(path: Path) -> bool:
     return path in INSTRUCTION_FILES or any(folder in path.parents for folder in INSTRUCTION_FOLDERS)
 
 
+def pictographic(char: str) -> bool:
+    """A symbol such as an emoji: Unicode category So, or the planes of emoji, skin tones
+    included (a standard-library stand-in for the Extended_Pictographic property)."""
+    return unicodedata.category(char) == "So" or 0x1F000 <= ord(char) <= 0x1FFFF
+
+
+def emoji_part(line: str, index: int) -> bool:
+    """True for a presentation selector right after a pictographic character, or a zero
+    width joiner between two (the one before it may carry its selector)."""
+    char, before = line[index], line[index - 1] if index else ""
+    if char in PRESENTATION_SELECTORS:
+        return bool(before) and pictographic(before)
+    if char != ZERO_WIDTH_JOINER or index + 1 >= len(line) or not before:
+        return False
+    if before in PRESENTATION_SELECTORS and index >= 2:
+        before = line[index - 2]
+    return pictographic(before) and pictographic(line[index + 1])
+
+
 def check_hidden_text(rel: Path, text: str, errors: list) -> None:
     """Report each hidden character with its line, column and code point and, in Markdown,
-    each HTML comment outside fenced code."""
-    markdown = rel.name.endswith(MARKDOWN_SUFFIXES)
-    fence = ""
+    each HTML comment outside code."""
     for number, line in enumerate(text.split("\n"), start=1):
         for match in HIDDEN_CHARACTER.finditer(line):
+            if emoji_part(line, match.start()):
+                continue
             errors.append(f"{rel}:{number}:{match.start() + 1}: invisible or bidirectional character "
                           f"U+{ord(match.group()):04X}")
-        if not markdown:
+    if rel.name.endswith(MARKDOWN_SUFFIXES):
+        check_html_comments(rel, text, errors)
+
+
+def strip_quotes(line: str, most: int = -1) -> tuple:
+    """(how many blockquote markers open the line, at most most when given; the rest)."""
+    depth = 0
+    while depth != most and (marker := QUOTE_MARKER.match(line)):
+        depth, line = depth + 1, line[marker.end():]
+    return depth, line
+
+
+def indentation(text: str) -> tuple:
+    """(the column where the text after its leading blanks starts, that text); a tab moves
+    to the next multiple of 4."""
+    column = 0
+    for index, char in enumerate(text):
+        if char not in " \t":
+            return column, text[index:]
+        column += 1 if char == " " else 4 - column % 4
+    return column, ""
+
+
+def opening_fence(text: str) -> str:
+    """The fence run a line opens, or "": a backtick run followed by text that holds a
+    backtick is a code span (```a```), not a fence."""
+    match = FENCE_RUN.match(text)
+    return "" if not match or (match.group(1)[0] == "`" and "`" in match.group(2)) else match.group(1)
+
+
+def check_html_comments(rel: Path, text: str, errors: list) -> None:
+    """Report each <!-- outside code. A fence counts when it is indented 0 to 3 columns from
+    its container (the margin, a blockquote, a list item's content, which starts after the
+    blanks that follow the marker, or one column after it when 5 or more follow); it ends with a closing
+    run of its character, at least as long and with nothing after it, or when a line leaves
+    the container (fewer > markers, or less indentation than the item on a line that is
+    not blank). Code spans on one line are skipped."""
+    fence, fence_quotes, fence_column = "", 0, 0
+    items, quotes = [], 0  # content columns of the open list items, outside fences
+    for number, line in enumerate(text.split("\n"), start=1):
+        if fence:
+            depth, body = strip_quotes(line, fence_quotes)
+            column, rest = indentation(body)
+            if depth == fence_quotes and not (rest and column < fence_column):
+                closing = FENCE_RUN.match(rest)
+                if (closing and closing.group(1)[0] == fence[0] and len(closing.group(1)) >= len(fence)
+                        and not closing.group(2).strip() and column - fence_column <= 3):
+                    fence = ""
+                continue
+            fence = ""  # the line left the fence's container; read it as text
+        depth, body = strip_quotes(line)
+        if depth != quotes:
+            items, quotes = [], depth
+        column, rest = indentation(body)
+        while rest and items and column < items[-1]:
+            items.pop()
+        container = items[-1] if items else 0
+        item = LIST_MARKER.match(rest) if rest and column - container <= 3 else None
+        if item:
+            # 1 to 4 blanks after the marker: the content starts after them; 5 or more: one
+            # column after the marker, and the text after the blanks is indented code.
+            gap = len(item.group(2).expandtabs(4))
+            container = column + len(item.group(1)) + (gap if 1 <= gap <= 4 else 1)
+            items.append(container)
+            column, rest = column + len(item.group(1)) + gap, rest[item.end():]
+        if column - container <= 3 and (run := opening_fence(rest)):
+            fence, fence_quotes, fence_column = run, depth, container
             continue
-        marker = FENCE.match(line)
-        if marker and (not fence or (marker.group(1)[0] == fence[0] and len(marker.group(1)) >= len(fence)
-                                     and not line.strip().strip(fence[0]))):
-            fence = "" if fence else marker.group(1)
-        elif not fence:
-            for match in re.finditer("<!--", line):
-                errors.append(f"{rel}:{number}:{match.start() + 1}: HTML comment in a Markdown instruction file")
+        shown = CODE_SPAN.sub(lambda span: " " * len(span.group(0)), line)
+        for match in re.finditer("<!--", shown):
+            errors.append(f"{rel}:{number}:{match.start() + 1}: HTML comment in a Markdown instruction file")
 
 
 def main() -> int:
