@@ -189,11 +189,16 @@ installer runs again.
   files (backed up first) and backs up those the source dropped. The other
   tools get none yet.
 - /Codex rules/ : the installer writes =~/.codex/rules/dotagents.rules=, whose
-  =prefix_rule= entries forbid the git commands that push or publish and
-  every command of gh 2.100.0 that writes, except =gh api=. A prefix rule cannot
-  forbid all but a list, so a =gh= command added later, and one with a flag
-  before its subcommand (=gh -R o/r pr create=), are the guard's alone. Codex
-  writes =default.rules= itself, and the installer leaves it alone.
+  =prefix_rule= entries forbid the git commands that push or publish, every
+  command of gh 2.100.0 but the read or local ones the guard lets through
+  and =gh api=, and the token prints as far as a prefix can say them:
+  =gh auth token= and =git-credential=, =gh auth status= with =-t=,
+  =--show-token=, =-at=, =-ta=, =-t=true= or =--show-token=true= right after
+  it, and =gh config get oauth_token= without =-h=. A prefix rule cannot
+  forbid all but a list nor see past its words, so a =gh= command added
+  later, a flag before the subcommand (=gh -R o/r pr create=) or before the
+  token flag (=gh auth status -a -t=) are the guard's alone. Codex writes
+  =default.rules= itself, and the installer leaves it alone.
 - /skillOverrides/ : claude.ai syncs its copy of each uploaded skill into
   Claude Code as =anthropic-skills:<name>=, and Claude Code would list it next
   to the local one. The installer sets each of those to =off= in
@@ -225,12 +230,23 @@ The guard blocks git gate bypasses (=--no-verify=, =commit -n=, hook skip
 variables, a disabled =core.hooksPath=) and every push and publish, in every
 tool: =git push=, =git subtree push=, =git send-pack=, =git http-push=,
 =git lfs push=, =git svn dcommit=, =git p4 submit=, =git send-email= and
-every =gh= command but the read-only ones (=view=, =list=, =diff=,
-=status= and =checks= in any group, =repo= and =gist clone=, =search=,
-=auth status=, =browse -n=, help), so a write command =gh= adds later is
-blocked too ([[#no-agent-push][no-agent-push]]), also run through =find -exec= (nested too), wrappers
-such as =sudo=, =watch=, =strace=, =parallel=, =systemd-run= or =nsenter=, the
-remote command of =ssh=, or git's own programs (=git-push=). A
+every =gh= command but those that only read or work locally (=view=,
+=list=, =diff=, =status= and =checks= in any group, =repo= and =gist clone=,
+=pr checkout=, =run watch= and =download=, =release download=, =config= and
+=variable get=, =repo read-file= and =read-dir=, =ruleset check=,
+=attestation verify=, =search=, =status=, =browse=, =completion=,
+=licenses=, =version= and help), so a write command =gh= adds later is
+blocked too ([[#no-agent-push][no-agent-push]]). A flag other than =-R= or =--repo= before a
+=gh= subcommand makes the command unknown, so it is blocked: =gh= takes the
+flag's next word as its value while it looks for the subcommand. The guard
+also blocks the =gh= commands that print the authentication token, which
+would stay in the session's transcript: =gh auth token=,
+=gh auth git-credential=, =gh auth status= with =-t= or =--show-token=
+(anywhere, also in a cluster such as =-at=, the last value winning) and
+=gh config get oauth_token=. It finds all of these also run through
+=find -exec= (nested too), wrappers such as =sudo=, =watch=, =strace=,
+=parallel=, =systemd-run= or =nsenter=, the remote command of =ssh=, or
+git's own programs (=git-push=). A
 push that also rewrites or deletes published history (=--force= and its
 variants, =+refspec=, =--delete=, =:ref=, =--mirror=, =--prune=) and
 =gh pr merge --admin= are named as such. The after-edit hook flags em and en
@@ -303,8 +319,9 @@ The hooks share one failure model:
 - /Two locks on a push/ : the guard blocks pushes and publishes in every tool,
   and in Claude Code the adapter also denies =git push=, so the permission
   prompt never offers it. In Codex, =~/.codex/rules/dotagents.rules= forbids
-  the same git commands and the =gh= commands that write, and
-  holds even while Codex skips hooks the user has not trusted yet; Codex
+  the same git commands, the =gh= commands that are not read or local and
+  the plain forms of the token prints, and holds even while Codex skips
+  hooks the user has not trusted yet; Codex
   calls its rules experimental, and a prefix rule cannot see
   =git -C <dir> push=, which the guard catches.
 - /Not a security boundary/ : the guard splits the command as a shell does and

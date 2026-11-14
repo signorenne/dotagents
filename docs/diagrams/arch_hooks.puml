@@ -28,7 +28,7 @@ refresh --> tool : stale-memory reminder,\nafter a compaction "invoke\nthe workf
 == Before a shell command ==
 tool -> guard : payload with the command
 guard -> guard : split into\nsimple commands
-alt a gate bypass, any push or publish\n(git push and the like, a gh command\nthat is not read-only, every tool)
+alt a gate bypass, any push or publish,\na gh command that is not read or\nlocal, or one that prints the token\n(every tool)
   guard --> tool : exit 2, reason on stderr;\nCopilot CLI: also a deny\ndecision as JSON on stdout;\nAntigravity CLI: exit 0\nand a deny decision
 else nothing to block
   guard --> tool : exit 0 (Antigravity CLI:\nan allow decision)
