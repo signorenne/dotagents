@@ -844,6 +844,13 @@ elif command[0] == "git":
         if all(word in command for word in words.split()):
             print(message, file=sys.stderr)
             sys.exit(128)
+    # unborn: worktrees on a branch with no commits yet (git checkout --orphan), where
+    # rev-parse -q --verify HEAD exits 1 with no output and log exits 128.
+    if path in scenario.get("unborn", []) and "rev-parse" in command:
+        sys.exit(1)
+    if path in scenario.get("unborn", []) and "log" in command:
+        print("fatal: your current branch 'orphan' does not have any commits yet", file=sys.stderr)
+        sys.exit(128)
     trees = scenario.get("trees", {"/testbed": scenario.get("diff", "")})
     branches = scenario.get("branches", {})
     after_base = scenario.get("after_base", {})
@@ -1235,7 +1242,10 @@ class BenchmarkRun(unittest.TestCase):
                 # A worktree whose folder the agent deleted holds no change; its commits stay on its branch.
                 ("deleted worktree", {"trees": {"/testbed": self.NOTES}, "prunable": ["/home/agent/fix"],
                                       "branches": {"refs/heads/fix": [200, self.FIX]}}, "branch refs/heads/fix",
-                 self.FIX)):
+                 self.FIX),
+                # A worktree on a branch with no commits yet (checkout --orphan) has no commit time.
+                ("unborn worktree", {"trees": {"/testbed": self.NOTES, "/home/agent/new": self.FIX},
+                                     "unborn": ["/home/agent/new"]}, "worktree /home/agent/new", self.FIX)):
             with self.subTest(label=label):
                 self.set_scenario(scenario)
                 rundir = self.folder / f"prediction-{label.replace(' ', '-')}"

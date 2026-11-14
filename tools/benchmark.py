@@ -678,7 +678,10 @@ def predict(name: str, base: str, user: str = "agent") -> tuple:
             trees[-1][1] = True  # its folder is gone: no change to take, its commits stay on its branch
     for path, gone in trees:
         if path != TESTBED and not gone and changed(path):
-            when = git("log", "-1", "--format=%ct", cwd=path).stdout.strip()
+            # A branch with no commits yet (checkout --orphan) has no commit time: git log
+            # would fail there, so rev-parse tells it apart (exit 1, nothing printed).
+            born = git("rev-parse", "-q", "--verify", "HEAD", cwd=path, ok=(0, 1)).returncode == 0
+            when = git("log", "-1", "--format=%ct", cwd=path).stdout.strip() if born else ""
             candidates.append((int(when) if when.isdigit() else 0, f"worktree {path}", path, None))
     refs = git("for-each-ref", "--format=%(committerdate:unix) %(refname)", "refs/heads").stdout
     for line in refs.splitlines():
