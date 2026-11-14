@@ -53,7 +53,8 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         setup change such as astropy's pin never counts as the agent's) in /testbed
         (committed, staged or not), else in the newest other worktree or branch the agent
         left it on, never counting the method's notes (.private/), and without the files
-        the task's hidden test patch touches. RUNDIR/runs/<run>/ holds record.json (every
+        the task's hidden test patch touches; a git failure while taking it makes the run an
+        error, never an empty prediction. RUNDIR/runs/<run>/ holds record.json (every
         call's JSON result, the replies, the stop reason, the probe, the costs, the start
         commit) and prediction.diff.
         Cost: a run's share is the cap divided by the number of runs; a run's spend is its
@@ -67,8 +68,9 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         prints the plan and the prerequisites, then, with podman only, starts each task's
         image (pulling it if missing, as a run would), makes a run's check of the commits
         after base_commit and takes a run's prediction from the untouched image, printing
-        per task whether a run would stop, a non-empty prediction counting as a stop
-        (every run's prediction would carry it); it calls no claude and writes nothing.
+        per task whether a run would stop, a non-empty prediction or a git failure while
+        taking it counting as a stop (every run's prediction would carry it); it calls no
+        claude and writes nothing.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package, from
@@ -648,26 +650,36 @@ def predict(name: str, base: str, user: str = "agent") -> tuple:
     """(diff against base, where it came from): /testbed with every change staged, else the
     newest other worktree or branch that differs from base, the commit the image starts on;
     the method's working notes (.private/, which a task repository does not ignore) never
-    count."""
-    def git(*args, cwd: str = TESTBED) -> subprocess.CompletedProcess:
-        return container_git(name, *args, cwd=cwd, user=user)
+    count. A worktree whose folder is gone (git lists it as prunable) holds no change; its
+    commits stay on its branch. A git call that fails (any exit but 0, and for a diff
+    --quiet but 0 or 1) is a Failure: a prediction it would leave empty is not the agent's."""
+    def git(*args, cwd: str = TESTBED, ok: tuple = (0,)) -> subprocess.CompletedProcess:
+        result = container_git(name, *args, cwd=cwd, user=user)
+        if result.returncode not in ok:
+            raise Failure(f"take the prediction: git {args[0]} in {cwd} exited {result.returncode}: "
+                          f"{result.stderr.strip()[-300:]}")
+        return result
 
     def changed(path: str) -> bool:
         git("add", "-A", cwd=path)
-        return git("diff", "--cached", "--quiet", base, *NOT_NOTES, cwd=path).returncode == 1
+        return git("diff", "--cached", "--quiet", base, *NOT_NOTES, cwd=path, ok=(0, 1)).returncode == 1
 
     if changed(TESTBED):
         return git("diff", "--cached", "--binary", base, *NOT_NOTES).stdout, TESTBED
-    candidates = []
+    candidates, trees = [], []
     for line in git("worktree", "list", "--porcelain").stdout.splitlines():
-        path = line[len("worktree "):] if line.startswith("worktree ") else None
-        if path and path != TESTBED and changed(path):
+        if line.startswith("worktree "):
+            trees.append([line[len("worktree "):], False])
+        elif line.startswith("prunable") and trees:
+            trees[-1][1] = True  # its folder is gone: no change to take, its commits stay on its branch
+    for path, gone in trees:
+        if path != TESTBED and not gone and changed(path):
             when = git("log", "-1", "--format=%ct", cwd=path).stdout.strip()
             candidates.append((int(when) if when.isdigit() else 0, f"worktree {path}", path, None))
     refs = git("for-each-ref", "--format=%(committerdate:unix) %(refname)", "refs/heads").stdout
     for line in refs.splitlines():
         when, _, ref = line.partition(" ")
-        if ref and git("diff", "--quiet", base, ref, *NOT_NOTES).returncode == 1:
+        if ref and git("diff", "--quiet", base, ref, *NOT_NOTES, ok=(0, 1)).returncode == 1:
             candidates.append((int(when) if when.isdigit() else 0, f"branch {ref}", TESTBED, ref))
     if not candidates:
         return "", "none"

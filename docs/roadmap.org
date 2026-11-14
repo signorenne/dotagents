@@ -389,11 +389,15 @@ As of 14 November 2026:
   the full run
   (=test_dry_run_reports_a_non_empty_prediction_from_an_untouched_image= in
   =tests/test_tools.py=).
-- [ ] A git failure in the benchmark's prediction step (=git add -A=, or a
+- [X] A git failure in the benchmark's prediction step (=git add -A=, or a
   diff that exits other than 0 or 1) makes the run an error and the dry
   run's line "a run would stop", instead of an empty prediction graded
   unresolved. Accepted by the maintainer on 14 November 2026, over leaving
-  it, before the pilot.
+  it, before the pilot. Every git call of the step must exit 0 (a =diff
+  --quiet= 0 or 1); a worktree that git lists as prunable (its folder
+  deleted) holds no change and is skipped, as before
+  (=test_a_git_failure_in_the_prediction_is_an_error_not_an_empty_prediction=
+  in =tests/test_tools.py=).
 - [ ] Before the pilot, from the independent review of 14 November 2026,
   accepted by the maintainer that day: =grade= takes a bare
   =--swebench-python= name from =PATH= again (=absolute()= since 05aa8fe
