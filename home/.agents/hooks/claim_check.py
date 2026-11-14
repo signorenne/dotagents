@@ -5,11 +5,12 @@
 the session's transcript that a test run passed after the last file edit.
 
 It blocks the stop once when last_assistant_message claims that tests pass ("tests pass",
-"all tests passed", "the suite is green", "189 tests OK"), the transcript shows a known
-test run, and after the last edit either only commands that certainly run no tests came,
-or the last known run failed and no command of unknown kind followed it. An edit is an
-Edit, Write, MultiEdit or NotebookEdit call that did not fail, or a Bash call whose result
-records changed files (bashEditDiff; a command of the third kind below that does is an
+"all tests passed", "the suite is green", "189 tests OK") and either only commands that
+certainly run no tests came after the last edit, whether or not a test ran before it, or
+the last known run failed and no command of unknown kind followed it. An edit is an
+Edit, Write, MultiEdit or NotebookEdit call that did not fail, or a Bash call of the
+second or third kind below whose result records changed files (bashEditDiff; a known test
+run's changed files do not count; a command of the third kind that changes files is an
 edit followed by a run of unknown outcome, as pre-commit run reformatting a file and then
 running the tests); edits of task notes (a .private folder), of
 temporary files and of Claude Code's own folder (~/.claude) do not count.
@@ -40,7 +41,8 @@ hook reads only its last MAX_BYTES and lets the stop through, printing nothing, 
 doubt: stop_hook_active anything but false (true: the agent already continued because of
 a stop hook; missing: Cursor, which runs Claude Code's Stop hooks with its own input and
 no cap on follow-ups), no claim, a transcript it cannot read or whose tail does not end
-with the final message in the shape it knows, no known test run in that tail, or, after
+with the final message in the shape it knows, neither an edit nor a test run in that
+tail, or, after
 the last edit, a subagent call, a command of the third kind, or a known test run in the
 background, without a result or of unknown outcome.
 
