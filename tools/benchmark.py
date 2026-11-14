@@ -73,8 +73,9 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         claude and writes nothing.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
-        with PY, a Python 3.10 or later environment holding the swebench package, from
-        RUNDIR/grading/, so its logs stay there, through the Docker API in DOCKER_HOST
+        with PY, a Python 3.10 or later environment holding the swebench package (a path,
+        relative or absolute, or a name found on PATH), from RUNDIR/grading/, so its logs
+        stay there, through the Docker API in DOCKER_HOST
         (default podman's socket under XDG_RUNTIME_DIR); when no docker program is on PATH,
         one that runs podman is put there, since the harness stops its containers with it.
         The harness keys predictions by instance id, so each arm and repeat is graded in a
@@ -878,8 +879,12 @@ def grade(args) -> int:
     if host.startswith("unix://") and not Path(host[len("unix://"):]).exists():
         raise Failure(f"no Docker API at {host}: start podman's (podman system service --time=0 {host} &, or "
                       f"systemctl --user start podman.socket) and set DOCKER_HOST to it")
-    # The harness runs in grading/; resolve() would follow a venv's python symlink out of the venv.
-    python = Path(args.swebench_python).absolute()
+    # The harness runs in grading/, so a path becomes absolute (resolve() would follow a venv's
+    # python symlink out of the venv); a bare name stays one, found on PATH. The raw argument
+    # decides: Path("./python3") would read as the bare name python3.
+    python = Path(args.swebench_python)
+    if os.sep in args.swebench_python:
+        python = python.absolute()
     if run_program([str(python), "-c", "import swebench"], "check the SWE-bench Python").returncode:
         raise Failure(f"{python} cannot import swebench: make a Python 3.10 or later virtual environment and "
                       f"pip install swebench in it")
