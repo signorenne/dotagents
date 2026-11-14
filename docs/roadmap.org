@@ -360,10 +360,12 @@ As of 14 November 2026:
   trusting the SWE-bench author, swapping the task, or leaving it
   (=test_a_commit_after_base_may_change_only_files_no_hidden_patch_changes=
   in =tests/test_tools.py=).
-- [ ] The benchmark's =--dry-run= also opens each task's image and runs the
+- [X] The benchmark's =--dry-run= also opens each task's image and runs the
   check of the commits after =base_commit=, with podman only and no API
   cost, so a task that would stop shows before any run spends money.
-  Accepted by the maintainer on 14 November 2026, with the item above.
+  Accepted by the maintainer on 14 November 2026, with the item above
+  (=test_dry_run_checks_each_image_with_podman_only= in
+  =tests/test_tools.py=).
 - [ ] =grade= turns a relative =--swebench-python= into an absolute path
   (=Path.absolute()=, not =resolve()=, since a venv's =python= is a
   symlink): the harness runs in =RUNDIR/grading/=, so a relative one fails

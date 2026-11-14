@@ -61,7 +61,10 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         attempt's spend still counts against the cap. Run again on the same RUNDIR to go
         on: the stopped run starts again from the beginning, and finished runs, errors
         included, are not run again (delete a run's folder to run it again). --dry-run
-        prints the plan and the prerequisites and starts nothing.
+        prints the plan and the prerequisites, then, with podman only, starts each task's
+        image (pulling it if missing, as a run would) and makes a run's check of the
+        commits after base_commit, printing per task whether a run would stop; it calls no
+        claude and writes nothing.
 
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package, from
@@ -446,35 +449,41 @@ def qualified(image: str) -> str:
     return image if "/" in image and ("." in first or ":" in first or first == "localhost") else f"docker.io/{image}"
 
 
-def container_git(name: str, *args, cwd: str = TESTBED) -> subprocess.CompletedProcess:
-    return run_program(["podman", "exec", "-u", "agent", name, "git", "-C", cwd, *args], "git in the container")
+def container_git(name: str, *args, cwd: str = TESTBED, user: str = "agent") -> subprocess.CompletedProcess:
+    return run_program(["podman", "exec", "-u", user, name, "git", "-C", cwd, *args], "git in the container")
+
+
+def launch(name: str, image: str, binds: list = ()) -> None:
+    """Start the image as a container that only sleeps, so every step is a podman exec;
+    binds are (host path, container path) pairs, bound read-only."""
+    argv = ["podman", "run", "-d", "--name", name, "--security-opt", "label=disable"]
+    for source, target in binds:
+        argv += ["-v", f"{source}:{target}:ro"]
+    checked(argv + ["--entrypoint", "sleep", qualified(image), "infinity"], "start the container")
 
 
 def start_container(context, name: str, image: str, arm: str) -> None:
-    argv = ["podman", "run", "-d", "--name", name, "--security-opt", "label=disable",
-            "-v", f"{context.claude}:{CONTAINER_CLAUDE}:ro"]
-    if arm == "method":
-        argv += ["-v", f"{context.hooks_python}:{HOOKS_PYTHON}:ro"]
-    checked(argv + ["--entrypoint", "sleep", qualified(image), "infinity"], "start the container")
+    binds = [(context.claude, CONTAINER_CLAUDE)] + ([(context.hooks_python, HOOKS_PYTHON)] if arm == "method" else [])
+    launch(name, image, binds)
     checked(["podman", "exec", name, "sh", "-c", f"useradd -m -s /bin/bash agent && chown -R agent:agent {TESTBED}"],
             "create the user agent")
     for key, value in GIT_IDENTITY:
         checked(["podman", "exec", "-u", "agent", name, "git", "config", "--global", key, value], "set git's identity")
 
 
-def commits_after_base(name: str, task: dict) -> list:
+def commits_after_base(name: str, task: dict, user: str = "agent") -> list:
     """The image's commits after base_commit. A SWE-bench setup commit may change files to
     pin the environment; one that changes, against base_commit, a file the gold patch or the
     hidden test patch changes may hold the fix or the tests: Failure."""
     base = task["agent"]["base_commit"]
     hidden = patch_paths(task["grading"].get("patch", "")) | patch_paths(task["grading"].get("test_patch", ""))
-    listing = container_git(name, "rev-list", "--all", "--not", base)
+    listing = container_git(name, "rev-list", "--all", "--not", base, user=user)
     if listing.returncode:
         raise Failure(f"list the commits after base_commit: {listing.stderr.strip()[-300:]}")
     commits = listing.stdout.split()
     for commit in commits:
         # --no-renames lists both sides of a rename; -z keeps unusual file names unquoted.
-        changed = container_git(name, "diff", "--name-only", "--no-renames", "-z", base, commit)
+        changed = container_git(name, "diff", "--name-only", "--no-renames", "-z", base, commit, user=user)
         if changed.returncode:
             raise Failure(f"compare commit {commit} with base_commit: {changed.stderr.strip()[-300:]}")
         touched = sorted(set(changed.stdout.split("\0")) & hidden)
@@ -482,6 +491,19 @@ def commits_after_base(name: str, task: dict) -> list:
             raise Failure(f"commit {commit} after base_commit changes {', '.join(touched)}, which the task's gold "
                           f"or hidden test patch changes: the image may hold the fix")
     return commits
+
+
+def check_image(task: dict) -> list:
+    """The check a run makes before its first call, on the task's image alone (no user
+    agent, nothing bound in, no claude), git running as root: the commits after
+    base_commit, or Failure where a run would stop."""
+    name = f"dotagents-bench-check-{task['agent']['instance_id']}"
+    run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
+    try:
+        launch(name, task["agent"]["image"])
+        return commits_after_base(name, task, user="root")
+    finally:
+        run_program(["podman", "rm", "-f", "-t", "0", name], "remove the container")
 
 
 def install_method(context, name: str) -> dict:
@@ -688,6 +710,15 @@ def run(args) -> int:
         print(f"{len(order)} runs, cap {args.cap_usd:.2f}, share {share:.2f}")
         for name, ok, detail in found:
             print(f"{name}: {'ok' if ok else 'missing'} ({detail})")
+        if not next(ok for name, ok, _ in found if name == "podman"):
+            print("images: not checked (podman missing)")
+            return 0
+        for task in tasks:
+            ident = task["agent"]["instance_id"]
+            try:
+                print(f"{ident} image: ok, commits after base_commit: {len(check_image(task))}", flush=True)
+            except Failure as error:
+                print(f"{ident} image: a run would stop: {error}", flush=True)
         return 0
     missing = [f"{name}: {detail}" for name, ok, detail in found if not ok]
     if missing:

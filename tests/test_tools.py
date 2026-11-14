@@ -996,8 +996,34 @@ class BenchmarkRun(unittest.TestCase):
                 self.assertIn(f"{task['agent']['instance_id']}.{arm}.1 share 1.00", result.stdout)
         self.assertIn("podman: missing", result.stdout)
         self.assertIn("claude: missing", result.stdout)
+        self.assertIn("images: not checked (podman missing)", result.stdout)
         self.assertFalse(self.log.exists())
         self.assertFalse((self.rundir / "runs").exists())
+
+    def test_dry_run_checks_each_image_with_podman_only(self):
+        # The check a run makes before its first call, once per task: a task whose image
+        # would stop its runs shows before any run spends money.
+        tasks = json.loads(self.tasks.read_text(encoding="utf-8"))["tasks"]
+        tasks[0]["grading"]["patch"] = ("diff --git a/pyproject.toml b/pyproject.toml\n--- a/pyproject.toml\n"
+                                        "+++ b/pyproject.toml\n@@ -1 +1 @@\n-a\n+b\n")
+        stops, passes = (task["agent"]["instance_id"] for task in tasks)
+        checked = self.folder / "checked.json"
+        checked.write_text(json.dumps({"tasks": tasks}), encoding="utf-8")
+        self.set_scenario({"after_base": {"4b48727": ["pyproject.toml"]}})
+        result = self.run_bench("--dry-run", tasks=checked)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn(f"{stops} image: a run would stop: commit 4b48727 after base_commit changes pyproject.toml",
+                      result.stdout)
+        self.assertIn(f"{passes} image: ok, commits after base_commit: 1", result.stdout)
+        self.assertEqual(self.calls("claude"), [])
+        self.assertFalse(self.rundir.exists())
+        podman = [entry["argv"] for entry in self.calls("podman")]
+        started = [argv for argv in podman if argv[0] == "run"]
+        self.assertEqual([argv[-2] for argv in started], [f"docker.io/{task['agent']['image']}" for task in tasks])
+        for argv in started:  # nothing bound in, and every container removed at the end
+            self.assertNotIn("-v", argv)
+            name = argv[argv.index("--name") + 1]
+            self.assertEqual([call for call in podman if name in call][-1], ["rm", "-f", "-t", "0", name])
 
     def test_the_cap_stops_runs_before_the_total_passes_it(self):
         # A share of 1 (4 runs under 4): the first run overshoots to 3.5, its share used up
