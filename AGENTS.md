@@ -58,7 +58,7 @@ python3 -m unittest discover -s tests
 python3 tools/build.py
 ```
 
-Run all three before every commit. CI runs the same commands.
+Before each commit, run validate and the test module that covers what the commit changes; run all three on the last commit of a branch, or of a series of commits on main, before it lands. CI runs the same three commands.
 
 ## Review checklist
 

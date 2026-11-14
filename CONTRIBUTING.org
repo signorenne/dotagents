@@ -46,7 +46,9 @@ the first edit; this file does not repeat it.
 
 * Local gates
 
-Run all three before every commit:
+Before each commit, run validate and the test module that covers the change (for
+example python3 -m unittest tests.test_hooks.ClaimCheck); run all three on the
+last commit of a branch, or of a series of commits on main, before it lands:
 
 #+BEGIN_SRC sh
 python3 tools/validate.py              # skill and subagent format, text rules, script syntax
