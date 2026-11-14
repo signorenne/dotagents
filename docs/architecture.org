@@ -86,10 +86,19 @@ each edge carries:
   one line not opened by an escaped backtick. A code span over several
   lines and an indented code block are not recognised, so a =<!--= in them
   is reported.
+- =tools/guard_replay.py= (not drawn) judges the shell commands of the
+  maintainer's past Claude Code sessions with two versions of the guard,
+  without running them, and reports what a guard change newly blocks and
+  newly allows; =tools/benchmark.py= (not drawn) runs SWE-bench tasks with
+  and without the method and summarizes them per arm. Both run only on the
+  maintainer's machine and write to =.private/evidence/= ([[*The evidence tools][The evidence
+  tools]]).
 - =tests/= holds four unittest suites: the hooks fed each tool's payload
-  shape, the installer run against a temporary =HOME=, validate, build and
-  the commit-msg hook run on a copy of the repository or on sample messages,
-  and the scripts bundled with as-built-docs and precise-ui-changes.
+  shape, the installer run against a temporary =HOME=, the tools (validate,
+  build and the commit-msg hook on a copy of the repository or on sample
+  messages, the guard replay on synthetic transcripts, the benchmark against
+  fake claude, podman and harness programs), and the scripts bundled with
+  as-built-docs and precise-ui-changes.
 - =.githooks/commit-msg= rejects a commit whose message is not the one line
   =type(scope): description= in lower case, or carries a body or an AI
   trailer, and says what to write instead. Each clone enables it once with
@@ -701,3 +710,73 @@ After-edit hook (=after_edit.py=):
    reaches the agent.
    A reformat adds a notice to re-read the file before the next edit (on
    Antigravity CLI, on stderr too).
+
+* The evidence tools
+
+Two tools give the method evidence about itself. Both run only on the
+maintainer's machine, where the transcripts, the container images and the
+runs are, so CI runs their tests and not them.
+[[file:../DESIGN.org::#guard-replay][DESIGN.org#guard-replay]] and [[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]] say when they
+run; [[file:evidence.org][docs/evidence.org]] says what the benchmark measures and holds its
+results. Both use the standard library only.
+
+Guard replay (=tools/guard_replay.py=):
+
+1. Load two guards: the base, =home/.agents/hooks/guard_bash.py= at =--base=
+   (default =main=, read with =git show=), and the head, this checkout's file
+   or =--head=. Each judges a command line with its =decision()=, or, in a
+   guard older than it, with the steps =main()= ran (=parse_commands=,
+   =rough_commands= when the text does not parse, =command_reasons=).
+2. Read every =*.jsonl= under =--transcripts= (default
+   =~/.claude/projects=, subagents' transcripts included) line by line. A
+   shell call is a =tool_use= block named =Bash= with a string command in a
+   record of type =assistant=, counted once per block id, since resumed
+   sessions repeat earlier calls in new files and =api-request-blob= records
+   copy them. Lines that are not JSON, other records, calls without a
+   command and commands over 100,000 characters are counted and skipped.
+3. Judge each distinct command once with each guard, never running it. A
+   non-empty result blocks, and so does an exception, since Claude Code runs
+   the guard with =onFailure= block.
+4. Write an Org report, by default
+   =.private/evidence/guard-replay-<time>.org= in the main checkout, also
+   when run from a worktree: the base commit, the head file's SHA-256, the
+   counts, then each command newly blocked or newly allowed, once, with its
+   number of calls and the deciding guard's reasons, cut to 300 characters
+   in a verbatim block whose lines Org would read as a heading or a keyword
+   get a leading comma. Stdout gets only the counts and the report's path,
+   since commands may hold secrets. Exit 0, 2 for a usage error, 1
+   otherwise.
+
+Benchmark (=tools/benchmark.py=; podman, claude and a Python environment
+with the =swebench= package are checked only by the subcommand that needs
+them):
+
+1. =select= keeps the "1-4 hours" and ">4 hours" tasks of SWE-bench
+   Verified, chooses N with a seed, one per repository before a second, and
+   writes the fields the agent may see apart from the ones only grading
+   reads.
+2. =run= runs each task in each arm R times, one run at a time, in an
+   interleaved order. A run starts the task's image with podman, the user
+   =agent= owning =/testbed= and the host's =claude= bound read-only, and
+   checks that every commit after =base_commit= keeps its tree. The method
+   arm gets the installed method copied in (=settings.json= reduced to the
+   keys =install.py= writes, its hooks on a standalone Python bound at
+   =/opt/dotagents-python=) and a probe that its guard blocks a push; a
+   failed probe makes the run an error. Both arms get the same prompt and
+   flags, =--safe-mode= in the plain arm only, and only the Claude access
+   token of the login file, through the environment. When the agent stops,
+   a simulated maintainer on the host answers or replies DONE, at most 6
+   times. Each run has an equal share of the cap, each call is capped at
+   what is left of it, and no run starts when one more share would pass the
+   cap. A run leaves =record.json= and =prediction.diff= (the change against
+   =base_commit=, without the files the hidden tests touch) in
+   =RUNDIR/runs/<run>/=; a usage limit or an expired login stops the whole
+   run, which resumes on the next start.
+3. =grade= runs the SWE-bench harness through podman's Docker API from
+   =RUNDIR/grading/=, once per arm and repeat because the harness keys
+   predictions by instance id, with a =docker= program that runs podman on
+   its =PATH= for its cleanup, and writes =grades.json= (resolved,
+   regressions); =--gold= grades the reference patches into =gold.json=.
+4. =summary= writes the per-arm and per-task Org tables that
+   [[file:evidence.org][docs/evidence.org]] holds, metrics only, labeled "pilot: not conclusive"
+   below the full run of 20 tasks with three runs per arm.
