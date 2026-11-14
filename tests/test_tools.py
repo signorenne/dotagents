@@ -857,9 +857,14 @@ elif command[0] == "git":
     refs = [word for word in command if word in branches]
     commits = [word for word in command if word in after_base]
     if "rev-list" in command:
-        print("\n".join(after_base))
+        # off_head: commits after base_commit on another branch, which only --all reaches.
+        print("\n".join(commit for commit in after_base if "--all" in command
+                        or commit not in scenario.get("off_head", [])))
     elif "--name-only" in command and commits:
-        sys.stdout.write("".join(name + ("\0" if "-z" in command else "\n") for name in after_base[commits[0]]))
+        # [old, new] is a rename, which git lists by its new name alone without --no-renames.
+        names = [name for entry in after_base[commits[0]] for name in
+                 ((entry if "--no-renames" in command else entry[1:]) if isinstance(entry, list) else [entry])]
+        sys.stdout.write("".join(name + ("\0" if "-z" in command else "\n") for name in names))
     elif "rev-parse" in command:
         print(head)
     elif "worktree" in command:
@@ -1051,6 +1056,10 @@ class BenchmarkRun(unittest.TestCase):
             self.assertNotIn("-v", argv)
             name = argv[argv.index("--name") + 1]
             self.assertEqual([call for call in podman if name in call][-1], ["rm", "-f", "-t", "0", name])
+        # The bare image, as a run finds it before its setup: no user agent created, git as root.
+        execs = [argv for argv in podman if argv[0] == "exec"]
+        self.assertEqual(([argv for argv in execs if "useradd" in " ".join(argv)],
+                          sorted({argv[2] for argv in execs if argv[1] == "-u"})), ([], ["root"]))
 
     def test_dry_run_reports_a_non_empty_prediction_from_an_untouched_image(self):
         # A run's prediction step, taken on the image before any agent: a change it finds
@@ -1155,12 +1164,17 @@ class BenchmarkRun(unittest.TestCase):
         test_path = task["grading"]["test_patch"].split(" b/", 1)[1].split("\n", 1)[0]
         tasks = self.folder / "gold-paths.json"
         tasks.write_text(json.dumps({"tasks": [task]}), encoding="utf-8")
-        for label, files, touched in (("pin", ["pyproject.toml"], None),
-                                      ("gold", ["pyproject.toml", "src/widget.py"], "src/widget.py"),
-                                      ("test", [test_path], test_path)):
+        # A rename's old side is a changed file too; a commit on another branch counts as well.
+        for label, after_base, off_head, commit, touched in (
+                ("pin", {"4b48727": ["pyproject.toml"]}, [], "4b48727", None),
+                ("gold", {"4b48727": ["pyproject.toml", "src/widget.py"]}, [], "4b48727", "src/widget.py"),
+                ("test", {"4b48727": [test_path]}, [], "4b48727", test_path),
+                ("rename", {"4b48727": [["src/widget.py", "src/gadget.py"]]}, [], "4b48727", "src/widget.py"),
+                ("other branch", {"4b48727": ["pyproject.toml"], "5d1e0aa": ["src/widget.py"]}, ["5d1e0aa"],
+                 "5d1e0aa", "src/widget.py")):
             with self.subTest(label=label):
                 self.log.unlink(missing_ok=True)
-                self.set_scenario({"after_base": {"4b48727": files}})
+                self.set_scenario({"after_base": after_base, "off_head": off_head})
                 rundir = self.folder / f"after-base-{label}"
                 result = self.run_bench(tasks=tasks, arms="plain", rundir=rundir)
                 self.assertEqual(result.returncode, 0, result.stderr)
@@ -1172,7 +1186,7 @@ class BenchmarkRun(unittest.TestCase):
                     self.assertEqual(len(agent), 1)
                 else:
                     self.assertEqual((record["stop"], record["calls"], agent), ("error", [], []))
-                    self.assertIn("4b48727", record["error"])
+                    self.assertIn(commit, record["error"])
                     self.assertIn(touched, record["error"])
                     self.assertNotIn("pyproject.toml", record["error"])
 

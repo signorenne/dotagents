@@ -398,14 +398,20 @@ As of 14 November 2026:
   deleted) holds no change and is skipped, as before
   (=test_a_git_failure_in_the_prediction_is_an_error_not_an_empty_prediction=
   in =tests/test_tools.py=).
-- [ ] Before the pilot, from the independent review of 14 November 2026,
+- [X] Before the pilot, from the independent review of 14 November 2026,
   accepted by the maintainer that day: =grade= takes a bare
   =--swebench-python= name from =PATH= again (=absolute()= since 05aa8fe
   breaks it); tests make each git step before the agent fail (=rev-list=,
   the name-only diff, =rev-parse=) and pin =--no-renames=, =rev-list
   --all= and the dry run's bare image (no =useradd=); the dry run keeps
   checking the raw prediction, and its docstring stops saying every run
-  would carry it and that it writes nothing (it may pull an image).
+  would carry it and that it writes nothing (it may pull an image)
+  (=test_grade_finds_a_bare_swebench_python_name_on_path=,
+  =test_a_git_failure_before_the_agent_stops_the_run_as_an_error=, the
+  rename and other branch cases of
+  =test_a_commit_after_base_may_change_only_files_no_hidden_patch_changes=
+  and =test_dry_run_checks_each_image_with_podman_only= in
+  =tests/test_tools.py=).
 - [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
   before the first published version of METHOD.org.
 
