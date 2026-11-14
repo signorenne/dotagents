@@ -475,6 +475,42 @@ class PlanScripts(unittest.TestCase):
         # 2 lines of the deleted file, 1 in q.sql, 4 in test_a.py (two blank lines and test_two)
         self.assertIn(f"base {self.base}, 7 changed lines", result.stdout)
 
+    def test_floor_check_says_whether_a_diff_changes_only_docs_or_python_comments(self):
+        # A docs-only diff runs lighter gates (METHOD.org, Checks), so "yes" needs proof that no
+        # code changed: documentation files, or Python edits whose tokens other than comments
+        # are unchanged. A line inside a string that starts with # is code; any other file is
+        # code too. The line informs, it never changes the exit code.
+        lib = '"""Doc."""\nX = """\n# data\n"""\n\n\ndef f():\n    return 1  # one\n'
+        (self.repo / "docs").mkdir()
+        (self.repo / "docs/guide.org").write_text("* Guide\n")
+        (self.repo / "lib.py").write_text(lib)
+        (self.repo / "a.c").write_text("int x; /* c */\n")
+        (self.repo / "app.json").write_text('{"a": 1}\n')
+        (self.repo / "logo.png").write_bytes(b"\x89PNG\r\n\x1a\n\x00")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "more")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.write_plan("full")
+        cases = (
+            ({"docs/guide.org": "* Guide\n\nMore prose.\n"}, "yes"),
+            ({"lib.py": lib.replace("\n\ndef f", "\n# added\ndef f").replace("# one", "# uno")}, "yes"),
+            ({"docs/guide.org": "* Guide 2\n", "lib.py": lib + "# trailing\n"}, "yes"),
+            ({"lib.py": lib.replace("# data", "# other")}, "no: lib.py"),
+            ({"lib.py": lib.replace("return 1", "return 2")}, "no: lib.py"),
+            ({"a.c": "int x; /* changed */\n"}, "no: a.c"),
+            ({"app.json": '{"a": 2}\n'}, "no: app.json"),
+            ({"logo.png": b"\x89PNG\r\n\x1a\n\x01"}, "no: logo.png"),
+        )
+        for files, verdict in cases:
+            with self.subTest(files=sorted(files), verdict=verdict):
+                self.git("checkout", "-q", "HEAD", "--", ".")
+                for name, content in files.items():
+                    path = self.repo / name
+                    path.write_bytes(content) if isinstance(content, bytes) else path.write_text(content)
+                result = self.run_script("floor_check.py")
+                self.assertEqual(result.returncode, 0, result.stdout)
+                self.assertIn(f"docs or comments only: {verdict}\n", result.stdout)
+
     def test_a_base_that_is_not_a_commit_never_reaches_git_as_an_option(self):
         target = self.root / "written-by-git"
         self.plan.write_text(PLAN.format(base=f"--output={target}", lane="full"))

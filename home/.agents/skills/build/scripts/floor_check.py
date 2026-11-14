@@ -4,6 +4,8 @@
 """Compare a change with its base and report what must never pass unnoticed: removed
 tests, added skips, added suppressions, the size of the change and the risk surfaces it
 touches. A quick-lane change that outgrew its lane is reported as raised to the full lane.
+It also says whether the diff changes only documentation or Python comments, the proof a
+docs-only change needs before it runs the lighter gates (METHOD.org, Checks).
 
   python3 floor_check.py [--base REF] [--cwd DIR] [--lane quick|full] [--quick-limit 100]
 
@@ -21,8 +23,10 @@ could not run (no repository, unknown base, git failed); it never reads as clean
 from __future__ import annotations
 
 import argparse
+import io
 import re
 import sys
+import tokenize
 from pathlib import Path
 
 sys.dont_write_bytecode = True
@@ -60,6 +64,7 @@ PATH_SURFACES = (
     ("public API", re.compile(r"(^|/)(include|api|public)/")),
 )
 CODE = re.compile(r"\.(py|c|cc|cpp|cxx|h|hh|hpp|js|jsx|mjs|ts|tsx|go|rs|java|kt|cs|rb|swift|qml|sh)$")
+DOCS = re.compile(r"\.(md|markdown|org|rst|adoc|txt)$|(^|/)docs?/", re.I)
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
                              r"std::atomic|\basyncio\.|\bgo func\b|\bsynchronized\b|\bQThread\b|ThreadPool")),
@@ -105,6 +110,43 @@ def test_names(lines: list) -> list:
                 names.append(re.sub(r"\s+", "", match.group(1)))
                 break
     return names
+
+
+def python_tokens(text: str) -> list | None:
+    """Python source as (type, text) tokens without comments and blank lines, or None when it
+    does not tokenize. A NEWLINE token counts by its type: a comment added after the last
+    line moves the file's final newline without changing code."""
+    try:
+        return [(token.type, "" if token.type == tokenize.NEWLINE else token.string)
+                for token in tokenize.generate_tokens(io.StringIO(text).readline)
+                if token.type not in (tokenize.COMMENT, tokenize.NL)]
+    except (tokenize.TokenError, SyntaxError):
+        return None
+
+
+def code_change(paths: list, commit: str, cwd) -> str | None:
+    """The first changed path that is code, or None when every path is a documentation file or
+    a Python file whose tokens other than comments are unchanged. A path a risk surface names,
+    a code file of another language and any other file count as code: the conservative
+    reading, since only Python's comments are told apart from code here."""
+    root, ok = planfile.git(["rev-parse", "--show-toplevel"], cwd)
+    if not ok:
+        return paths[0] if paths else None
+    for path in sorted(paths):
+        if any(pattern.search(path) for _, pattern in PATH_SURFACES):
+            return path
+        if path.endswith(".py"):
+            old, found = planfile.git(["show", f"{commit}:{path}"], cwd)
+            current = Path(root) / path
+            if not found or not current.is_file():
+                return path
+            new = current.read_text(encoding="utf-8", errors="replace").rstrip("\n")
+            before, after = python_tokens(old), python_tokens(new)
+            if before is None or before != after:
+                return path
+        elif CODE.search(path) or not DOCS.search(path):
+            return path
+    return None
 
 
 def report(files: dict, lane: str, limit: int) -> tuple[list, list, int]:
@@ -170,9 +212,15 @@ def main(argv=None) -> int:
     if not ok:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2
+    names, ok = planfile.git(["diff", "--name-only", "--no-renames", commit, "--"], args.cwd, timeout=60)
+    if not ok:
+        print(f"floor_check: git diff {base} failed; nothing was checked")
+        return 2
     lane = (args.lane or header.get("Lane", "")).lower()
     problems, surfaces, size = report(parse_diff(diff), lane, args.quick_limit)
     print(f"base {base}, {size} changed lines" + (f", lane {lane}" if lane else ""))
+    changed = code_change([name for name in names.splitlines() if name], commit, args.cwd)
+    print("docs or comments only: " + ("yes" if changed is None else f"no: {changed}"))
     if state["untracked"]:
         print(f"untracked, not counted: {', '.join(state['untracked'][:10])}")
     for line in surfaces:
