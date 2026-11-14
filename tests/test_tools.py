@@ -1304,6 +1304,8 @@ class BenchmarkRun(unittest.TestCase):
                  "/testbed"),
                 ("worktree list", {"fail": {"worktree list": bad}}, "worktree", "/testbed"),
                 ("worktree add", {**worktree, "fail": {"/home/agent/fix add -A": lock}}, "add", "/home/agent/fix"),
+                ("worktree rev-parse", {**worktree, "fail": {"/home/agent/fix rev-parse": bad}}, "rev-parse",
+                 "/home/agent/fix"),
                 ("worktree log", {**worktree, "fail": {"log": bad}}, "log", "/home/agent/fix"),
                 ("worktree diff --quiet", {**worktree, "fail": {"/home/agent/fix diff --cached --quiet": bad}}, "diff",
                  "/home/agent/fix"),
@@ -1630,25 +1632,28 @@ class BenchmarkResults(unittest.TestCase):
     def test_a_run_that_failed_after_the_agent_counts_as_an_error_only(self):
         # A run whose prediction step failed reached the agent, whose cost counts, but has no
         # prediction: an error, not a run the harness failed to report on. A run whose agent
-        # call ended in an error still has its prediction, which grade grades.
+        # call ended in an error still has its prediction, which grade grades, and which the
+        # harness may fail on like any other (grade exits 1).
         run_id = f"{self.ids[0]}.method.1"
         path = self.rundir / "runs" / run_id / "record.json"
         prediction = path.parent / "prediction.diff"
-        fix = prediction.read_text(encoding="utf-8")
+        fix, crash = prediction.read_text(encoding="utf-8"), "diff --git a/x b/x\n+CRASH\n"
         # runs, errors, graded, empty or not applied, tests timed out, no report, resolved, rate
-        for label, error, source, row in (
-                ("prediction failed", "take the prediction: git add in /testbed exited 128: fatal: lock", None,
-                 ["4", "1", "3", "0", "0", "0", "3", "100%"]),
-                ("agent error", None, "/testbed", ["4", "1", "4", "0", "0", "0", "4", "100%"])):
+        for label, error, source, patch, exit_code, row in (
+                ("prediction failed", "take the prediction: git add in /testbed exited 128: fatal: lock", None, None,
+                 0, ["4", "1", "3", "0", "0", "0", "3", "100%"]),
+                ("agent error", None, "/testbed", fix, 0, ["4", "1", "4", "0", "0", "0", "4", "100%"]),
+                ("agent error, harness failed", None, "/testbed", crash, 1,
+                 ["4", "1", "3", "0", "0", "1", "3", "100%"])):
             with self.subTest(label=label):
                 record = json.loads(path.read_text(encoding="utf-8"))
                 record.update(stop="error", error=error, prediction_source=source)
                 path.write_text(json.dumps(record), encoding="utf-8")
                 prediction.unlink(missing_ok=True)
-                if source:
-                    prediction.write_text(fix, encoding="utf-8")
+                if patch:
+                    prediction.write_text(patch, encoding="utf-8")
                 result = self.grade()
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(result.returncode, exit_code, result.stdout + result.stderr)
                 grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
                 self.assertEqual(run_id in grades, bool(source))
                 summary = self.tool("summary", "--rundir", self.rundir)
