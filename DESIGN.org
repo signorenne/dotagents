@@ -482,8 +482,10 @@ failure hook's reminder.
 | =progress-log=              | implement (section 5), session-close                                               | the reviewer (recorded failing runs, log claims checked against the diff); the progress check in Claude Code and Codex (a branch commit missing from its log)     |
 | =tests-attacked=            | implement (section 7), trustworthy-tests                                           | the reviewer's attack on each new or changed test                                                                                                                 |
 | =learning-in-global-rules=  | global rules (Learning), tutor                                                     | none: the model only                                                                                                                                              |
+| =method-measured=           | this rule, =docs/evidence.org=                                                     | none: the maintainer checks the date of =docs/evidence.org= against the version                                                                                   |
 | =one-source=                | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (generated files); =install.py --audit= (files that do not come from here)                                                                |
 | =skills-load-locally=       | =AGENTS.md= (Where changes go)                                                     | =tests/test_install.py= (synced copies turned off); =tools/validate.py= (no skill name in both roots)                                                             |
+| =guard-replay=              | =CONTRIBUTING.org= (Workflow), =AGENTS.md= (Review checklist)                      | the reviewer's checklist question; the replay report in the progress log                                                                                          |
 | =concise-skills=            | =docs/skill-authoring.org=, =AGENTS.md= (Hard rules)                               | =tools/validate.py= (a body of at most 20,000 bytes, the description limits)                                                                                      |
 | =skills-from-real-runs=     | =docs/skill-authoring.org=                                                         | none: the model only                                                                                                                                              |
 | =light-scripts=             | =AGENTS.md= (Where changes go)                                                     | =tests/test_skill_scripts.py=, run by CI in two jobs without Pillow                                                                                               |
@@ -581,6 +583,20 @@ top.
 
 In: =home/.agents/AGENTS.md= (Learning), =claude-ai/skills/tutor/=.
 
+*** Each version of the method is measured
+:PROPERTIES:
+:CUSTOM_ID: method-measured
+:END:
+Before a version of the nexenne method is published, =tools/benchmark.py=
+runs the full benchmark, at least 20 SWE-bench Verified tasks with three
+runs per arm, with and without the method on the same main model, and its
+metrics summary is committed in =docs/evidence.org=; raw runs stay in
+=.private/evidence/=. A pilot does not count. It also runs on the
+maintainer's request after a change to a workflow skill or a subagent, and
+never without the maintainer's go and a cap on its cost.
+
+In: =tools/benchmark.py=, =docs/evidence.org=.
+
 ** Source and install
 
 *** One source of truth in =~/.agents=, generated copies per tool
@@ -606,6 +622,21 @@ by uploading the built zip. One version is edited and tested locally, and
 Claude Code would otherwise list both copies.
 
 In: =install.py= (=skillOverrides=), =tools/build.py=.
+
+*** A guard change is replayed before it lands
+:PROPERTIES:
+:CUSTOM_ID: guard-replay
+:END:
+A change to =home/.agents/hooks/guard_bash.py= lands only after
+=tools/guard_replay.py= compared the guard of the target branch with the
+changed one over the shell commands of the maintainer's Claude Code
+transcripts, and the maintainer judged each command the change newly blocks;
+the progress log records the counts and the judgement. It is a local step,
+not a CI gate, because the transcripts exist only on the maintainer's
+machine.
+
+In: =tools/guard_replay.py=, =CONTRIBUTING.org= (Workflow), =AGENTS.md=
+(Review checklist).
 
 ** Skills
 
