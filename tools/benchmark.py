@@ -80,8 +80,8 @@ grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, s
         (default podman's socket under XDG_RUNTIME_DIR); when no docker program is on PATH,
         one that runs podman is put there, since the harness stops its containers with it.
         The harness keys predictions by instance id, so each arm and repeat is graded in a
-        call of its own; runs that never reached the agent, or ended in an error, are not
-        graded.
+        call of its own; runs that never reached the agent, or whose prediction failed, are
+        not graded.
         RUNDIR/grades.json holds per run whether it is resolved and which PASS_TO_PASS
         tests failed (regressions). The harness writes no report for an empty patch, one
         that does not apply, or one whose tests time out: each counts as graded and
@@ -994,9 +994,11 @@ def arm_row(arm: str, records: list, grades, share: float) -> list:
     over = [record["spend"] - share for record in mine if record["spend"] > share + 1e-9]
     return [arm, str(len(mine)), str(sum(1 for record in mine if record["stop"] == "error")),
             str(len(graded)) if known else "-", str(failed) if known else "-", str(timed_out) if known else "-",
-            # A run that ended in an error after the agent (its prediction failed) has no
-            # prediction to grade: an error, not a run the harness failed on.
-            str(sum(1 for record in reached if record["stop"] != "error") - len(graded)) if known else "-",
+            # A run whose prediction failed after the agent (an error, its prediction_source
+            # never set) has nothing to grade: not a run the harness failed on. An agent call
+            # that ended in an error still left a prediction, which grade grades.
+            str(sum(1 for record in reached if record["stop"] != "error" or record.get("prediction_source"))
+                - len(graded)) if known else "-",
             str(resolved) if known else "-",
             f"{100 * resolved / len(graded):.0f}%" if graded else "-",
             median([record["agent_cost"] for record in reached], ".2f"),
