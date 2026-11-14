@@ -76,31 +76,30 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
 grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, swebench 5)
         with PY, a Python 3.10 or later environment holding the swebench package (a path,
         relative or absolute, or a name found on PATH), from RUNDIR/grading/, so its logs
-        stay there, through the Docker API in DOCKER_HOST
-        (default podman's socket under XDG_RUNTIME_DIR); when no docker program is on PATH,
-        one that runs podman is put there, since the harness stops its containers with it.
-        The harness keys predictions by instance id, so each arm and repeat is graded in a
-        call of its own; runs that never reached the agent, or whose prediction failed, are
-        not graded.
+        stay there, through the Docker API in DOCKER_HOST (default podman's socket under
+        XDG_RUNTIME_DIR); when no docker program is on PATH, one that runs podman is put
+        there, since the harness stops its containers with it. The harness keys
+        predictions by instance id, so each arm and repeat is graded in a call of its own;
+        runs that never reached the agent, or whose prediction failed, are not graded.
         RUNDIR/grades.json holds per run whether it is resolved, which PASS_TO_PASS tests
         failed (regressions) and a hash of the prediction it graded. The harness writes no
         report for an empty patch, one that does not apply, or one whose tests time out:
-        each counts as graded and unresolved. A run it failed on otherwise has no grade, and grade exits 1 naming it
-        (grade again to retry). With --gold it grades the reference patches of the tasks
-        (RUNDIR's tasks.json, or --tasks) into RUNDIR/gold.json instead.
+        each counts as graded and unresolved. A run it failed on otherwise has no grade,
+        and grade exits 1 naming it (grade again to retry). With --gold it grades the
+        reference patches of the tasks (RUNDIR's tasks.json, or --tasks) into
+        RUNDIR/gold.json instead.
 
 summary writes per arm the runs, errors, graded runs (empty or unapplied predictions and
-        timed-out tests among them, each counted), runs without a report (the harness failed
-        on them, grades.json does not hold them yet, or their prediction changed since it
-        was graded: grade again), the resolved rate over the graded runs, median and total
-        cost (agent and maintainer apart), median turns, minutes and replies, runs with
-        regressions, runs over their share and the stop reasons, then per task both arms
-        side by side: an Org fragment of metrics only, no transcript or command text, to
-        --org or stdout. It is labeled "pilot: not
-        conclusive" unless both arms finished every run of a plan as large as the full run
-        of DESIGN.org's method-measured rule (20 tasks, 3 runs per arm). It also gives the
-        total spend, the interrupted attempts' share of it and the runs the cap left
-        unmade.
+        timed-out tests among them, each counted), runs without a report (the harness
+        failed on them, grades.json does not hold them yet, or their prediction changed
+        since it was graded: grade again), the resolved rate over the graded runs, median
+        and total cost (agent and maintainer apart), median turns, minutes and replies,
+        runs with regressions, runs over their share and the stop reasons, then per task
+        both arms side by side: an Org fragment of metrics only, no transcript or command
+        text, to --org or stdout. It is labeled "pilot: not conclusive" unless both arms
+        finished every run of a plan as large as the full run of DESIGN.org's
+        method-measured rule (20 tasks, 3 runs per arm). It also gives the total spend,
+        the interrupted attempts' share of it and the runs the cap left unmade.
 
 Standard library only. Exit: 0 done, 1 a step failed (reported), 2 usage error.
 """

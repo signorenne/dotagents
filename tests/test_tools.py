@@ -1708,6 +1708,14 @@ class BenchmarkResults(unittest.TestCase):
                 path.write_text(json.dumps(grades), encoding="utf-8")
                 summary = self.tool("summary", "--rundir", self.rundir)
                 self.assertEqual(self.table(summary.stdout, "method")[1:9], row)
+        # The same for a grade of an empty prediction, which grade writes without the harness.
+        with self.subTest(label="empty prediction made again"):
+            prediction = self.rundir / "runs" / run_id / "prediction.diff"
+            prediction.write_text("", encoding="utf-8")
+            self.assertEqual(self.grade().returncode, 0)
+            prediction.write_text("diff --git a/x b/x\n+RESOLVE\n", encoding="utf-8")
+            summary = self.tool("summary", "--rundir", self.rundir)
+            self.assertEqual(self.table(summary.stdout, "method")[1:9], ["4", "0", "3", "0", "0", "1", "3", "100%"])
 
     def test_grade_takes_a_relative_swebench_python_and_keeps_its_symlink(self):
         # The harness runs in RUNDIR/grading/, so a relative path must still reach the
