@@ -1246,6 +1246,9 @@ for ident in ids:
     if "HANG" in patch:
         (folder / "test_output.txt").write_text("running...\n\nTimeout error: 1800 seconds exceeded.")
         continue
+    if "QUOTE" in patch:  # the tests ran and printed the phrase; then the harness failed
+        (folder / "test_output.txt").write_text("test_retry ... Timeout error: retrying\nok\n")
+        continue
     if "CRASH" in patch:
         continue
     failing = ["test_old"] if "REGRESS" in patch else []
@@ -1351,24 +1354,27 @@ class BenchmarkResults(unittest.TestCase):
 
     def test_grade_counts_empty_and_unapplied_patches_and_reports_harness_failures(self):
         empty, unapplied, crashed = (f"{self.ids[0]}.method.1", f"{self.ids[1]}.method.1", f"{self.ids[0]}.method.2")
-        hung = f"{self.ids[1]}.plain.1"
+        hung, quoted = f"{self.ids[1]}.plain.1", f"{self.ids[0]}.plain.2"
         for run_id, patch in ((empty, ""), (unapplied, "diff --git a/x b/x\n+UNAPPLIABLE\n"),
-                              (crashed, "diff --git a/x b/x\n+CRASH\n"), (hung, "diff --git a/x b/x\n+HANG\n")):
+                              (crashed, "diff --git a/x b/x\n+CRASH\n"), (hung, "diff --git a/x b/x\n+HANG\n"),
+                              (quoted, "diff --git a/x b/x\n+QUOTE\n")):
             (self.rundir / "runs" / run_id / "prediction.diff").write_text(patch, encoding="utf-8")
         result = self.grade()
         self.assertEqual(result.returncode, 1, result.stdout)  # a run the harness did not report on
         self.assertIn(crashed, result.stderr)
         grades = json.loads((self.rundir / "grades.json").read_text(encoding="utf-8"))
         self.assertEqual({run_id: (grades[run_id]["graded"], grades[run_id]["resolved"], grades[run_id]["outcome"])
-                          for run_id in (empty, unapplied, crashed, hung)},
+                          for run_id in (empty, unapplied, crashed, hung, quoted)},
                          {empty: (True, False, "empty prediction"), unapplied: (True, False, "patch did not apply"),
-                          crashed: (False, False, "no report"), hung: (True, False, "tests timed out")})
+                          crashed: (False, False, "no report"), hung: (True, False, "tests timed out"),
+                          quoted: (False, False, "no report")})
         self.assertNotIn(hung, result.stderr)  # a timeout is the patch's failure, not the harness's
         # Empty and unapplied predictions are failures to resolve; a harness failure stays
         # apart, outside the rate: 1 resolved of 3 graded, not of the 4 that reached the agent.
         summary = self.tool("summary", "--rundir", self.rundir)
-        self.assertEqual(self.table(summary.stdout, "method")[3:8], ["3", "2", "1", "1", "33%"])
-        self.assertEqual(self.table(summary.stdout, "plain")[3:8], ["3", "0", "0", "0", "0%"])
+        self.assertEqual(self.table(summary.stdout, "method")[3:9], ["3", "2", "0", "1", "1", "33%"])
+        # plain: one report, one timeout, and the run whose output only quotes a timeout.
+        self.assertEqual(self.table(summary.stdout, "plain")[3:9], ["2", "0", "1", "1", "0", "0%"])
 
     def test_grade_needs_podman_s_socket(self):
         result = self.grade(env={**self.env, "DOCKER_HOST": f"unix://{self.folder / 'no.sock'}"})
@@ -1387,14 +1393,14 @@ class BenchmarkResults(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stderr)
         text = org.read_text(encoding="utf-8")
         self.assertIn("pilot: not conclusive", text)  # 2 tasks and 2 runs per arm, under the full run's
-        self.assertEqual(self.table(text, "arm")[:8], ["arm", "runs", "errors", "graded", "empty or not applied",
-                                                         "no report", "resolved", "resolved rate"])
+        self.assertEqual(self.table(text, "arm")[:9], ["arm", "runs", "errors", "graded", "empty or not applied",
+                                                         "tests timed out", "no report", "resolved", "resolved rate"])
         # Medians over the runs that reached the agent, totals over all runs.
         self.assertEqual(self.table(text, "method"),
-                         ["method", "4", "0", "4", "0", "0", "4", "100%", "1.00", "12.00", "0.01", "0.04", "10.0", "1.0", "0",
+                         ["method", "4", "0", "4", "0", "0", "0", "4", "100%", "1.00", "12.00", "0.01", "0.04", "10.0", "1.0", "0",
                           "1.0", "1", "7.01", "DONE 4"])  # 9.01 passes the share of 2
         self.assertEqual(self.table(text, "plain"),
-                         ["plain", "4", "1", "3", "0", "0", "0", "0%", "0.50", "3.00", "0.00", "0.00", "10.0", "1.0", "3",
+                         ["plain", "4", "1", "3", "0", "0", "0", "0", "0%", "0.50", "3.00", "0.00", "0.00", "10.0", "1.0", "3",
                           "0.0", "0", "0.00", "DONE 3, error 1"])
         self.assertEqual(self.table(text, self.ids[0]), [self.ids[0], "2/2", "1.00", "0/2", "1.25"])
         self.assertEqual(self.table(text, self.ids[1]), [self.ids[1], "2/2", "5.00", "0/1", "0.50"])  # its setup error never reached the agent
@@ -1439,7 +1445,7 @@ class BenchmarkResults(unittest.TestCase):
         result = self.tool("summary", "--rundir", self.rundir)
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("not graded", result.stdout)
-        self.assertEqual(self.table(result.stdout, "method")[3:8], ["-"] * 5)
+        self.assertEqual(self.table(result.stdout, "method")[3:9], ["-"] * 6)
 
 
 if __name__ == "__main__":

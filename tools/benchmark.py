@@ -75,15 +75,16 @@ grade   runs the SWE-bench harness (python -m swebench.harness.run_evaluation, s
         (grade again to retry). With --gold it grades the reference patches of the tasks
         (RUNDIR's tasks.json, or --tasks) into RUNDIR/gold.json instead.
 
-summary writes per arm the runs, errors, graded runs (empty or unapplied predictions among
-        them), runs without a report, the resolved rate over the graded runs, median and
-        total cost (agent and maintainer apart), median turns, minutes and replies, runs
-        with regressions, runs over their share and the stop reasons, then per task both
-        arms side by side: an Org fragment of metrics only, no transcript or command text,
-        to --org or stdout. It is labeled "pilot: not conclusive" unless both arms finished
-        every run of a plan as large as the full run of DESIGN.org's method-measured rule
-        (20 tasks, 3 runs per arm). It also gives the total spend, the interrupted
-        attempts' share of it and the runs the cap left unmade.
+summary writes per arm the runs, errors, graded runs (empty or unapplied predictions and
+        timed-out tests among them, each counted), runs without a report, the resolved rate
+        over the graded runs, median and total cost (agent and maintainer apart), median
+        turns, minutes and replies, runs with regressions, runs over their share and the
+        stop reasons, then per task both arms side by side: an Org fragment of metrics
+        only, no transcript or command text, to --org or stdout. It is labeled "pilot: not
+        conclusive" unless both arms finished every run of a plan as large as the full run
+        of DESIGN.org's method-measured rule (20 tasks, 3 runs per arm). It also gives the
+        total spend, the interrupted attempts' share of it and the runs the cap left
+        unmade.
 
 Standard library only. Exit: 0 done, 1 a step failed (reported), 2 usage error.
 """
@@ -745,7 +746,8 @@ def docker_host() -> str:
 
 
 APPLY_FAILED = ">>>>> Patch Apply Failed"  # swebench.harness.constants.APPLY_PATCH_FAIL
-TIMED_OUT = "Timeout error:"  # what run_evaluation adds to test_output.txt when the tests time out
+# What run_evaluation appends to test_output.txt when the tests time out.
+TIMED_OUT = re.compile(r"Timeout error: \d+ seconds exceeded\.\s*\Z")
 
 
 def harness(python: Path, grading: Path, env: dict, run_id: str, predictions: str, model: str, ids: list) -> dict:
@@ -773,7 +775,7 @@ def harness(python: Path, grading: Path, env: dict, run_id: str, predictions: st
                 except OSError:
                     logs_of[name] = ""
             outcome = ("patch did not apply" if APPLY_FAILED in logs_of["run_instance.log"] else
-                       "tests timed out" if TIMED_OUT in logs_of["test_output.txt"] else "no report")
+                       "tests timed out" if TIMED_OUT.search(logs_of["test_output.txt"]) else "no report")
             reports[ident] = {"graded": outcome != "no report", "resolved": False, "regressions": [],
                               "outcome": outcome}
             continue
@@ -892,12 +894,14 @@ def arm_row(arm: str, records: list, grades, share: float) -> list:
     graded = [grades[record["run"]] for record in reached if known and grades.get(record["run"], {}).get("graded")]
     resolved = sum(1 for value in graded if value["resolved"])
     failed = sum(1 for value in graded if value.get("outcome") in ("empty prediction", "patch did not apply"))
+    # A timeout may come from a loaded machine rather than the patch: shown apart.
+    timed_out = sum(1 for value in graded if value.get("outcome") == "tests timed out")
     stops = {}
     for record in mine:
         stops[record["stop"]] = stops.get(record["stop"], 0) + 1
     over = [record["spend"] - share for record in mine if record["spend"] > share + 1e-9]
     return [arm, str(len(mine)), str(sum(1 for record in mine if record["stop"] == "error")),
-            str(len(graded)) if known else "-", str(failed) if known else "-",
+            str(len(graded)) if known else "-", str(failed) if known else "-", str(timed_out) if known else "-",
             str(len(reached) - len(graded)) if known else "-", str(resolved) if known else "-",
             f"{100 * resolved / len(graded):.0f}%" if graded else "-",
             median([record["agent_cost"] for record in reached], ".2f"),
@@ -941,7 +945,8 @@ def summary(args) -> int:
              f"Spent {finished_spend + attempts_spend:.2f} in all: {finished_spend:.2f} in finished runs and "
              f"{attempts_spend:.2f} in interrupted attempts ({len(attempts)}); planned runs not made: "
              f"{len(not_made)}.", ""]
-    lines += org_table([["arm", "runs", "errors", "graded", "empty or not applied", "no report", "resolved",
+    lines += org_table([["arm", "runs", "errors", "graded", "empty or not applied", "tests timed out", "no report",
+                         "resolved",
                          "resolved rate", "median agent cost",
                          "total agent cost", "median maintainer cost", "total maintainer cost", "median turns",
                          "median minutes", "runs with regressions", "median replies", "runs over share",
