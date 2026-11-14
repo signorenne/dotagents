@@ -23,7 +23,7 @@ the maintainer accepts it. Sources: [[file:docs/evidence.org][docs/evidence.org]
    next step. Any session resumes from it.
 3. Judgment stays on the strongest model and with the maintainer; mechanics
    move to scripts and hooks that cost no model turn.
-4. Look before asking, ask once and in one batch, and stop only for a closed
+4. Look before asking, ask once through the question interface, and stop only for a closed
    list of reasons. Every other choice is taken, recorded with what it costs
    if wrong, and shown at the end.
 5. Short contexts: clearing the session between steps is cheap because the
@@ -67,8 +67,9 @@ Risk surfaces force the full lane: a public API, a data migration, security
 (outside input, authentication, secrets), a new dependency, threading, the
 build, an irreversible step. Work that needs several plans gets a design
 first (the design skill): objective, non-goals, decisions, acceptance and the
-ordered list of plans; each plan is then one run of build, in its own
-session.
+ordered list of plans; each plan is then one run of build, continued in
+the same session unless the context is long (a fresh session then resumes
+from the plan file).
 
 The risk grade of a plan (low, medium, high) sets the review depth: high
 risk gets a second reviewer pass on the fixes and is proposed for an
@@ -109,7 +110,7 @@ Review quick or full (full with a second pass when the risk is high).
 | Code map      | the files, symbols and lines the work needs, what to reuse, what not to touch; a map to check against the code                          | before approval |
 | Assumptions   | table: assumption, the check that could refute it, its result                                                                           | before approval, results as they come |
 | Steps         | table: number, step, files, check, status (pending, in progress, done, dropped), commit; then constraints for every step and the interfaces between dependent steps | before approval, status as it goes |
-| Verification  | the narrow check per step, the full gates once on the last commit                                                                       | before approval |
+| Verification  | the narrow check per step, the full gates once on the last commit (docs or comments only: the checks that read them)                    | before approval |
 | Rulings       | table: number, ruling, why, alternative, cost if wrong, review (pending, kept, changed)                                                 | as they are taken |
 | Dead ends     | one line per approach that failed: what, the result, why dropped                                                                        | as they happen |
 | Review        | table: number, source (reviewer, maintainer), severity, location, finding, verdict, evidence                                            | at review |
@@ -138,10 +139,14 @@ a new plan; they are not converted.
 
 - While investigating the agent asks nothing: what the code, the docs or
   the decision log can settle, it reads.
-- Before approval it shows, in one message, its assumptions as a table
-  (evidence, what breaks if wrong, how sure) and the open questions that are
-  the maintainer's, each with options, consequences and its recommendation.
-  One answer approves the plan.
+- Before approval it shows its assumptions as a table (evidence, what
+  breaks if wrong, how sure), then asks the open questions that are the
+  maintainer's through the tool's question interface when it has one (in
+  Claude Code AskUserQuestion): one question per item, its options with
+  their consequences and the recommended one first, at most four per round,
+  a dependent question after the answer it depends on. Without the
+  interface they come as a numbered list in one message. The answers approve
+  the plan.
 - During the work it stops only for:
   1. a change to the frozen intent (something the maintainer would notice in
      the result);
@@ -173,7 +178,9 @@ a new plan; they are not converted.
   fix that changes behavior is proven by a test seen failing first; then the
   plan's verification runs again. A fix that involves the maintainer's
   choice stops the work; any other fix that is not simple is made and
-  recorded as a ruling. Minor findings are listed, not fixed.
+  recorded as a ruling. Minor findings and open points this change caused
+  are fixed in the same pass when the fix is simple; the rest go to the
+  maintainer as one question (fix them all, pick, or leave them listed).
 - The baseline's test count on the last commit is compared with the base's,
   and the tests that pin the unchanged behavior pass there; built means every
   gate passed on the last commit, and a SKIP or INCOMPLETE gate keeps the
@@ -210,7 +217,9 @@ lane does not. A step ends when its check passes and its deliverables
 (docs, tests, examples, build lists) are in sync, and the work when the
 acceptance checks pass: nothing is polished after them, and anything worth
 more becomes a deferred line or a new plan. The narrow check runs per step, the full gates once on the
-last commit, through gate-runner.
+last commit, through gate-runner; when floor_check says the diff changes only
+docs or Python comments, the full gates are the documented checks that read
+those files.
 
 * Resume and short contexts
 
@@ -259,6 +268,12 @@ irreversible steps, step orders a fragment could scramble, and every text
 someone acts on later: the intent and acceptance criteria, rules, skill
 text, docs for people, commits. On request the register goes terser still
 (telegraphic), never at the cost of a fact.
+
+A reply that ends a task opens with Done: yes or Done: no and what is left
+for the maintainer and for the agent; a next step that needs a new session
+is given as the exact prompt to paste, in a fenced block. A turn that ends
+while work runs says what runs, when it should end, and that the agent
+resumes when it reports.
 
 * Decisions
 

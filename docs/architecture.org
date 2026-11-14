@@ -307,8 +307,8 @@ What each edge carries:
 |---------------+----------------------------+--------------------------------------------------------------|
 | project-setup | decide                     | the open points the repository does not answer               |
 | design        | decide                     | each design choice                                           |
-| design        | build, in a fresh session  | one plan of the design                                       |
-| build         | decide                     | the user's choices, in one batch before approval             |
+| design        | build, in the same session | one plan of the design                                       |
+| build         | decide                     | the user's choices, through the question box before approval |
 | build         | trustworthy-tests          | each test, written first                                     |
 | build         | systematic-debugging       | a problem after two failed fixes                             |
 | close         | build, in a fresh session  | the plan file, brought up to date                            |
@@ -324,7 +324,7 @@ What each edge carries:
 3. Build, in its lane: build starts from plan_state.py, investigates (scout
    only when the area is unknown or wide), names the lane, writes the plan
    file, and in the full lane has it checked by an independent subagent and
-   approved once with every question in one batch. It writes each test first
+   approved once, its questions asked through the question box. It writes each test first
    by trustworthy-tests and records the failing run with check_step, turns to
    systematic-debugging after two failed fixes, runs floor_check and the full
    gates through gate-runner, the review through reviewer in quick or full

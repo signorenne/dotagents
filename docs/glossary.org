@@ -64,34 +64,34 @@ coin a synonym in a local doc when this file already names the concept.
 
 * Workflow terms
 
-| Term                   | Definition                                                                                                                                                    |
-|------------------------+---------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| maieutic method        | The Socratic way of working in both directions: the user questions the agent, and the agent settles the user's choices with an assumptions table and only the questions that change them. |
-| maintainer             | The person who owns a repository and its decisions, reviews every change and is the only one who pushes; the skills call them the user.                       |
-| method                 | The way a change goes from request to landing in this setup: lanes, the plan file, stops, review and checks, owned by =METHOD.org=.                           |
-| slug                   | The short kebab-case name of a change, shared by its plan file (=.private/plans/<slug>.<ext>=), its log and its branch (=<type>/<slug>=).                     |
-| refute before you rely | The core method: each claim the work depends on is a hypothesis to break with the cheapest check that could fail before anything is built on it.              |
-| refuted assumption     | A claim a check proved wrong, recorded with the check and what it changed in the plan file's Assumptions.                                                     |
-| decision               | A choice that belongs to the user (scope, public API, architecture, rules, trade-offs), reached with decide and recorded only after explicit confirmation.    |
-| ruling                 | A choice the agent takes during a change that the plan did not settle, recorded in the plan with its reason, alternative and cost if wrong, pending until the maintainer reviews it. |
-| design                 | The document of work that needs several plans: objective, non-goals, decisions, acceptance and the ordered plans, from the design skill in =.private/designs/=. |
-| plan file              | The one file per change in =.private/plans/<slug>.<ext>= that holds its state header, intent, code map, assumptions, steps, rulings, dead ends and review.    |
-| plan log               | =<slug>.log= beside a plan file, written only by scripts and hooks: each check, failing-first run, gate and commit.                                           |
-| lane                   | The size of the process a change takes, said after investigating: direct, quick or full; it can be raised mid-work, never lowered.                            |
-| risk surface           | What forces the full lane: a public API, a data migration, security, a new dependency, threading, the build, an irreversible step.                            |
-| stop list              | The closed list of reasons the agent stops during a build (=METHOD.org=, Questions and stops); everything else is a ruling.                                   |
-| deferred list          | =.private/deferred.<ext>=, one line per issue that is not the current change's problem and that its base commit has too.                                      |
-| verdict                | The main agent's answer to a review finding: real with the reviewer's severity, false with a disproof, or undecided with what would settle it.                         |
-| handoff                | The brief close writes to =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>= for a session whose state no plan file holds.                                          |
-| working notes          | The git-ignored =.private/= folder of each repository, holding plan files, designs, the deferred list, handoffs, audit reports and as-built notes.            |
-| fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between tasks and between the plans of a design; it resumes from the plan file. |
-| compaction             | The agent's summary of its own conversation when the context fills; after one, the session refresh warns that its memory of the code may be stale.            |
-| narrow gate            | One module's tests, one test case or one file, run while iterating.                                                                                           |
-| full gates             | The project's documented pre-PR gates, run before a change is called done.                                                                                    |
-| worktree               | A separate git working tree on its own branch, outside the main checkout, which isolated-work creates for a risky change and for each parallel writer.        |
-| landing                | Bringing a reviewed branch onto its target on the maintainer's go by rebase and fast-forward, then removing its worktree and branch.                          |
-| project layer          | The files each repository needs once (=AGENTS.md=, the bridges, the project docs, =.private/= in =.gitignore=), set up by project-setup.                      |
-| project docs           | The docs project-setup creates: vision, design, style guide and contributing at the root; a docs map, writing guide, decision log and agent workflows.        |
-| as-built docs          | Docs of an existing repository written from its code by as-built-docs: a knowledge base, a test guide and a developer guide, synced when the code changes.    |
-| audit report           | The local report code-audit writes in =.private/audit/=, with confirmed findings and questions for the user.                                                  |
-| palette                | =palette.iuml= of the plantuml-diagrams skill: the nexenne day and night colours every diagram includes.                                                      |
+| Term                   | Definition                                                                                                                                                                                             |
+|------------------------+--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| maieutic method        | The Socratic way of working in both directions: the user questions the agent, and the agent settles the user's choices with an assumptions table and only the questions that change them.              |
+| maintainer             | The person who owns a repository and its decisions, reviews every change and is the only one who pushes; the skills call them the user.                                                                |
+| method                 | The way a change goes from request to landing in this setup: lanes, the plan file, stops, review and checks, owned by =METHOD.org=.                                                                    |
+| slug                   | The short kebab-case name of a change, shared by its plan file (=.private/plans/<slug>.<ext>=), its log and its branch (=<type>/<slug>=).                                                              |
+| refute before you rely | The core method: each claim the work depends on is a hypothesis to break with the cheapest check that could fail before anything is built on it.                                                       |
+| refuted assumption     | A claim a check proved wrong, recorded with the check and what it changed in the plan file's Assumptions.                                                                                              |
+| decision               | A choice that belongs to the user (scope, public API, architecture, rules, trade-offs), reached with decide and recorded only after explicit confirmation.                                             |
+| ruling                 | A choice the agent takes during a change that the plan did not settle, recorded in the plan with its reason, alternative and cost if wrong, pending until the maintainer reviews it.                   |
+| design                 | The document of work that needs several plans: objective, non-goals, decisions, acceptance and the ordered plans, from the design skill in =.private/designs/=.                                        |
+| plan file              | The one file per change in =.private/plans/<slug>.<ext>= that holds its state header, intent, code map, assumptions, steps, rulings, dead ends and review.                                             |
+| plan log               | =<slug>.log= beside a plan file, written only by scripts and hooks: each check, failing-first run, gate and commit.                                                                                    |
+| lane                   | The size of the process a change takes, said after investigating: direct, quick or full; it can be raised mid-work, never lowered.                                                                     |
+| risk surface           | What forces the full lane: a public API, a data migration, security, a new dependency, threading, the build, an irreversible step.                                                                     |
+| stop list              | The closed list of reasons the agent stops during a build (=METHOD.org=, Questions and stops); everything else is a ruling.                                                                            |
+| deferred list          | =.private/deferred.<ext>=, one line per issue that is not the current change's problem and that its base commit has too.                                                                               |
+| verdict                | The main agent's answer to a review finding: real with the reviewer's severity, false with a disproof, or undecided with what would settle it.                                                         |
+| handoff                | The brief close writes to =.private/handoff/<YYYY-MM-DD>-<slug>.<ext>= for a session whose state no plan file holds.                                                                                   |
+| working notes          | The git-ignored =.private/= folder of each repository, holding plan files, designs, the deferred list, handoffs, audit reports and as-built notes.                                                     |
+| fresh session          | A new agent session with no memory of the previous one (in Claude Code after =/clear=), used between tasks, and between the plans of a design when the context is long; it resumes from the plan file. |
+| compaction             | The agent's summary of its own conversation when the context fills; after one, the session refresh warns that its memory of the code may be stale.                                                     |
+| narrow gate            | One module's tests, one test case or one file, run while iterating.                                                                                                                                    |
+| full gates             | The project's documented pre-PR gates, run before a change is called done.                                                                                                                             |
+| worktree               | A separate git working tree on its own branch, outside the main checkout, which isolated-work creates for a risky change and for each parallel writer.                                                 |
+| landing                | Bringing a reviewed branch onto its target on the maintainer's go by rebase and fast-forward, then removing its worktree and branch.                                                                   |
+| project layer          | The files each repository needs once (=AGENTS.md=, the bridges, the project docs, =.private/= in =.gitignore=), set up by project-setup.                                                               |
+| project docs           | The docs project-setup creates: vision, design, style guide and contributing at the root; a docs map, writing guide, decision log and agent workflows.                                                 |
+| as-built docs          | Docs of an existing repository written from its code by as-built-docs: a knowledge base, a test guide and a developer guide, synced when the code changes.                                             |
+| audit report           | The local report code-audit writes in =.private/audit/=, with confirmed findings and questions for the user.                                                                                           |
+| palette                | =palette.iuml= of the plantuml-diagrams skill: the nexenne day and night colours every diagram includes.                                                                                               |

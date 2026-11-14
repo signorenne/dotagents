@@ -20,7 +20,7 @@ global rules.
 - The agent guides you on choices that are yours (scope, public API,
   architecture, rules): the decide skill shows what is known as an
   assumptions table (evidence, what breaks if wrong, how sure), asks only the
-  questions whose answers change the choice (in one batch when independent),
+  questions whose answers change the choice (through the question box, one per item),
   each with a recommended option and the consequence of each option, and
   records the decision after your explicit confirmation. During a build the
   agent stops only for the closed list in METHOD.org; every other choice is a

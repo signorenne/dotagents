@@ -472,11 +472,13 @@ not rules: a change that touches a rule that binds still follows that rule.
   each skill invoked before a compaction. Revisit when real sessions show the
   summary keeps that state without the brief (unmeasured today), or
   when the tool keeps whole skills through a compaction.
-- /A fresh session between the plans of a design/ : assumes the design
-  conversation (the interview, the rejected options) would steer the
-  build, and that only a reader without it shows the design and the plan are
-  self-contained. Revisit when builds run in the design's own session match
-  their plans as well, by the reviewer's findings, over several tasks.
+- /The plans of a design run on in the same session/ : the maintainer
+  asked 9 times to finish work in one go rather than across fresh sessions
+  (12 November 2026); the design and the plan file carry the state, so a
+  fresh session is offered only when the context is long. Assumes the design
+  conversation does not steer a build away from its plan. Revisit when
+  builds run in the design's own session drift from their plans, by the
+  reviewer's findings, over several tasks.
 - /maxTurns caps/ (250 for scout and reviewer, 200 for gate-runner) : assume
   a subagent can loop without converging, so a cap bounds its cost; they sit
   above the longest of about 490 past runs ([[file:docs/architecture.org][docs/architecture.org]]).
@@ -550,6 +552,8 @@ failure hook's reminder.
 | =lanes=                     | global rules (Agentic work), build (section 2), =METHOD.org= (Lanes)           | floor_check (a quick change that outgrew its lane); fail rule Q                                                                                                   |
 | =one-entry=                 | build, design, close                                                           | =install.py= (the retired skills removed)                                                                                                                         |
 | =single-review-pass=        | build (section 7)                                                              | fail rule R                                                                                                                                                       |
+| =fix-simple-minors=         | build (section 7)                                                              | the Review table of each plan (a verdict per finding)                                                                                                             |
+| =docs-only-gates=           | build (section 6), global rules (Agentic work)                                 | floor_check.py (docs or comments only), =tests/test_skill_scripts.py=                                                                                             |
 | =inline-build=              | =METHOD.org=                                                                   | none: the model only                                                                                                                                              |
 | =delegation-tiers=          | global rules (Agentic work), the fan-out skills                                | none: the model only                                                                                                                                              |
 | =terse-register=            | global rules (Output)                                                          | none: the model only                                                                                                                                              |
@@ -632,16 +636,21 @@ maintainer on 12 November 2026.
 
 In: =home/.agents/AGENTS.md= (Agentic work).
 
-*** Questions come in one batch, after an assumptions table
+*** Questions go through the question interface, after an assumptions table
 :PROPERTIES:
 :CUSTOM_ID: one-batch
 :END:
-Before approval the agent shows, in one message, its assumptions as a table
-(evidence, what breaks if wrong, how sure) and the open questions that are
-the maintainer's, each with options, consequences and its recommendation.
-One answer approves the plan. decide does the same: the assumptions table
-first, then independent questions together, a dependent one after the
-answer it depends on. Replaces =grouped-questions=.
+Before approval the agent shows its assumptions as a table (evidence, what
+breaks if wrong, how sure), then asks the open questions that are the
+maintainer's through the tool's question interface when it has one (in
+Claude Code AskUserQuestion): one question per item, its options with their
+consequences and the recommended one first, at most four per round, a
+dependent question after the answer it depends on; without the interface,
+a numbered list in one message. The answers approve the plan. decide does
+the same, and confirms each decision as its own question, never one yes for
+a list. Changed by the maintainer on 12 November 2026, who had asked 15
+times in past sessions to be asked one question at a time through the
+interface. Replaces =grouped-questions=.
 
 In: =METHOD.org=, =home/.agents/skills/build/SKILL.md=,
 =home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md= (Decisions).
@@ -713,6 +722,34 @@ by fail rule R.
 
 In: =METHOD.org= (Review and triage), =home/.agents/skills/build/SKILL.md=
 (section 7).
+
+*** Simple minor findings are fixed in the same pass
+:PROPERTIES:
+:CUSTOM_ID: fix-simple-minors
+:END:
+Minor findings and open points this change caused are fixed in the same
+pass when the fix is simple, each behavior-changing fix proven by a test
+seen failing first; the rest go to the maintainer as one question (fix them
+all, pick, or leave them listed). Accepted by the maintainer on 12 November
+2026, who had asked 7 times in past sessions to fix every listed point.
+Replaces the line "minor findings are listed, not fixed".
+
+In: =METHOD.org= (Review and triage), =home/.agents/skills/build/SKILL.md=
+(section 7).
+
+*** A docs or comments only change runs the gates that read it
+:PROPERTIES:
+:CUSTOM_ID: docs-only-gates
+:END:
+When floor_check shows that a diff changes only documentation files or
+Python comments, the full gates are the documented checks that read those
+files, not the build and the whole test suite. A comment in another
+language counts as code until a check tells it apart. Accepted by the
+maintainer on 12 November 2026, after full builds ran for docs-only
+changes.
+
+In: =METHOD.org= (Checks), =home/.agents/skills/build/SKILL.md= (section 6),
+the global rules (Agentic work), =home/.agents/skills/build/scripts/floor_check.py=.
 
 *** Implementation runs in the main conversation
 :PROPERTIES:
