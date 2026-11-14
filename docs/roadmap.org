@@ -290,6 +290,22 @@ As of 14 November 2026:
 
 ** Skills
 
+- [X] project-setup gives a repository the project doc set NX has, in its
+  prose format: =VISION=, =DESIGN=, =STYLE_GUIDE= (code repositories only),
+  =CONTRIBUTING= and, on request, =AI_DISCLAIMER= at the root; a docs map, a
+  writing guide, the decision log and the agent workflows in its docs
+  folder; and always the =CLAUDE.md=, =GEMINI.md= and
+  =.github/copilot-instructions.md= bridges. It asks only the docs folder
+  and format when the repository mixes them, and adds project skills only
+  on request (its step 4 and the templates under =root-md/=, =root-org/=,
+  =docs-md/= and =docs-org/=). Requested by the maintainer on 14 November
+  2026 after a run on fdc-next; decided by the maintainer that day: no
+  glossary or file-system doc (the as-built-docs guides carry both), all
+  three bridges (Copilot CLI and Cursor then load the rules twice), the AI
+  disclaimer only on request, the set scaled to the repository kind, the
+  maintainer's style rules as editable defaults, and no real-session test
+  (the maintainer reruns setup on fdc-next). A repository's own convention
+  winning over a default is the agent's reading, to confirm.
 - [ ] First real runs of the new =as-built-docs= on ATC and ASM.
 - [ ] First real run of =code-audit=.
 - [ ] An on-request script for trigger tests (requests that should and should

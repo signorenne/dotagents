@@ -77,7 +77,8 @@ coin a synonym in a local doc when this file already names the concept.
 | full gates             | The project's documented pre-PR gates, run before a change is called done.                                                                                    |
 | worktree               | A separate git working tree on its own branch, outside the main checkout, which isolated-work creates for a risky change and for each parallel writer.        |
 | landing                | Bringing a reviewed branch onto its target on the maintainer's go by rebase and fast-forward, then removing its worktree and branch.                          |
-| project layer          | The files each repository needs once (=AGENTS.md=, a decision log, an agent workflows doc, =.private/= in =.gitignore=), set up by project-setup.             |
+| project layer          | The files each repository needs once (=AGENTS.md=, the bridges, the project docs, =.private/= in =.gitignore=), set up by project-setup.                      |
+| project docs           | The docs project-setup creates: vision, design, style guide and contributing at the root; a docs map, writing guide, decision log and agent workflows.        |
 | as-built docs          | Docs of an existing repository written from its code by as-built-docs: a knowledge base, a test guide and a developer guide, synced when the code changes.    |
 | audit report           | The local report code-audit writes in =.private/audit/=, with confirmed findings and questions for the user.                                                  |
 | palette                | =palette.iuml= of the plantuml-diagrams skill: the nexenne day and night colours every diagram includes.                                                      |
