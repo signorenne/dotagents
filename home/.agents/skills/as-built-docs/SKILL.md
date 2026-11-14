@@ -12,7 +12,7 @@ Goal: three documents that a person reads easily and can trust. They say how the
 
 - Keep facts in a notes file (.private/as-built/notes.md when .private/ is git-ignored, otherwise a scratch folder), one line each: id, area tag, statement, file:line. Write from the notes: they survive compaction and spare rereading the code.
 - Delegate code reading, one area per subagent that runs on the session's model, told to stay read-only and to return facts in that line format: in Claude Code the general-purpose subagent, elsewhere the tool's default general agent. Run commands whose output you need yourself, saved to a file you search; gate-runner only for pass or fail checks with long logs.
-- External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition. External names are the names of external values and of the calls and events of a platform API the software uses.
+- External value: a named value the software exchanges with another system (message or signal field, API parameter, configuration key, file field), defined in a contract (API spec, schema, message database) owned by whoever maintains that definition. External names are the names of external values and of the calls and events of the platform the software runs on (the device's or host's SDK, not a library the code is built with).
 - Describe the software as built, without judging it: no bugs, suspicions, unused code or contract anomalies in the docs. Note each one in the notes file under "for the audit", with file:line, and hand the list over at the end.
 - Write one document and one section at a time.
 
@@ -48,7 +48,7 @@ The outline of each document with the purpose of each section, the vocabulary te
 - Header: one line with the commit, the versions and links to the sibling documents.
 - Section 1, Vocabulary: the 10 to 15 terms this document's reader needs first, one sentence each of at most 35 words, in the order they first appear. A term shared with a sibling document is worded the same in both. Define any other term where it first appears.
 - Section 2, The big picture: what the software is for, then how it works in 3 to 6 numbered steps and one diagram, all within 300 words of its heading.
-- Every section after the big picture, apart from those whose shape section 5 sets (the test index, the test cases, troubleshooting, the appendix), opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
+- Every section after the big picture, apart from the test index, the test cases, troubleshooting, the reference lookups and the appendix, opens with what it covers and why it matters, then the normal case and one example. Exceptions follow in a short Details list; a peculiarity the reader never meets stays out.
 - One idea per sentence, split above about 25 words (a vocabulary entry excepted); one topic per paragraph, at most 5 sentences; active voice; one term per concept.
 - Numbers only where they explain something or the reader types or reads them. Tables only for lookups (items with several attributes, if-then rules), each introduced by a sentence.
 - Each fact has one home, and a sibling document links to it rather than repeating it, at most one cross-reference per paragraph (the header line excepted). The vocabulary and the external values are the exceptions: the knowledge base explains external values, the developer guide's appendix maps them to code.
@@ -71,7 +71,7 @@ Each word budget counts as section 4 says, and its "about" allows 10 percent eit
 
 ## 6. Diagrams and pictures
 
-PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and comes at the start of the section it explains, right after the opening that says what the section covers and why it matters. Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
+PlantUML in the docs' diagrams folder with a kb_, tg_ or dev_ prefix, drawn and checked with the plantuml-diagrams skill; without plantuml, say so and mark the diagrams not rendered. Each diagram has a title (the question it answers), appears in one document only, and comes at the start of the section it explains, right after the opening that says what the section covers and why it matters (in the big picture, after what the software is for). Class diagrams show each class's key members. The usual set: in the knowledge base the context, the core model and one per complex function; in the test guide the bench; in the developer guide the components by layer, the packages, the class diagrams, the core state machine, one sequence per main flow and persistence.
 
 Pictures of the UI come from the real app, never from a drawing of how it might look:
 
