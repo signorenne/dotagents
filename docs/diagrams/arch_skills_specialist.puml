@@ -54,5 +54,6 @@ legend right
   Solid arrow: hands work to
   Plain line: each names the other
   Outside the packages: skills of the other maps
+  Rows marked not drawn: in the table only
 endlegend
 @enduml
