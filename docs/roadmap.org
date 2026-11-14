@@ -313,7 +313,7 @@ As of 14 November 2026:
   not trigger a skill, several runs each) and a skill-off baseline, standard
   library only, as =docs/skill-authoring.org= asks. Estimated at 1 to 3 US
   dollars per run of five skills (estimate, research of 12 November 2026).
-- [ ] trustworthy-tests, in "Cover where implementations go wrong": every
+- [X] trustworthy-tests, in "Cover where implementations go wrong": every
   place that sets a value whose reading the change alters (search for its
   writers), and each state in which an external call legitimately fails
   (an empty or unborn repository, a deleted folder). Proposed on 14
@@ -322,7 +322,8 @@ As of 14 November 2026:
   prediction, though an agent error leaves one; every git failure in the
   prediction step was assumed to be an error, though a branch with no
   commits fails =git log=); recorded by the maintainer as an open item, the
-  skill text changes on the maintainer's go.
+  skill text changes on the maintainer's go. Applied on the maintainer's go
+  the same day (claude-ai/skills/trustworthy-tests/SKILL.md).
 
 ** Research
 
