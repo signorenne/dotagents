@@ -1631,6 +1631,239 @@ class ProgressCheck(unittest.TestCase):
         self.assert_lets_stop(result)
 
 
+class ClaimCheck(unittest.TestCase):
+    # Claude Code's Stop hook (code.claude.com/docs/en/hooks): input transcript_path,
+    # stop_hook_active, last_assistant_message; "the transcript file isn't guaranteed to
+    # include the final message at Stop time on all versions". The transcript's shape is
+    # not documented; these records follow the JSON lines Claude Code writes: assistant
+    # records hold text and tool_use blocks, user records tool_result blocks (is_error)
+    # and toolUseResult (bashEditDiff when a Bash call changed files).
+    CLAIM = "Fixed the parser; all 12 tests pass."
+
+    def setUp(self):
+        self.tmp = Path(tempfile.mkdtemp())
+        self.addCleanup(shutil.rmtree, self.tmp)
+        self.calls = 0
+
+    def call(self, name: str, given: dict, output: str = "", failed: bool = False, extra: dict = None,
+             answered: bool = True) -> list:
+        """A tool call and, when answered, its result."""
+        self.calls += 1
+        ident = f"toolu_{self.calls:03d}"
+        records = [{"type": "assistant", "isSidechain": False, "message": {"role": "assistant", "content": [
+            {"type": "tool_use", "id": ident, "name": name, "input": given}]}}]
+        if answered:
+            records.append({"type": "user", "isSidechain": False, "message": {"role": "user", "content": [
+                {"type": "tool_result", "tool_use_id": ident, "content": output, "is_error": failed}]},
+                "toolUseResult": extra if extra is not None else {"stdout": output, "stderr": "", "interrupted": False}})
+        return records
+
+    def edit(self, path: str = "/w/src/app.py", tool: str = "Edit", failed: bool = False) -> list:
+        key = "notebook_path" if tool == "NotebookEdit" else "file_path"
+        return self.call(tool, {key: path, "old_string": "a", "new_string": "b"},
+                         "<tool_use_error>String not found</tool_use_error>" if failed else "The file was updated.",
+                         failed)
+
+    def tests(self, passed: bool = True, command: str = "python3 -m pytest -q", output: str = None) -> list:
+        if output is None:
+            output = "12 passed in 0.31s" if passed else "Exit code 1\nFAILED tests/test_app.py::test_x\n1 failed, 11 passed"
+        return self.call("Bash", {"command": command, "description": "Run the tests"}, output, failed=not passed)
+
+    @staticmethod
+    def said(text: str) -> list:
+        return [{"type": "assistant", "isSidechain": False,
+                 "message": {"role": "assistant", "content": [{"type": "text", "text": text}]}}]
+
+    def transcript(self, *parts, final: str = CLAIM) -> str:
+        """A transcript of the parts, ending with the final message unless final is None."""
+        records = [record for part in parts for record in part] + (self.said(final) if final is not None else [])
+        path = self.tmp / f"session-{len(list(self.tmp.iterdir()))}.jsonl"  # a new file for each
+        path.write_text("".join(json.dumps(record) + "\n" for record in records), encoding="utf-8")
+        return str(path)
+
+    def check(self, transcript, message: str = CLAIM, **fields) -> subprocess.CompletedProcess:
+        payload = {"session_id": "s", "transcript_path": transcript, "cwd": "/w", "permission_mode": "default",
+                   "hook_event_name": "Stop", "stop_hook_active": False, "last_assistant_message": message,
+                   "background_tasks": [], "session_crons": [], **fields}
+        return subprocess.run([sys.executable, str(HOOKS / "claim_check.py")], input=json.dumps(payload),
+                              capture_output=True, text=True, check=False, timeout=20)
+
+    def assert_lets_stop(self, result):
+        self.assertEqual((result.returncode, result.stdout, result.stderr), (0, "", ""))
+
+    def assert_blocks(self, result, detail: str):
+        self.assertEqual((result.returncode, result.stderr), (0, ""))
+        reply = json.loads(result.stdout)
+        self.assertEqual(sorted(reply), ["decision", "reason"])
+        self.assertEqual(reply["decision"], "block")
+        self.assertIn("says the tests pass", reply["reason"])
+        self.assertIn(detail, reply["reason"])
+        self.assertIn("Run the tests now and report their result", reply["reason"])
+        self.assertIn("say plainly that they were not run", reply["reason"])
+
+    BEFORE = "every test run came before your last file edit"
+    FAILED = "the last test runs failed"
+
+    def test_a_passing_run_after_the_last_edit_supports_the_claim(self):
+        self.assert_lets_stop(self.check(self.transcript(self.tests(False), self.edit(), self.tests())))
+        for command, output in (
+                ("cd /w && timeout 600 python3 -m unittest discover -s tests 2>&1 | tail -3", "Ran 12 tests in 0.5s\n\nOK"),
+                ("go test ./...", "ok  \texample.com/app\t0.012s"), ("cargo test", "test result: ok. 5 passed; 0 failed"),
+                ("npm test", "Tests:       4 passed, 4 total"), ("make -C build check", "PASS: 4"),
+                ("ctest --test-dir build", "100% tests passed, 0 tests failed out of 2"),
+                ("./gradlew test", "BUILD SUCCESSFUL in 3s")):
+            with self.subTest(command=command):
+                self.assert_lets_stop(self.check(self.transcript(self.edit(), self.tests(True, command, output))))
+
+    def test_a_run_only_before_the_last_edit_blocks_once(self):
+        for tool in ("Edit", "Write", "MultiEdit", "NotebookEdit"):
+            with self.subTest(tool=tool):
+                transcript = self.transcript(self.tests(), self.edit(tool=tool))
+                self.assert_blocks(self.check(transcript), self.BEFORE)
+                self.assert_lets_stop(self.check(transcript, stop_hook_active=True))  # continued once already
+
+    def test_a_failing_run_blocks(self):
+        for parts in ((self.edit(), self.tests(False)), (self.tests(False),),
+                      (self.edit(), self.tests(False), self.tests(False)),
+                      # a pipe into tail hides the exit status, not the runner's summary
+                      (self.edit(), self.tests(True, "python3 -m unittest 2>&1 | tail -3",
+                                               "Ran 5 tests in 0.1s\n\nFAILED (failures=1)"))):
+            with self.subTest(parts=len(parts)):
+                self.assert_blocks(self.check(self.transcript(*parts)), self.FAILED)
+
+    def test_no_claim_lets_the_stop_through(self):
+        # Each transcript would block a claim: only the message lets the stop through.
+        for message in ("Done.", "The tests do not pass yet: 2 failures remain.", "I did not run the tests.",
+                        "If the tests pass, merge it.", "Run the tests to make sure the tests pass.",
+                        "The tests were not run after the last edit."):
+            with self.subTest(message=message):
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), final=message), message))
+
+    def test_claims_in_their_usual_words_are_checked(self):
+        for message in ("All tests pass.", "Tests passed.", "The suite is green.", "189 tests OK",
+                        "Gates: validate OK, 189 tests OK, build OK.", "The test suite passes.",
+                        "All 12 tests are passing now.", "The hook tests pass."):
+            with self.subTest(message=message):
+                self.assert_blocks(self.check(self.transcript(self.tests(), self.edit(), final=message), message),
+                                   self.BEFORE)
+
+    def test_continued_or_without_the_flag_lets_the_stop_through(self):
+        # Cursor runs Claude Code's Stop hooks with its own input (no stop_hook_active) and
+        # no cap on follow-ups (cursor.com/docs/reference/third-party-hooks).
+        transcript = self.transcript(self.tests(), self.edit())
+        for fields in ({"stop_hook_active": True}, {"stop_hook_active": "false"}, {"stop_hook_active": None}):
+            with self.subTest(fields=fields):
+                self.assert_lets_stop(self.check(transcript, **fields))
+        payload = {"transcript_path": transcript, "last_assistant_message": self.CLAIM, "status": "completed",
+                   "loop_count": 0}
+        result = subprocess.run([sys.executable, str(HOOKS / "claim_check.py")], input=json.dumps(payload),
+                                capture_output=True, text=True, check=False, timeout=20)
+        self.assert_lets_stop(result)
+
+    def test_a_lagging_or_unknown_transcript_lets_the_stop_through(self):
+        cases = {
+            "final message not written yet": self.transcript(self.tests(), self.edit(), final=None),
+            "last text before the last call": self.transcript(self.said("Running the tests."), self.tests(),
+                                                              self.edit(), final=None),
+            "another final message": self.transcript(self.tests(), self.edit(), final="Something else."),
+            "no test run to match": self.transcript(self.edit()),
+        }
+        codex = self.tmp / "rollout.jsonl"
+        codex.write_text("".join(json.dumps(r) + "\n" for r in (
+            {"type": "response_item", "payload": {"type": "function_call", "name": "shell", "arguments": "{}"}},
+            {"type": "response_item", "payload": {"type": "message", "role": "assistant",
+                                                  "content": [{"type": "output_text", "text": self.CLAIM}]}})))
+        cases["another tool's format"] = str(codex)
+        for label, transcript in cases.items():
+            with self.subTest(label=label):
+                self.assert_lets_stop(self.check(transcript))
+
+    def test_unreadable_transcripts_let_the_stop_through(self):
+        junk = self.tmp / "junk.jsonl"
+        junk.write_bytes(bytes(range(256)) * 100)
+        text = self.tmp / "text.jsonl"
+        text.write_text("not json\n" + DEEP_JSON + "\n[1, 2]\n\"a string\"\n")
+        empty = self.tmp / "empty.jsonl"
+        empty.write_text("")
+        fifo = self.tmp / "fifo.jsonl"
+        os.mkfifo(fifo)  # opening it for reading would wait for a writer
+        unreadable = [str(self.tmp / "missing.jsonl"), str(self.tmp), "/dev/zero", str(fifo), str(junk), str(text),
+                      str(empty), "", 5, None, ["a"], "bad\u0000path"]
+        if os.geteuid() != 0:  # root reads a file of mode 0
+            locked = self.tmp / "locked.jsonl"
+            locked.write_text(Path(self.transcript(self.tests(), self.edit())).read_text())
+            locked.chmod(0)
+            unreadable.append(str(locked))
+        start = time.monotonic()
+        for transcript in unreadable:
+            with self.subTest(transcript=transcript):
+                self.assert_lets_stop(self.check(transcript))
+        self.assertLess(time.monotonic() - start, 15)
+        for payload in ("not json", "", DEEP_JSON, "[1]", json.dumps({"stop_hook_active": False})):
+            with self.subTest(payload=payload[:20]):
+                self.assert_lets_stop(subprocess.run([sys.executable, str(HOOKS / "claim_check.py")], input=payload,
+                                                     capture_output=True, text=True, check=False, timeout=20))
+
+    def test_a_huge_transcript_is_read_within_its_budget(self):
+        # 20 MB of other work: evidence older than the tail is not read, so it cannot
+        # block; evidence in the tail still counts.
+        filler = [record for index in range(2000) for record in self.said(f"note {index}: " + "x" * 10000)]
+        for parts, blocks in (((self.tests(), self.edit(), filler), False), ((filler, self.tests(), self.edit()), True)):
+            with self.subTest(blocks=blocks):
+                transcript = self.transcript(*parts)
+                self.assertGreater(Path(transcript).stat().st_size, 20_000_000)
+                start = time.monotonic()
+                result = self.check(transcript)
+                self.assertLess(time.monotonic() - start, 3)
+                (self.assert_blocks(result, self.BEFORE) if blocks else self.assert_lets_stop(result))
+        one_line = self.tmp / "one-line.jsonl"
+        one_line.write_text('{"type": "assistant", "text": "' + "x" * 20_000_000)
+        start = time.monotonic()
+        self.assert_lets_stop(self.check(str(one_line)))
+        self.assertLess(time.monotonic() - start, 3)
+
+    def test_a_possible_run_after_the_last_edit_lets_the_stop_through(self):
+        # Tests may run in a subagent (the gates skill's gate-runner), in the background or
+        # through a script with no known runner's name: the claim is not checked then.
+        for label, later in (
+                ("subagent", self.call("Agent", {"subagent_type": "gate-runner", "prompt": "Run the gates."}, "PASS")),
+                ("background", self.call("Bash", {"command": "python3 -m pytest", "run_in_background": True},
+                                         "Command running in background with ID: b1")),
+                ("script", self.call("Bash", {"command": "sh tools/gates.sh"}, "GATES rc=0")),
+                ("no result", self.call("Bash", {"command": "python3 -m pytest"}, answered=False))):
+            with self.subTest(label=label):
+                self.assert_lets_stop(self.check(self.transcript(self.tests(), self.edit(), later)))
+        # A run started in the background has no outcome yet: it is no run to match a claim to.
+        background = self.call("Bash", {"command": "python3 -m pytest", "run_in_background": True},
+                               "Command running in background with ID: b2")
+        self.assert_lets_stop(self.check(self.transcript(background, self.edit())))
+
+    def test_shell_edits_count_and_notes_do_not(self):
+        def shell(command, changed, more=0, output=""):
+            return self.call("Bash", {"command": command}, output, extra={
+                "stdout": output, "stderr": "", "interrupted": False,
+                "bashEditDiff": {"changedFiles": changed, "files": [], "moreFiles": more}})
+        for label, later in (("changed file", shell("sed -i s/a/b/ src/app.py", ["/w/src/app.py"])),
+                             ("more files", shell("python3 gen.py", [], more=3))):
+            with self.subTest(label=label):
+                self.assert_blocks(self.check(self.transcript(self.tests(), later)), self.BEFORE)
+        # A test run that changes files (snapshots) is a run; a command that changes nothing
+        # is not an edit; a failed edit changed nothing.
+        for label, parts in (
+                ("snapshot run", (self.tests(False), self.edit(),
+                                  shell("python3 -m pytest --snapshot-update", ["/w/tests/snap.txt"], output="3 passed"))),
+                ("no change", (self.tests(), self.call("Bash", {"command": "ls src"}, "app.py"))),
+                ("failed edit", (self.tests(), self.edit(failed=True)))):
+            with self.subTest(label=label):
+                self.assert_lets_stop(self.check(self.transcript(*parts)))
+        # Task notes, temporary files and Claude Code's own files: no test reads them.
+        notes = self.transcript(self.tests(), self.edit("/w/.private/progress/task.org"),
+                                self.edit(str(Path(tempfile.gettempdir()) / "s" / "notes.md"), tool="Write"),
+                                self.edit(str(Path.home() / ".claude/projects/p/memory/m.md"), tool="Write"),
+                                self.edit("/scratch/plan.md", tool="Write"),
+                                shell("echo x >> .private/notes.md", ["/w/.private/notes.md"]))
+        self.assert_lets_stop(self.check(notes, scratchpad_dir="/scratch"))
+
 
 class RepeatedFailure(unittest.TestCase):
     # Claude Code's PostToolUseFailure (code.claude.com/docs/en/hooks): input session_id,
