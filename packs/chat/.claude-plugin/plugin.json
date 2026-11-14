@@ -1,0 +1,8 @@
+{
+  "name": "dotagents-chat",
+  "description": "The skills that also run in chat: debugging, tests that can fail, verification, research, decisions, prompts, notes, tutoring and handoffs.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nicolò Plebani"
+  }
+}

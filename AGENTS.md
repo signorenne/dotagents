@@ -20,7 +20,7 @@ claude-ai/overrides.json      local skills also uploaded to claude.ai, with thei
 adapters/claude/              Claude Code settings merged by the installer
 install.py                    installer: each tool described as data, a hash manifest for upgrade and --uninstall, the personal layer, generic targets
 personal/                     the maintainer's personal layer (install.py --personal personal)
-.claude-plugin/, packs/       the Claude Code marketplace and one folder of links per pack, written by tools/build.py --marketplace
+.claude-plugin/, packs/       the Claude Code marketplace and one folder per pack (links and its plugin.json), written by tools/build.py --marketplace
 tools/                        validate.py, build.py, session_stats.py (where session time and usage go), guard_replay.py (a guard change against past commands) and benchmark.py (the method's A/B benchmark)
 tests/                        unittest suites for hooks, installer, tools and skill scripts
 .githooks/commit-msg          this repository's commit message check (git config core.hooksPath .githooks enables it)

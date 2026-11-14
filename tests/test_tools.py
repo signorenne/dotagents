@@ -61,6 +61,12 @@ class Tools(unittest.TestCase):
         marketplace.write_text(marketplace.read_text().replace('"1.0.0"', '"0.9.0"', 1))
         (self.repo / "packs/method/skills/build").unlink()
         (self.repo / "packs/craft/skills/stray").symlink_to("../../../home/.agents/skills/gates")
+        (self.repo / "packs/method/.claude-plugin/plugin.json").unlink()
+        craft = self.repo / "packs/craft/.claude-plugin/plugin.json"
+        craft.write_text(craft.read_text().replace("Craft skills", "Other skills"))
+        stale = self.repo / "packs/stale/.claude-plugin"
+        stale.mkdir(parents=True)
+        (stale / "plugin.json").write_text('{"name": "dotagents-stale"}\n')
         skill = self.repo / "home/.agents/skills/new-one"
         skill.mkdir()
         (skill / "SKILL.md").write_text('---\nname: new-one\ndescription: "Does a new thing. Use when asked."\n'
@@ -77,12 +83,21 @@ class Tools(unittest.TestCase):
         self.assertIn("FAIL packs/craft/skills/stray: a link no pack names; run python3 tools/build.py "
                       "--marketplace", lines)
         self.assertIn("FAIL home/.agents/skills/new-one: in 0 packs of tools/build.py (PACKS), not one", lines)
+        for manifest in ("method", "craft"):
+            self.assertIn(f"FAIL packs/{manifest}/.claude-plugin/plugin.json: missing or out of date; run python3 "
+                          "tools/build.py --marketplace", lines)
+        self.assertIn("FAIL packs/stale/.claude-plugin/plugin.json: a manifest no pack names; run python3 "
+                      "tools/build.py --marketplace", lines)
         self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
         result = self.run_tool("validate.py")
         self.assertEqual([line for line in result.stdout.splitlines() if line.startswith("FAIL ")],
                          ["FAIL home/.agents/skills/new-one: in 0 packs of tools/build.py (PACKS), not one"])
         self.assertFalse((self.repo / "packs/craft/skills/stray").is_symlink())
         self.assertTrue((self.repo / "packs/method/skills/build").is_symlink())
+        self.assertFalse((self.repo / "packs/stale").exists())
+        manifest = json.loads((self.repo / "packs/method/.claude-plugin/plugin.json").read_text())
+        self.assertEqual(manifest["name"], "dotagents-method")
+        self.assertIn("Craft skills", craft.read_text())
 
     def test_validate_checks_eval_cases_without_running_them(self):
         case = self.repo / "packs/method/evals/broken"

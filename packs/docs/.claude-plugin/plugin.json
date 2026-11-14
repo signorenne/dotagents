@@ -1,0 +1,8 @@
+{
+  "name": "dotagents-docs",
+  "description": "Documentation skills: as-built docs, requirements and architecture, project setup for agents, and PlantUML diagrams.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nicolò Plebani"
+  }
+}

@@ -1,0 +1,8 @@
+{
+  "name": "dotagents-craft",
+  "description": "Craft skills: clean architecture, event-driven UIs, Qt Quick, precise UI changes, code audits and notes from work.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nicolò Plebani"
+  }
+}

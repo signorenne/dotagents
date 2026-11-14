@@ -1,0 +1,8 @@
+{
+  "name": "dotagents-method",
+  "description": "The dotagents method: build in lanes from one plan file, design, close, decide, review and gates, with the scout, reviewer and gate-runner subagents, the guard and session hooks, and the global rules.",
+  "version": "1.0.0",
+  "author": {
+    "name": "Nicolò Plebani"
+  }
+}

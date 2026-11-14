@@ -52,8 +52,8 @@ depend on the model remembering it.
   library only (METHOD.org, Checks).
 - /Packs/ : =.claude-plugin/marketplace.json= and =packs/<pack>/=, written by
   =python3 tools/build.py --marketplace=: four Claude Code plugins (method,
-  craft, docs, chat) whose folders hold only relative links into
-  =home/.agents= and =claude-ai/skills=.
+  craft, docs, chat) whose folders hold relative links into =home/.agents=
+  and =claude-ai/skills= and a generated =.claude-plugin/plugin.json=.
 - /Claude Code adapter/ : =adapters/claude/settings.json=: read-only git and
   build commands allowed, =git push= denied (also as =git -C <dir> push=),
   =git reset --hard=, =git clean=, =git rebase=, =git update-ref=,
