@@ -914,6 +914,17 @@ def extract_command(payload: dict) -> str:
     return ""
 
 
+def decision(text: str) -> dict:
+    """The guard's verdict on a command line: command_reasons of its simple commands, with
+    the rough split when the text does not parse; {} lets it through. tools/guard_replay.py
+    calls it to judge past commands without running them."""
+    try:
+        commands = parse_commands(text)
+    except (ParseError, RecursionError):
+        commands = rough_commands(text)
+    return command_reasons(commands)
+
+
 def allow(tool: str) -> int:
     if tool == "gemini":
         print("{}")
@@ -936,11 +947,7 @@ def main() -> int:
     command = extract_command(payload)
     if not command:
         return allow(tool)
-    try:
-        commands = parse_commands(command)
-    except (ParseError, RecursionError):
-        commands = rough_commands(command)
-    reasons = command_reasons(commands)
+    reasons = decision(command)
     if not reasons:
         return allow(tool)
     advice = []
