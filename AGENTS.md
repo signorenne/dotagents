@@ -22,7 +22,7 @@ install.py                    installer: copies the source and generates each to
 tools/                        validate.py, build.py, guard_replay.py (a guard change against past commands) and benchmark.py (the method's A/B benchmark)
 tests/                        unittest suites for hooks, installer, tools and skill scripts
 .githooks/commit-msg          this repository's commit message check (git config core.hooksPath .githooks enables it)
-docs/                         Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide, glossary and roadmap
+docs/                         Org docs: docs map, architecture, pipeline, workflow guide, skill authoring guide, method evidence, glossary and roadmap
 *.org at the root             README, VISION, DESIGN (with the rules that bind), CONTRIBUTING, AI_DISCLAIMER; the bridges CLAUDE.md, GEMINI.md and .github/copilot-instructions.md point here
 ```
 
