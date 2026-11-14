@@ -1176,6 +1176,31 @@ class BenchmarkRun(unittest.TestCase):
                     self.assertIn(touched, record["error"])
                     self.assertNotIn("pyproject.toml", record["error"])
 
+    def test_a_git_failure_before_the_agent_stops_the_run_as_an_error(self):
+        # Each git step before the first call (the commits after base_commit, the files each
+        # changes, the commit the image starts on) that fails would otherwise pass for "no
+        # commit" or "no file": the run stops as an error, and the dry run shows the stop.
+        ident = json.loads(self.one.read_text(encoding="utf-8"))["tasks"][0]["agent"]["instance_id"]
+        bad = "fatal: bad object"
+        for label, fail, error in (
+                ("rev-list", {"rev-list": bad}, f"list the commits after base_commit: {bad}"),
+                ("name-only diff", {"--name-only": bad}, f"compare commit 4b48727 with base_commit: {bad}"),
+                ("rev-parse", {"rev-parse": bad}, f"read the commit the image starts on: {bad}")):
+            scenario = {"after_base": {"4b48727": ["pyproject.toml"]}, "fail": fail}
+            with self.subTest(label=label):
+                self.log.unlink(missing_ok=True)
+                self.set_scenario(scenario)
+                rundir = self.folder / f"before-{label.replace(' ', '-')}"
+                result = self.run_bench(tasks=self.one, arms="plain", rundir=rundir)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                [record] = self.records(rundir).values()
+                self.assertEqual((record["stop"], record["error"], record["calls"]), ("error", error, []))
+                self.assertEqual(self.calls("claude"), [])
+                self.set_scenario(scenario)
+                result = self.run_bench("--dry-run", tasks=self.one, rundir=self.folder / "dry")
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertIn(f"{ident} image: a run would stop: {error}\n", result.stdout)
+
     NOTES = ("diff --git a/.private/progress/fix.org b/.private/progress/fix.org\nnew file mode 100644\n"
              "--- /dev/null\n+++ b/.private/progress/fix.org\n@@ -0,0 +1 @@\n+notes\n")
     FIX = "diff --git a/src/widget.py b/src/widget.py\n--- a/src/widget.py\n+++ b/src/widget.py\n@@ -1 +1 @@\n-a\n+b\n"
