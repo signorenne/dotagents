@@ -105,15 +105,27 @@ As of 14 November 2026:
   their manuals as remembered, not checked: none is installed here. Those
   of make, ninja and =cmake --build= were read from their help.
 - [ ] Decisions of the claim check and the hidden-text check that wait for the
-  maintainer's review (numbered as in that work's progress log): what counts
-  as an edit and as a run, and that edits of task notes, temporary files,
-  the scratchpad and =~/.claude= do not count (D-6); a script or build
-  target named test, gate, check or verify counts as a test run (D-9); an
-  emoji's own selector and joiner pass the hidden-text check, while keycaps
-  and tag sequences are reported (D-10); a build whose targets name no test
-  is of unknown kind (D-11); PowerShell commands are read like Bash ones,
-  and any =mcp__= tool after the last edit is a run of unknown outcome
-  (D-12).
+  maintainer's review. The claim check counts as an edit an =Edit=,
+  =Write=, =MultiEdit= or =NotebookEdit= call that did not fail, or a quiet
+  or unknown shell command whose result records changed files, except edits
+  of task notes (=.private/=), temporary files, the scratchpad and
+  =~/.claude=, so a progress log written after the gates does not send the
+  agent back. It counts as a known test run a test runner (=pytest=,
+  =python -m unittest=, =go test=, =npm test= and the like, also through a
+  launcher or =bash -c=), read from its summary lines or, when none
+  matches, its exit status. A script or build target named test, gate,
+  check or verify (=./run_tests.sh=, =make check=) is a known test run too,
+  so a failing check script after the last edit sends the agent back. A
+  build whose targets name no test (a bare =make=) is of unknown kind,
+  since its default target may run tests. PowerShell commands are read
+  with the Bash parser and the same program lists, so a PowerShell-only
+  command such as =Get-ChildItem= is of unknown kind, and any =mcp__= tool
+  after the last edit is a run of unknown outcome. The hidden-text check
+  lets through an emoji's own presentation selector (one U+FE0E or U+FE0F
+  right after a pictographic character) and a zero width joiner between
+  two pictographic characters, reports a run of selectors from its second
+  one, and reports keycaps (# U+FE0F U+20E3) and tag sequences
+  (subdivision flags).
 - [X] The progress check (=progress_check.py=, on =Stop= in Claude Code and
   Codex) sends the agent back once when its task branch has a commit that the
   progress log does not name or that is newer than the log; after a rebase,
