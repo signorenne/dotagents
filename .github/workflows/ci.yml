@@ -10,7 +10,7 @@ jobs:
     strategy:
       matrix:
         include:
-          - { os: ubuntu-latest, python: "3.9" }
+          - { os: ubuntu-24.04, python: "3.9" }  # setup-python has no 3.9 for ubuntu-latest (26.04)
           - { os: ubuntu-latest, python: "3.12", pillow: true }
           - { os: macos-latest, python: "3.12" }
     steps:
