@@ -42,7 +42,7 @@ each edge carries:
   18 local skills (=skills/=), the three subagents in Claude Code format
   (=agents/=), the seven hook scripts (=hooks/=) and the path rules
   (=path-rules.json=, each skill with the file globs that call for it).
-- =claude-ai/= holds the claude.ai set (=skills/=, ten skills), the overrides
+- =claude-ai/= holds the claude.ai set (=skills/=, eleven skills), the overrides
   that upload local skills too (=overrides.json=, today only decide) and the
   upload guide (=README.md=).
 - =adapters/claude/settings.json= is the adapter for Claude Code: no
@@ -418,13 +418,17 @@ which the diagram leaves out so that no line crosses the whole map:
 | systematic-debugging    | trustworthy-tests              | a failing test that reproduces the failure (to trustworthy-tests); a flaky or unclear failure (to systematic-debugging) (plain line) |
 | systematic-debugging    | verifying-before-claiming-done | the fix, checked before saying it is fixed                                                                                           |
 | trustworthy-tests       | verifying-before-claiming-done | the tests, checked before saying they are done                                                                                       |
+| atomic-notes            | efficient-research             | the facts a note depends on, to check or look up                                                                                     |
+| atomic-notes            | minimal-editing                | a small fix to an existing text                                                                                                      |
+| atomic-notes            | tutor                          | a request to learn, understand, study or practice                                                                                    |
+| atomic-notes            | verifying-before-claiming-done | the notes, checked before calling them correct                                                                                       |
 | scoping-before-building | Local skills                   | open work in a repository, to spec; a new system, to architecture-doc                                                                |
 | decide                  | Local skills                   | a decision too large, to spec                                                                                                        |
 | prompt-optimizer        | Local skills                   | a repository's =AGENTS.md=, to project-setup                                                                                         |
 | context-handoff         | Local skills                   | a handoff inside a repository, to session-close                                                                                      |
 | systematic-debugging    | Local skills                   | a fix of more than one sentence, to implement; work that blocks a UI thread, to event-driven-ui                                      |
 
-The set is the ten skills of =claude-ai/skills/= plus decide, uploaded through
+The set is the eleven skills of =claude-ai/skills/= plus decide, uploaded through
 its override. The installer puts all of them in every local agent too, so the
 same hand-offs work in chat and in a repository; a hand-off to a local skill
 applies where that skill is installed (the texts say "where available").
@@ -446,8 +450,11 @@ applies where that skill is installed (the texts say "where available").
 - Prompts and handoffs: prompt-optimizer makes a single requested change with
   minimal-editing and sends a repository's =AGENTS.md= to project-setup;
   context-handoff gives way to session-close inside a repository.
-- Closing: efficient-research, systematic-debugging and trustworthy-tests all
-  end with verifying-before-claiming-done.
+- Notes: atomic-notes checks the facts a note depends on through
+  efficient-research, gives a small fix of an existing text to
+  minimal-editing and a request to learn to tutor.
+- Closing: efficient-research, systematic-debugging, trustworthy-tests and
+  atomic-notes all end with verifying-before-claiming-done.
 - tutor hands nothing on: it teaches by the Learning section of the global
   rules.
 

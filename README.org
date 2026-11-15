@@ -236,6 +236,8 @@ the set through [[file:claude-ai/overrides.json][claude-ai/overrides.json]], wit
   chat, session or model.
 - [[file:claude-ai/skills/prompt-optimizer/SKILL.md][prompt-optimizer]] : rewrites prompts and agent instructions to be
   specific, checkable and free of filler.
+- [[file:claude-ai/skills/atomic-notes/SKILL.md][atomic-notes]] : writes notes and explanations the Zettelkasten way, one
+  idea per note linked under a hub, facts checked, and reorganizes existing notes.
 
 * License
 
