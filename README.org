@@ -59,8 +59,8 @@ What it gives every session, in chat or in a repository:
 - [[file:docs/architecture.org][docs/architecture.org]] : the system structure, the install flow, a
   session's runtime view, the skill map and the hooks, with diagrams.
 - [[file:docs/skill-authoring.org][docs/skill-authoring.org]] : how a skill is written, checked and tested.
-- [[file:docs/evidence.org][docs/evidence.org]] : what the A/B benchmark of the method measures, how,
-  its limits and its results.
+- [[file:docs/evidence.org][docs/evidence.org]] : the record of the method's A/B benchmark (dropped
+  on 15 November 2026): what it measured, how, its limits and its runs.
 - [[file:docs/glossary.org][docs/glossary.org]] and [[file:docs/roadmap.org][docs/roadmap.org]] : the terms, and what is open.
 - [[file:CONTRIBUTING.org][CONTRIBUTING.org]] and [[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]] : the workflow, gates and
   commit convention, and accountability for AI-assisted work.

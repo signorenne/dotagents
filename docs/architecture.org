@@ -721,9 +721,10 @@ After-edit hook (=after_edit.py=):
 Two tools give the method evidence about itself. Both run only on the
 maintainer's machine, where the transcripts, the container images and the
 runs are, so CI runs their tests and not them.
-[[file:../DESIGN.org::#guard-replay][DESIGN.org#guard-replay]] and [[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]] say when they
-run; [[file:evidence.org][docs/evidence.org]] says what the benchmark measures and holds its
-results. Both use the standard library only.
+[[file:../DESIGN.org::#guard-replay][DESIGN.org#guard-replay]] says when the guard replay runs; the benchmark
+was dropped on 15 November 2026 and stays unused, with
+[[file:evidence.org][docs/evidence.org]] as the record of what it measured and its runs. Both
+use the standard library only.
 
 Guard replay (=tools/guard_replay.py=):
 
