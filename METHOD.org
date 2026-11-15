@@ -143,8 +143,9 @@ a new plan; they are not converted.
   breaks if wrong, how sure), then asks the open questions that are the
   maintainer's through the tool's question interface when it has one (in
   Claude Code AskUserQuestion): one question per item, its options with
-  their consequences and the recommended one first, at most four per round,
-  a dependent question after the answer it depends on. Without the
+  their consequences and the recommended one first, at most four per round
+  (more go in further rounds of the same approval), a dependent question
+  after the answer it depends on. Without the
   interface they come as a numbered list in one message. The answers approve
   the plan.
 - During the work it stops only for:
@@ -208,8 +209,10 @@ Three standard-library scripts in the build skill, each one call:
   dirty tree is logged as uncommitted.
 - floor_check: compares the diff with the base and reports removed tests,
   added skips and added suppressions, the size of the diff and the risk
-  surfaces it touches; a quick-lane change that outgrew its lane is raised
-  before review. Exit 2 means it could not run and never reads as clean.
+  surfaces it touches, and whether the diff changes only documentation or
+  Python comments (the proof the lighter gates of such a diff need); a
+  quick-lane change that outgrew its lane is raised before review. Exit 2
+  means it could not run and never reads as clean.
 
 The full lane runs the baseline (the narrow check and the tests that pin the
 unchanged behavior) on the base commit before the first step; the quick

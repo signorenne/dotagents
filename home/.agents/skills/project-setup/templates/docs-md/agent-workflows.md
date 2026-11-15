@@ -38,7 +38,8 @@ with open design choices, or a change across modules.
 1. Scout the area, including the decision log.
 2. Show the assumptions (evidence, what breaks if wrong, how sure) and the
    open design choices that are the maintainer's, each with options,
-   consequences and a recommendation, in one batch when they are independent.
+   consequences and a recommendation, one per item in the question box when
+   the tool has one.
 3. Write the design to .private/designs/<slug>.md with the sections below.
    A reader without access to the discussion must be able to build from it:
    name files, types, functions, error behavior and commands.
@@ -50,7 +51,8 @@ with open design choices, or a change across modules.
    current code and the cited documentation (without subagents, do it
    yourself after re-reading each source). Fix the design; show the
    maintainer any change to a requirement or decision already settled.
-6. Stop. Each plan of the design is then built in a fresh session.
+6. Stop. Each plan of the design is then built, in this session or, when
+   the context is long, in a fresh one.
    .private/ is untracked, so the design does not follow into a new
    worktree or clone; pass it by absolute path there.
 

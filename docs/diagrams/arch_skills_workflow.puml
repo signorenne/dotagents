@@ -21,7 +21,7 @@ component "Land and clean up: isolated-work\ngate-runner" as isolated
 
 setup --> decide
 design -right-> decide
-design ..> build
+design --> build
 build -up-> decide
 build --> tests
 build --> debug

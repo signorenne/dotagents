@@ -644,8 +644,9 @@ Before approval the agent shows its assumptions as a table (evidence, what
 breaks if wrong, how sure), then asks the open questions that are the
 maintainer's through the tool's question interface when it has one (in
 Claude Code AskUserQuestion): one question per item, its options with their
-consequences and the recommended one first, at most four per round, a
-dependent question after the answer it depends on; without the interface,
+consequences and the recommended one first, at most four per round (more
+go in further rounds of the same approval), a dependent question after the
+answer it depends on; without the interface,
 a numbered list in one message. The answers approve the plan. decide does
 the same, and confirms each decision as its own question, never one yes for
 a list. Changed by the maintainer on 12 November 2026, who had asked 15
