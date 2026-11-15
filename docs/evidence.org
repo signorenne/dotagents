@@ -116,5 +116,44 @@ agent needed the maintainer.
   |------------------------+-----------------+--------------------------+----------------+-------------------------|
   | astropy__astropy-13398 | 0/0             | -                        | 0/0            | -                       |
   | django__django-13344   | 1/1             | 0.92                     | 1/1            | 0.38                    |
-- Pilot: not run yet; it waits for a cap the maintainer sets just before it
-  starts. Its summary goes here, labeled "pilot: not conclusive".
+- Pilot, 14 and 15 November 2026, pilot: not conclusive. The 5 pilot
+  tasks, two runs per arm (20 runs, one at a time, about two hours), under
+  a cap of 100 USD the maintainer set, with the method installed and the
+  tool both at a904df2. Every run stopped DONE, none as an error; 21.04 USD
+  spent, 14.44 in the method arm and 6.61 in the plain arm (agent and
+  maintainer, rounded). Both arms resolved 6 of 10, the same tasks:
+  =django__django-13344=, =pytest-dev__pytest-10356= and
+  =pydata__xarray-3993= in every run, =astropy__astropy-13398= and
+  =sympy__sympy-13852= in none. The method arm cost about 2.2 times as much
+  (median agent cost 0.66 against 0.28 USD), took more turns (median 20.5
+  against 14) and more time (median 4.2 against 3.4 minutes); neither arm
+  asked the maintainer anything (median replies 0). All four astropy runs
+  failed the same 4 hidden tests and the same 5 earlier passing tests with
+  numeric mismatches in the coordinate transforms, though their patches
+  differ (the reference patch resolves the task here, so grading works);
+  all four sympy runs failed the same hidden test. Only the astropy method
+  runs came near their share (4.50 and 4.83 of 5.00). Costs are Claude
+  Code's API-equivalent estimate; signed in with a claude.ai plan, the runs
+  drew on its usage limits. What it shows: the route works end to end at
+  this size, and on these five tasks the method changed no outcome and cost
+  more. Five tasks with two runs each cannot show a difference in resolved
+  rate either way; the full run is the measure. The summary of
+  =tools/benchmark.py=:
+
+  pilot: not conclusive (fewer than 20 tasks or 3 runs per arm finished in both arms).
+
+  5 tasks, 2 runs per arm, model claude-opus-5-5, maintainer claude-sonnet-5-5, cap 100.00, share 5.00.
+  Spent 21.04 in all: 21.04 in finished runs and 0.00 in interrupted attempts (0); planned runs not made: 0.
+
+  | arm    | runs | errors | graded | empty or not applied | tests timed out | no report | resolved | resolved rate | median agent cost | total agent cost | median maintainer cost | total maintainer cost | median turns | median minutes | runs with regressions | median replies | runs over share | max over share | stops   |
+  |--------+------+--------+--------+----------------------+-----------------+-----------+----------+---------------+-------------------+------------------+------------------------+-----------------------+--------------+----------------+-----------------------+----------------+-----------------+----------------+---------|
+  | method | 10   | 0      | 10     | 0                    | 0               | 0         | 6        | 60%           | 0.66              | 14.22            | 0.02                   | 0.22                  | 20.5         | 4.2            | 2                     | 0.0            | 0               | 0.00           | DONE 10 |
+  | plain  | 10   | 0      | 10     | 0                    | 0               | 0         | 6        | 60%           | 0.28              | 6.39             | 0.01                   | 0.22                  | 14.0         | 3.4            | 2                     | 0.0            | 0               | 0.00           | DONE 10 |
+
+  | task                     | method resolved | method median agent cost | plain resolved | plain median agent cost |
+  |--------------------------+-----------------+--------------------------+----------------+-------------------------|
+  | astropy__astropy-13398   | 0/2             | 4.62                     | 0/2            | 2.08                    |
+  | django__django-13344     | 2/2             | 0.72                     | 2/2            | 0.34                    |
+  | pytest-dev__pytest-10356 | 2/2             | 0.43                     | 2/2            | 0.26                    |
+  | sympy__sympy-13852       | 0/2             | 0.93                     | 0/2            | 0.27                    |
+  | pydata__xarray-3993      | 2/2             | 0.41                     | 2/2            | 0.25                    |

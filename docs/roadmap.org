@@ -376,9 +376,11 @@ As of 14 November 2026:
   =tests/test_tools.py=), and the rule that measures each version
   ([[file:../DESIGN.org::#method-measured][DESIGN.org#method-measured]]); what it measures is in
   [[file:evidence.org][docs/evidence.org]].
-- [ ] The benchmark's pilot: 5 tasks, two runs per arm, under a cap the
+- [X] The benchmark's pilot: 5 tasks, two runs per arm, under a cap the
   maintainer sets just before it starts; its summary goes to
-  [[file:evidence.org][docs/evidence.org]], labeled "pilot: not conclusive".
+  [[file:evidence.org][docs/evidence.org]], labeled "pilot: not conclusive". Run on 14 and 15
+  November 2026 under a cap of 100 USD: 21.04 USD spent, both arms 6 of 10
+  resolved on the same tasks, the method arm about 2.2 times the cost.
 - [X] The benchmark's run accepts a commit after =base_commit= that touches
   none of the files the task's gold patch or hidden test patch changes, so
   a SWE-bench setup commit that pins the environment passes (in
