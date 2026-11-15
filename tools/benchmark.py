@@ -56,7 +56,11 @@ run     runs each task R times per arm, in an interleaved order, one run at a ti
         the task's hidden test patch touches; a git failure while taking it makes the run an
         error, never an empty prediction. RUNDIR/runs/<run>/ holds record.json (every
         call's JSON result, the replies, the stop reason, the probe, the costs, the start
-        commit) and prediction.diff.
+        commit), prediction.diff, and, to judge the quality of the work but never graded,
+        agent.diff (the whole change, the hidden test files included) and transcripts/
+        (Claude Code's session files from the container, every call and subagent with its
+        tool calls), both scrubbed of the token; a session file that cannot be copied is
+        noted in record.json, not a run error.
         Cost: a run's share is the cap divided by the number of runs; a run's spend is its
         last agent result's total_cost_usd (which holds the earlier calls) plus the
         maintainer's calls; no run starts when the spend so far plus one share would pass
@@ -158,6 +162,7 @@ METHOD_SETTINGS = ("$schema", "attribution", "enabledPlugins", "hooks", "permiss
 HOOKS_PYTHON = "/opt/dotagents-python"
 CONTAINER_CLAUDE = "/usr/local/bin/claude"
 TESTBED = "/testbed"
+SESSIONS = "/home/agent/.claude/projects"  # where Claude Code keeps the agent's session files
 NOT_NOTES = ("--", ".", ":(exclude).private")  # a git pathspec: everything but the method's notes
 GIT_IDENTITY = (("user.name", "Agent"), ("user.email", "agent@example.invalid"))
 PROBE_PAYLOAD = json.dumps({"tool_name": "Bash", "tool_input": {"command": "git push origin main"}})
@@ -631,6 +636,31 @@ def converse(context, name: str, arm: str, agent: dict, record: dict) -> None:
         prompt = reply
 
 
+def save_transcripts(name: str, folder: Path, tokens: set) -> dict:
+    """Copy the agent's Claude Code session files (the main session and each subagent,
+    tool calls included) to folder/transcripts/, the tokens scrubbed: kept to judge how the
+    work was done, never graded. {"saved": count, "errors": [...]}; a file that cannot be
+    read is an error noted here, not a run error."""
+    saved, errors = 0, []
+    listing = run_program(["podman", "exec", "-u", "agent", name, "find", SESSIONS, "-name", "*.jsonl", "-type",
+                           "f"], "list the transcripts")
+    if listing.returncode:
+        return {"saved": 0, "errors": [f"list the transcripts: {listing.stderr.strip()[-300:]}"]}
+    for path in listing.stdout.split("\n"):
+        relative = Path(path[len(SESSIONS) + 1:]) if path.startswith(SESSIONS + "/") else None
+        if relative is None:
+            continue
+        text = run_program(["podman", "exec", "-u", "agent", name, "cat", path], "read a transcript")
+        if text.returncode:
+            errors.append(f"read {relative}: {text.stderr.strip()[-300:]}")
+            continue
+        target = folder / "transcripts" / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(scrubbed(text.stdout, tokens), encoding="utf-8")
+        saved += 1
+    return {"saved": saved, "errors": errors}
+
+
 def patch_paths(patch: str) -> set:
     paths = set()
     for line in patch.splitlines():
@@ -705,7 +735,7 @@ def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Pat
               "finished": False, "stop": None, "error": None, "probe": None, "calls": [], "maintainer": [],
               "agent_cost": 0.0, "maintainer_cost": 0.0, "spend": 0.0, "commits_after_base": [], "start_commit": None,
               "adaptations": context.method["adaptations"] if arm == "method" else [],
-              "prediction_source": None, "left_out": []}
+              "prediction_source": None, "left_out": [], "transcripts": None}
     run_program(["podman", "rm", "-f", "-t", "0", name], "remove an old container")
     try:
         start_container(context, name, agent["image"], arm)
@@ -716,8 +746,10 @@ def one_run(context, task: dict, arm: str, repeat: int, run_id: str, folder: Pat
             if not record["probe"]["passed"]:
                 raise Failure("the method's probe failed: the method is not live in the container")
         converse(context, name, arm, agent, record)
+        record["transcripts"] = save_transcripts(name, folder, context.tokens)
         diff, record["prediction_source"] = predict(name, record["start_commit"])
         diff = scrubbed(diff, context.tokens)  # an agent may have written its environment into a file
+        (folder / "agent.diff").write_text(diff, encoding="utf-8")  # the whole change, its tests included
         diff, record["left_out"] = without_paths(diff, patch_paths(task["grading"].get("test_patch", "")))
         (folder / "prediction.diff").write_text(diff, encoding="utf-8")
         record["finished"] = True
