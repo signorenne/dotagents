@@ -451,6 +451,11 @@ As of 14 November 2026:
   transcripts
   (=test_a_run_keeps_the_agent_s_whole_change_and_its_transcripts= in
   =tests/test_tools.py=).
+- [ ] The quality review as a step of =tools/benchmark.py=, so the full run
+  judges every task the way the pilot was judged by hand: blind inputs per
+  task (issue, shuffled changes with their tests, transcripts), reviewers
+  on the maintainer's rubric, unblinding into the summary. Needed by the
+  full run, whose goal is the quality of the results.
 - [ ] The benchmark's full run: at least 20 tasks with three runs per arm,
   before the first published version of METHOD.org.
 
