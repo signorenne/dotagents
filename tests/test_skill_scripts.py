@@ -477,12 +477,15 @@ class PlanScripts(unittest.TestCase):
 
     def test_floor_check_says_whether_a_diff_changes_only_docs_or_python_comments(self):
         # A docs-only diff runs lighter gates (METHOD.org, Checks), so "yes" needs proof that no
-        # code changed: documentation files, or Python edits whose tokens other than comments
-        # are unchanged. A line inside a string that starts with # is code; any other file is
-        # code too. The line informs, it never changes the exit code.
+        # code changed: documentation files (by extension, images only under docs/), or Python
+        # edits whose tokens other than comments are unchanged. A line inside a string that
+        # starts with #, a shebang, an untracked code file and any other file are code. The line
+        # informs, it never changes the exit code.
         lib = '"""Doc."""\nX = """\n# data\n"""\n\n\ndef f():\n    return 1  # one\n'
         (self.repo / "docs").mkdir()
         (self.repo / "docs/guide.org").write_text("* Guide\n")
+        (self.repo / "docs/Makefile").write_text("all:\n\techo 1\n")
+        (self.repo / "docs/diagram.svg").write_text("<svg>1</svg>\n")
         (self.repo / "lib.py").write_text(lib)
         (self.repo / "a.c").write_text("int x; /* c */\n")
         (self.repo / "app.json").write_text('{"a": 1}\n')
@@ -500,10 +503,15 @@ class PlanScripts(unittest.TestCase):
             ({"a.c": "int x; /* changed */\n"}, "no: a.c"),
             ({"app.json": '{"a": 2}\n'}, "no: app.json"),
             ({"logo.png": b"\x89PNG\r\n\x1a\n\x01"}, "no: logo.png"),
+            ({"docs/diagram.svg": "<svg>2</svg>\n", "notes.md": "* Notes\n"}, "yes"),
+            ({"docs/Makefile": "all:\n\techo 2\n"}, "no: docs/Makefile"),
+            ({"new.py": "print(1)\n"}, "no: new.py"),
+            ({"lib.py": "#!/usr/bin/env python3\n" + lib}, "no: lib.py"),
         )
         for files, verdict in cases:
             with self.subTest(files=sorted(files), verdict=verdict):
                 self.git("checkout", "-q", "HEAD", "--", ".")
+                self.git("clean", "-fdq")
                 for name, content in files.items():
                     path = self.repo / name
                     path.write_bytes(content) if isinstance(content, bytes) else path.write_text(content)

@@ -64,7 +64,8 @@ PATH_SURFACES = (
     ("public API", re.compile(r"(^|/)(include|api|public)/")),
 )
 CODE = re.compile(r"\.(py|c|cc|cpp|cxx|h|hh|hpp|js|jsx|mjs|ts|tsx|go|rs|java|kt|cs|rb|swift|qml|sh)$")
-DOCS = re.compile(r"\.(md|markdown|org|rst|adoc|txt)$|(^|/)docs?/", re.I)
+DOCS = re.compile(r"\.(md|markdown|org|rst|adoc|txt)$|(^|/)docs?/.*\.(puml|svg|png|jpe?g|gif|webp)$", re.I)
+HEADER = re.compile(r"^#!|^[ \t\f]*#.*?coding[:=]")  # a shebang or an encoding line: comments that run
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
                              r"std::atomic|\basyncio\.|\bgo func\b|\bsynchronized\b|\bQThread\b|ThreadPool")),
@@ -126,10 +127,13 @@ def python_tokens(text: str) -> list | None:
 
 def code_change(paths: list, commit: str, cwd) -> str | None:
     """The first changed path that is code, or None when every path is a documentation file or
-    a Python file whose tokens other than comments are unchanged. A path a risk surface names,
-    a code file of another language and any other file count as code: the conservative
-    reading, since only Python's comments are told apart from code here."""
+    a Python file whose tokens other than comments, its shebang and its encoding line are
+    unchanged. A path a risk surface names, a code file of another language, an untracked
+    code file and any other file count as code: the conservative reading, since only
+    Python's comments are told apart from code here. Documentation is decided by extension,
+    and an image or diagram only under docs/."""
     root, ok = planfile.git(["rev-parse", "--show-toplevel"], cwd)
+    header = lambda text: [line for line in text.splitlines()[:2] if HEADER.match(line)]
     if not ok:
         return paths[0] if paths else None
     for path in sorted(paths):
@@ -142,7 +146,7 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
                 return path
             new = current.read_text(encoding="utf-8", errors="replace").rstrip("\n")
             before, after = python_tokens(old), python_tokens(new)
-            if before is None or before != after:
+            if before is None or before != after or header(old) != header(new):
                 return path
         elif CODE.search(path) or not DOCS.search(path):
             return path
@@ -219,7 +223,7 @@ def main(argv=None) -> int:
     lane = (args.lane or header.get("Lane", "")).lower()
     problems, surfaces, size = report(parse_diff(diff), lane, args.quick_limit)
     print(f"base {base}, {size} changed lines" + (f", lane {lane}" if lane else ""))
-    changed = code_change([name for name in names.splitlines() if name], commit, args.cwd)
+    changed = code_change([name for name in names.splitlines() if name] + state["untracked"], commit, args.cwd)
     print("docs or comments only: " + ("yes" if changed is None else f"no: {changed}"))
     if state["untracked"]:
         print(f"untracked, not counted: {', '.join(state['untracked'][:10])}")
