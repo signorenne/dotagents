@@ -16,7 +16,12 @@ rules this repository installs) against Claude Code without them, on the
 same tasks with the same main model. Per arm: how many runs resolve their
 task (the task's hidden tests pass), how many break a test that passed
 before (a regression), the cost, the turns, the time, and how often the
-agent needed the maintainer.
+agent needed the maintainer. Above all, the quality of each result, which
+the hidden tests alone do not show (the maintainer, 15 November 2026):
+independent reviewers who do not know the arms judge each change on
+solving the issue fully, scope and minimality, code quality and the
+repository's conventions, and docs and changelog, and rank the changes of
+each task.
 
 * How it runs
 
@@ -157,3 +162,40 @@ agent needed the maintainer.
   | pytest-dev__pytest-10356 | 2/2             | 0.43                     | 2/2            | 0.26                    |
   | sympy__sympy-13852       | 0/2             | 0.93                     | 0/2            | 0.27                    |
   | pydata__xarray-3993      | 2/2             | 0.41                     | 2/2            | 0.25                    |
+- Quality of the pilot's results, 15 November 2026, pilot: not
+  conclusive. The maintainer's goal is the quality of the result, not only
+  whether the hidden tests pass, so the 20 changes were judged without a
+  new run. Per task, one independent reviewer (a Claude Code subagent on
+  the agents' model) saw the issue and the task's four changes under
+  shuffled labels, with no arm, cost or grade, applied each in a throwaway
+  container of the task's image to check its behavior, and scored each 1 to
+  5 on the maintainer's rubric (solves the issue fully, judged from the
+  issue and the code; scope and minimality; code quality and the
+  repository's conventions; docs and changelog where the repository
+  expects them), then ranked the four. Unblinded afterwards:
+
+  | arm    | solves | scope | quality | docs | total of 20 | mean rank (1 best) |
+  |--------+--------+-------+---------+------+-------------+--------------------|
+  | method | 4.50   | 4.90  | 4.50    | 4.50 | 18.4        | 2.10               |
+  | plain  | 4.50   | 4.60  | 4.50    | 3.90 | 17.5        | 2.90               |
+
+  | task                     | method total | method rank | plain total | plain rank |
+  |--------------------------+--------------+-------------+-------------+------------|
+  | astropy__astropy-13398   | 17.5         | 2.50        | 17.0        | 2.50       |
+  | django__django-13344     | 18.0         | 2.75        | 17.0        | 2.25       |
+  | pytest-dev__pytest-10356 | 19.5         | 1.50        | 18.0        | 3.50       |
+  | sympy__sympy-13852       | 19.0         | 1.50        | 18.0        | 3.50       |
+  | pydata__xarray-3993      | 18.0         | 2.25        | 17.5        | 2.75       |
+
+  The method arm's changes scored higher in total on all five tasks, and
+  ranked better on three, worse on one (django), equal on one (astropy).
+  The gap comes from docs and changelog (a missing release note, an
+  incomplete changelog and a wrong whatsnew section in the plain arm) and
+  from scope; the fixes themselves solved the issues equally well and were
+  of equal code quality. The best astropy change by correctness came from
+  the plain arm, the worst (refraction ignored) too. Per run, totals and the
+  reviewers' evidence are in the run folder's =quality/= on the maintainer's
+  machine. Limits: one reviewer per task and of the agents' own model
+  family, 10 changes per arm, small differences (0.9 of 20 points); the
+  agents' own tests and their transcripts were not kept, so test quality
+  and how the work was done are not judged (kept from 6ad0225 on).
