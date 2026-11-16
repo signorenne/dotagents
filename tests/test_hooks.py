@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Tests for the shared hooks, fed with each agent's payload shape."""
 
 import contextlib

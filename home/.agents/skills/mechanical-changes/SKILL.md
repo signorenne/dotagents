@@ -1,7 +1,7 @@
 ---
 name: mechanical-changes
 description: "Carries out one mechanical change across many files (a rename, an API migration, moving code between files, replacing a pattern everywhere) without changing behavior: a tested matcher finds every site, a written rulebook drives a re-runnable transformation, a trial on a sample comes first, each unit is checked from the cheapest check to the build, and the change lands in shards that build and revert on their own. Use when the user asks for a codemod, a repository-wide rename, refactor or migration, or the same edit in many files."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Mechanical changes

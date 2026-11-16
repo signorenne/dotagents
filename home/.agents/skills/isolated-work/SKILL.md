@@ -1,7 +1,7 @@
 ---
 name: isolated-work
 description: "Runs a complex or risky change in its own git worktree and branch so the main checkout stays untouched: creates the worktree from the right base outside the checkout, works there (through the implement skill), gates the exact commit, keeps the branch for the user's review, then lands it on the user's go by rebase and fast-forward for linear history, and removes the worktree and the branch. Use when a plan proposes isolation (a change across modules, a public API change, a data or many-file migration), when the user asks to work in a worktree or in isolation, or when another skill runs a change apart; parallel-agents uses it for each writer."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Isolated work

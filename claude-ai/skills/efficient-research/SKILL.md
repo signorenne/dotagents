@@ -1,7 +1,7 @@
 ---
 name: efficient-research
 description: "Decides when to search and how much, prefers primary sources, and labels what is sourced, inferred or unknown. Use to research or look up current, changeable or contested facts."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Efficient research

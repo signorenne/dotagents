@@ -1,7 +1,7 @@
 ---
 name: verifying-before-claiming-done
 description: "Checks the evidence before saying work is done, fixed, passing or ready, and reports what was verified and what was not. Use before any completion claim or end-of-task status."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Verifying before claiming done

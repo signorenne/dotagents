@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Prove that a UI change moved nothing outside the areas it was meant to change.
 
 Usage:

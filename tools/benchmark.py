@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """A/B benchmark of the nexenne method on SWE-bench Verified tasks: the same tasks run by
 Claude Code with the method installed (arm "method") and without it (arm "plain").
 

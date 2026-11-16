@@ -1,7 +1,7 @@
 ---
 name: implement
 description: "Implements a spec or a scoped task end to end with the project's matching workflow: grounding in the current code, plan approval, small verified steps committed one by one, a progress log of every step and of every decision with who took it (user or agent), full gates, and an independent review. Use when the user asks to implement, build or carry out a spec, a feature or a planned change in a repository. Not for a one-sentence change (do it directly) or a cross-module feature with no spec yet (spec first)."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Implement

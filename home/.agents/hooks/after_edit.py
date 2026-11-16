@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """After-edit hook shared by every coding agent.
 
 Usage in a hook config:

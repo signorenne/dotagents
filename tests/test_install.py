@@ -1,5 +1,5 @@
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """Tests for install.py, run against a temporary HOME."""
 
 import ast
@@ -87,22 +87,27 @@ class Install(unittest.TestCase):
 
     def test_a_renamed_skill_leaves_no_installed_copy(self):
         # review became branch-review: its old copy would still load in the tools that read
-        # ~/.agents/skills, and its Claude Code link would point at it.
-        old = self.home / ".agents/skills/review"
-        old.mkdir(parents=True)
-        (old / "SKILL.md").write_text('---\nname: review\nlicense: "MIT, Copyright (c) 2026 '
-                                      'Nicolò Plebani (nexenne). See LICENSE.txt"\n---\n', encoding="utf-8")
-        (self.home / ".claude/skills").mkdir(parents=True)
-        (self.home / ".claude/skills/review").symlink_to(old)
+        # ~/.agents/skills, and its Claude Code link would point at it. Our copies carry
+        # either copyright line: the one before 16 November 2026 or the one after.
         mine = self.home / ".agents/skills/my-review"
         mine.mkdir(parents=True)
         (mine / "SKILL.md").write_text("---\nname: my-review\n---\n", encoding="utf-8")
-        self.install()
-        self.assertFalse(old.exists())
-        self.assertFalse((self.home / ".claude/skills/review").is_symlink())
-        self.assertTrue((self.home / ".claude/skills/branch-review").is_symlink())
-        self.assertTrue((mine / "SKILL.md").is_file())
-        self.assertTrue(list((self.home / ".agents-backup").rglob("review/SKILL.md")))
+        (self.home / ".claude/skills").mkdir(parents=True)
+        for holder in ("Nicolò Plebani (nexenne)", "Nicolò Plebani (nexenne, signorenne)"):
+            with self.subTest(holder=holder):
+                old = self.home / ".agents/skills/review"
+                old.mkdir(parents=True)
+                (old / "SKILL.md").write_text('---\nname: review\nlicense: "MIT, Copyright (c) 2026 '
+                                              f'{holder}. See LICENSE.txt"\n---\n', encoding="utf-8")
+                (self.home / ".claude/skills/review").unlink(missing_ok=True)
+                (self.home / ".claude/skills/review").symlink_to(old)
+                self.install()
+                self.assertFalse(old.exists())
+                self.assertFalse((self.home / ".claude/skills/review").is_symlink())
+                self.assertTrue((self.home / ".claude/skills/branch-review").is_symlink())
+                self.assertTrue((mine / "SKILL.md").is_file())
+                saved = [path.read_text(encoding="utf-8") for path in (self.home / ".agents-backup").rglob("review/SKILL.md")]
+                self.assertTrue(any(f"{holder}. See" in text for text in saved), saved)
 
     def test_a_folder_of_the_same_name_that_is_not_ours_stays(self):
         theirs = self.home / ".agents/skills/review"

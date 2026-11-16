@@ -1,7 +1,7 @@
 ---
 name: trustworthy-tests
 description: "Writes and reviews automated tests that can fail: expected values from the spec, each test seen failing for the right reason, never weakened to pass. Use when writing, changing or reviewing tests."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Trustworthy tests

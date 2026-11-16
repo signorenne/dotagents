@@ -1,7 +1,7 @@
 ---
 name: prompt-optimizer
 description: "Rewrites prompts and AI instructions to be specific, checkable and free of filler. Use when writing or debugging a prompt, system prompt, agent or skill; a repo's AGENTS.md goes to project-setup."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Prompt optimizer

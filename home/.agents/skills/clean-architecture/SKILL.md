@@ -1,7 +1,7 @@
 ---
 name: clean-architecture
 description: "Builds and keeps an application in clean architecture with MVVM, as Martin, Evans, Fowler and Cockburn describe it: a pure domain (entities, value objects, aggregates), use cases, repositories whose interfaces the domain owns, DAOs and data sources in infrastructure, view models and views, one composition root, and dependencies that point inward and are checked by the build. Use when the user starts an application (or a module of one), adds a feature across layers, asks where code belongs, or asks to set up, review or enforce the architecture (layers, MVVM, repositories, DAOs, use cases, dependency rules). Not for writing requirements or architecture documents (architecture-doc)."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Clean architecture with MVVM

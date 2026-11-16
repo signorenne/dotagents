@@ -1,7 +1,7 @@
 ---
 name: precise-ui-changes
 description: "Makes and proves visual UI fixes (layout, spacing, alignment, sizes, icons, visual regressions) in any UI stack: renders the exact state repeatably at device pixels, crops and measures instead of eyeballing, makes the smallest change, proves with a bundled diff check that nothing outside the intended area moved, and only then updates the reference screenshots. Use when the user asks to fix or adjust how a screen or element looks, to align or resize UI elements, or to update screenshot or golden-image tests after a visual change."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Precise UI changes

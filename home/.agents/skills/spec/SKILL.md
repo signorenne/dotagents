@@ -1,7 +1,7 @@
 ---
 name: spec
 description: "Turns a feature idea into a self-contained implementation spec through scouting and a maieutic interview, without writing any code. Use when the user asks for a spec, an implementation plan or a design doc for one increment of an existing repository, or before a new module, a public component with open design choices, or any change that spans modules."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Spec

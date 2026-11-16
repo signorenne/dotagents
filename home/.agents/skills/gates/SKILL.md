@@ -1,7 +1,7 @@
 ---
 name: gates
 description: "Runs the project's documented build, test, sanitizer, lint, format and docs gates through the gate-runner subagent and reports only verdicts and the first errors, keeping long logs out of the conversation. Use when the user asks to run the gates, the tests, CI locally, or to check that a change builds."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Gates

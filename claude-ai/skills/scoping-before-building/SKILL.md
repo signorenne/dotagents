@@ -1,7 +1,7 @@
 ---
 name: scoping-before-building
 description: "Sizes up a request to make something and asks only the question that changes the result before building. Use when asked to build, make or write something whose purpose, audience or format is unclear."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Scoping before building

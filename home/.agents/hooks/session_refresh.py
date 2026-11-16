@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # SPDX-License-Identifier: MIT
-# Copyright (c) 2026 Nicolò Plebani (nexenne)
+# Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne)
 """SessionStart hook (Claude Code and Codex, matcher "compact|resume"): after a
 compaction or a resume, remind the agent that its picture of the code is a summary and
 print the real repository state (branch, changes, last commits and the other

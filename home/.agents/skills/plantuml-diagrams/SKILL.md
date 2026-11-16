@@ -1,7 +1,7 @@
 ---
 name: plantuml-diagrams
 description: "Draws and fixes PlantUML diagrams that read at a glance: one question per diagram, the right diagram type, a bundled palette with day and night colours, a layered compact layout without crossing lines or overlapping labels, a checklist on the source before rendering, and at most three render-and-look checks in day colours. Use when creating, fixing, reviewing or cleaning up PlantUML or UML diagrams (sequence, class, component, state, activity; .puml files), or when a document needs a diagram."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # PlantUML diagrams

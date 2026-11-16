@@ -1,7 +1,7 @@
 ---
 name: event-driven-ui
 description: "Designs and fixes event-based concurrency in applications with a UI or render loop, so the UI thread never blocks: one owning thread per piece of state, file writes, I/O and heavy computation on long-lived worker threads with results back as events, bounded queues with an overflow policy, coalesced bursts and budgeted handling, superseded work dropped, crash-safe file writes, and checks that keep it so. Use when a UI freezes, lags, stutters or drops frames and the blocking work is known (an unexplained freeze goes to systematic-debugging first), when work must move off the UI or render thread, or when designing or reviewing threads, queues, workers or event loops in a graphical or embedded application."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Event-driven UI

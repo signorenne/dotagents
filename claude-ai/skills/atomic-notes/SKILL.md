@@ -1,7 +1,7 @@
 ---
 name: atomic-notes
 description: "Writes clear, correct notes and explanations: one idea per note, linked under a hub like a mind map. Use to write, split or reorganize notes, or to explain a topic. Not for teaching (tutor)."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Atomic notes

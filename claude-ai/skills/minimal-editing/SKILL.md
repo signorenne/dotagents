@@ -1,7 +1,7 @@
 ---
 name: minimal-editing
 description: "Makes the smallest change that fully satisfies an edit request and shows only what changed. Use when fixing, tweaking, rewording or refactoring an existing draft, file, config or function."
-license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
+license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
 # Minimal editing

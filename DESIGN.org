@@ -809,12 +809,12 @@ human committer owns every line ([[file:AI_DISCLAIMER.org][AI_DISCLAIMER.org]]).
 In: =adapters/claude/settings.json= (attribution), =AGENTS.md= (Hard rules),
 =home/.agents/AGENTS.md= (Git), =.githooks/commit-msg=.
 
-*** MIT license held by Nicolò Plebani (nexenne)
+*** MIT license held by Nicolò Plebani (nexenne, signorenne)
 :PROPERTIES:
 :CUSTOM_ID: mit-license
 :END:
 Every skill folder has a =LICENSE.txt=. New work is MIT, Copyright (c) 2026
-Nicolò Plebani (nexenne). Adapted third-party work keeps its license and
+Nicolò Plebani (nexenne, signorenne). Adapted third-party work keeps its license and
 records the changes (see =claude-ai/skills/tutor/NOTICE.txt=). It is the
 maintainer's standard license, compatible with reuse across his projects.
 
