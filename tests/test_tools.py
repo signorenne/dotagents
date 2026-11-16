@@ -204,6 +204,10 @@ class Tools(unittest.TestCase):
         # Fixed baselines of 10k bytes, so 11k bytes is exactly 10% more whatever the real
         # files' length; a skill, the global rules and a subagent; padding partly in a
         # two-byte letter, so the limit counts bytes, not characters.
+        # The global rules are cut short first: padded near their 9,500-character cap they
+        # would trip the cap check, which this test does not pin.
+        rules = self.repo / "home/.agents/AGENTS.md"
+        rules.write_text(rules.read_text(encoding="utf-8")[:5000], encoding="utf-8")
         sizes = self.repo / "tools/size-baseline.json"
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
         baseline = json.loads(sizes.read_text())
