@@ -1,6 +1,6 @@
 ---
 name: plantuml-diagrams
-description: "Draws and fixes PlantUML diagrams that read at a glance: one question per diagram, the right diagram type, a bundled palette with day and night colours, a layered compact layout without crossing lines or overlapping labels, and a render-and-look check on every change. Use when creating, fixing, reviewing or cleaning up PlantUML or UML diagrams (sequence, class, component, state, activity; .puml files), or when a document needs a diagram."
+description: "Draws and fixes PlantUML diagrams that read at a glance: one question per diagram, the right diagram type, a bundled palette with day and night colours, a layered compact layout without crossing lines or overlapping labels, a checklist on the source before rendering, and at most three render-and-look checks in day colours. Use when creating, fixing, reviewing or cleaning up PlantUML or UML diagrams (sequence, class, component, state, activity; .puml files), or when a document needs a diagram."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne). See LICENSE.txt"
 ---
 
@@ -48,11 +48,22 @@ Sequence and activity diagrams have their own layout and ignore linetype, nodese
 - In a sequence diagram, put the participants that exchange the most messages next to each other, the caller leftmost: a message crosses every lifeline between its ends, and its text lies on them. Put hide footbox on the line after the include; it drops the repeated row of participants at the bottom.
 - In an activity diagram, keep each condition to a few words and define it in the text around the diagram: a long condition becomes a tall hexagon of small text. A note may hold the definition only when the legend says notes carry it; a note says what the legend says notes say.
 
-## Check every render
+## Check the source, then at most three renders
 
-1. Render to a scratch folder with plantuml -tpng -o <absolute scratch folder> <file> (without -o, or with a relative one, the image lands next to the source), and the night colours with -tpng -darkmode (-darkmode after the -t option; before it the render stays in day colours). A syntax error or a missing include exits non-zero, a missing Graphviz or layout library exits 0 with a Java stack trace, and all of them still write an image of the error: treat a non-zero exit or any output on stderr as a failure. The output is named after the name on the @startuml line.
+Before the first render, read the source and fix each item that fails; most defects end here, without an image:
+
+- a title that states the question, and about 12 boxes at most;
+- !include palette.iuml on the line after @startuml, and no colour, skinparam, style or theme;
+- packages for groups, no stereotypes; hide empty members, hide empty description or hide footbox where the type calls for it;
+- no words on component or deployment edges, and at most four words on any other label;
+- no two boxes that both lead to the same two targets, and a box that many edges reach on its own row;
+- left to right only for a chain of at most about five boxes; linetype, nodesep, ranksep and the layout engine unset.
+
+Then check the render, at most three times per diagram:
+
+1. Render the day colours only, to a scratch folder: plantuml -tpng -o <absolute scratch folder> <file> (without -o, or with a relative one, the image lands next to the source). Skip the night render: the palette holds the night colours, and with no other styling they stay readable. A syntax error or a missing include exits non-zero, a missing Graphviz or layout library exits 0 with a Java stack trace, and all of them still write an image of the error: treat a non-zero exit or any output on stderr as a failure. The output is named after the name on the @startuml line.
 2. Look at the PNG and list: line crossings, a label touching a line (its own included), a box or a title, a label nearer another edge than its own, an edge through a package title, two arrows sharing one arrowhead, edges much longer than their neighbors, and the width to height ratio (wider than about 2 to 1 is too small to read at page width). If you cannot view images, say the visual check was not done.
-3. Fix the worst problem with one change from the rules above and render again. After three rounds, keep a remaining crossing only if both lines stay easy to follow; otherwise split the diagram.
+3. Fix the worst problem with one change from the rules above and render again. After the third check, stop: keep a remaining crossing only if both lines stay easy to follow; otherwise split the diagram.
 4. Report what remains (for example "one crossing left, between X and Y").
 
 ## Files
