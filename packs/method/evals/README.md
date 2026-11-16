@@ -4,7 +4,9 @@ Each folder is a case for `claude plugin eval`: a prompt and free graders. No
 case calls a judge model; each run is still a real Claude session, so
 running them spends usage:
 
-    claude plugin eval packs/method --runs 1 --ablation none
+```sh
+claude plugin eval packs/method --runs 1 --ablation none
+```
 
 `python3 tools/validate.py` checks their structure without running them.
 
