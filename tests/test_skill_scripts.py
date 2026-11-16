@@ -481,11 +481,19 @@ class PlanScripts(unittest.TestCase):
         # edits whose tokens other than comments are unchanged. A line inside a string that
         # starts with #, a shebang, an untracked code file and any other file are code. The line
         # informs, it never changes the exit code.
-        lib = '"""Doc."""\nX = """\n# data\n"""\n\n\ndef f():\n    return 1  # one\n'
+        lib = '"""Doc."""\nX = """\n# data\n"""\nY = 2  # noqa: E501\nZ = 3  # type: ignore\n\n\ndef f():\n    return 1  # one\n'
         (self.repo / "docs").mkdir()
         (self.repo / "docs/guide.org").write_text("* Guide\n")
         (self.repo / "docs/Makefile").write_text("all:\n\techo 1\n")
         (self.repo / "docs/diagram.svg").write_text("<svg>1</svg>\n")
+        (self.repo / "docs/notes.txt").write_text("notes\n")
+        (self.repo / "docs/authoring.org").write_text("* Authoring\n")
+        (self.repo / "docs/CMakeLists.txt").write_text("project(docs)\n")
+        (self.repo / "requirements").mkdir()
+        (self.repo / "requirements/base.txt").write_text("requests==2.0\n")
+        (self.repo / "tests").mkdir()
+        (self.repo / "tests/data").mkdir()
+        (self.repo / "tests/data/golden.md").write_text("expected\n")
         (self.repo / "lib.py").write_text(lib)
         (self.repo / "a.c").write_text("int x; /* c */\n")
         (self.repo / "app.json").write_text('{"a": 1}\n')
@@ -507,6 +515,14 @@ class PlanScripts(unittest.TestCase):
             ({"docs/Makefile": "all:\n\techo 2\n"}, "no: docs/Makefile"),
             ({"new.py": "print(1)\n"}, "no: new.py"),
             ({"lib.py": "#!/usr/bin/env python3\n" + lib}, "no: lib.py"),
+            ({"lib.py": "# -*- coding: latin-1 -*-\n" + lib}, "no: lib.py"),
+            ({"lib.py": lib.replace("  # noqa: E501", "")}, "no: lib.py"),
+            ({"lib.py": lib.replace("# type: ignore", "# typed")}, "no: lib.py"),
+            ({"lib.py": None}, "no: lib.py"),
+            ({"docs/notes.txt": "more notes\n", "docs/authoring.org": "* Authoring 2\n"}, "yes"),
+            ({"docs/CMakeLists.txt": "project(docs2)\n"}, "no: docs/CMakeLists.txt"),
+            ({"requirements/base.txt": "requests==3.0\n"}, "no: requirements/base.txt"),
+            ({"tests/data/golden.md": "changed\n"}, "no: tests/data/golden.md"),
         )
         for files, verdict in cases:
             with self.subTest(files=sorted(files), verdict=verdict):
@@ -514,7 +530,10 @@ class PlanScripts(unittest.TestCase):
                 self.git("clean", "-fdq")
                 for name, content in files.items():
                     path = self.repo / name
-                    path.write_bytes(content) if isinstance(content, bytes) else path.write_text(content)
+                    if content is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(content) if isinstance(content, bytes) else path.write_text(content)
                 result = self.run_script("floor_check.py")
                 self.assertEqual(result.returncode, 0, result.stdout)
                 self.assertIn(f"docs or comments only: {verdict}\n", result.stdout)

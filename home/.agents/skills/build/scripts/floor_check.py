@@ -64,7 +64,10 @@ PATH_SURFACES = (
     ("public API", re.compile(r"(^|/)(include|api|public)/")),
 )
 CODE = re.compile(r"\.(py|c|cc|cpp|cxx|h|hh|hpp|js|jsx|mjs|ts|tsx|go|rs|java|kt|cs|rb|swift|qml|sh)$")
-DOCS = re.compile(r"\.(md|markdown|org|rst|adoc|txt)$|(^|/)docs?/.*\.(puml|svg|png|jpe?g|gif|webp)$", re.I)
+DOCS = re.compile(r"\.(md|markdown|org|rst|adoc)$|(^|/)(README|LICENSE|CHANGELOG|NOTICE|AUTHORS|CONTRIBUTING|COPYING)"
+                  r"[^/]*\.txt$|(^|/)docs?/.*\.(txt|puml|svg|png|jpe?g|gif|webp)$", re.I)
+TEST_DATA = re.compile(r"(^|/)(tests?|testdata|test_data|fixtures?|__snapshots__|golden)/", re.I)
+DIRECTIVE = re.compile(r"#\s*(type:|noqa|pragma|pylint:|fmt:|isort:|mypy:|pyright:|ruff:|nosec)", re.I)
 HEADER = re.compile(r"^#!|^[ \t\f]*#.*?coding[:=]")  # a shebang or an encoding line: comments that run
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
@@ -125,19 +128,31 @@ def python_tokens(text: str) -> list | None:
         return None
 
 
+def directives(text: str) -> list | None:
+    """The comments a linter, type checker or formatter reads (# noqa, # type: ignore and the
+    like), in order, or None when the source does not tokenize."""
+    try:
+        return [token.string for token in tokenize.generate_tokens(io.StringIO(text).readline)
+                if token.type == tokenize.COMMENT and DIRECTIVE.search(token.string)]
+    except (tokenize.TokenError, SyntaxError):
+        return None
+
+
 def code_change(paths: list, commit: str, cwd) -> str | None:
     """The first changed path that is code, or None when every path is a documentation file or
-    a Python file whose tokens other than comments, its shebang and its encoding line are
-    unchanged. A path a risk surface names, a code file of another language, an untracked
-    code file and any other file count as code: the conservative reading, since only
-    Python's comments are told apart from code here. Documentation is decided by extension,
-    and an image or diagram only under docs/."""
+    a Python file whose tokens other than comments, its shebang, its encoding line and its
+    tool directives (# noqa, # type: ignore and the like) are unchanged. A build or
+    dependency file, a file under a test data folder, a code file of another language, an
+    untracked code file and any other file count as code: the conservative reading, since
+    only Python's comments are told apart from code here. Documentation is decided by
+    extension (a .txt only when named like README or under docs/), and an image or diagram
+    only under docs/."""
     root, ok = planfile.git(["rev-parse", "--show-toplevel"], cwd)
     header = lambda text: [line for line in text.splitlines()[:2] if HEADER.match(line)]
     if not ok:
         return paths[0] if paths else None
     for path in sorted(paths):
-        if any(pattern.search(path) for _, pattern in PATH_SURFACES):
+        if any(pattern.search(path) for label, pattern in PATH_SURFACES if label in ("build", "dependency")):
             return path
         if path.endswith(".py"):
             old, found = planfile.git(["show", f"{commit}:{path}"], cwd)
@@ -146,9 +161,10 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
                 return path
             new = current.read_text(encoding="utf-8", errors="replace").rstrip("\n")
             before, after = python_tokens(old), python_tokens(new)
-            if before is None or before != after or header(old) != header(new):
+            if before is None or before != after or header(old) != header(new) or \
+                    directives(old) != directives(new):
                 return path
-        elif CODE.search(path) or not DOCS.search(path):
+        elif CODE.search(path) or TEST_DATA.search(path) or not DOCS.search(path):
             return path
     return None
 
