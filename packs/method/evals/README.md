@@ -15,14 +15,15 @@ Two kinds, by tag:
   descriptions alone route these requests.
 - `behavior`: what a skill does once it runs, on the corrections mined from
   real sessions (14 November 2026): a source the user names is read
-  (`tool_used` Read), API options are shown as code, design goes on into
-  build when asked (`tool_order`), and a final reply opens with `Done: yes`
-  or `Done: no` or gives the next step as a prompt to paste (`regex` on the
-  last message). They run with read-only tools and no fixture files, so
-  they test replies, not edits: `--tag behavior` runs them alone. An eval
+  (`tool_used` Read), API options are shown as code, and a final reply opens
+  with `Done: yes` or `Done: no` and gives the next step as a prompt to
+  paste (`regex` on the last message). They run with read-only tools and no
+  fixture files, so they test replies, not edits: `--tag behavior` runs them
+  alone. Not tested here: asking through the question box, since an eval
   run offers no AskUserQuestion even when a case lists it (its tools were
   Task, Glob, Grep, Read, Skill, TaskStop and ToolSearch on 14 November
-  2026), so asking through the question box is not tested here.
+  2026), and design going on into build, since design rightly stops in an
+  empty workspace before any build.
 
 The pack's session hook that prints the global rules lives in the
 marketplace entry, not in this folder, so `claude plugin eval` runs without

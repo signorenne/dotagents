@@ -1,6 +1,6 @@
 ---
 name: design-ends-with-a-prompt-to-paste
-description: "A design-only request; the reply gives the next step as a prompt to paste in a fenced block."
+description: "A design-only request; the reply opens with Done: yes or Done: no and gives the next step as a prompt to paste in a fenced block."
 tags: [behavior]
 runs: 1
 max_turns: 12
