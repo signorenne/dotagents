@@ -53,6 +53,7 @@ Decision: one or two sentences.
 Why: the answers and facts it rests on, and what the chosen option makes harder or rules out.
 Rejected: each alternative and the reason.
 Revisit if: the condition that would reopen it.
+Taken without asking: each point a source, the user's stated principle or a convention settled, with its reason.
 ```
 
 Ask for explicit confirmation of this text, each decision as its own question in the interface when there are several, never one yes for a list. Show the full text in the conversation before asking, or include it in the question, so it is visible when the user confirms. A confirmation is a yes to this decision; an "ok" given to a different question is not one.

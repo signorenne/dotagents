@@ -27,7 +27,7 @@ Run every git command as git -C <folder>, and read the change's files under that
    - calls to symbols that do not exist or changed signature, and wiring: each new function, option, command or endpoint reached by its callers, not left as a stub;
    - requirements: each acceptance criterion of the plan met by the diff and pinned by a test or command that can fail, and each unchanged behavior still pinned by a test the diff does not weaken and that passed in the log's gate lines on this commit;
    - the project's hard rules and conventions; conflicts with accepted decisions; rules changed without the maintainer's approval;
-   - verification: documented gates with no evidence of having run (the log's gate lines on this commit, none marked uncommitted).
+   - verification: documented gates with no evidence of having run (the log's gate lines on this commit, none marked uncommitted). When floor_check shows the diff as docs or comments only, the gates owed are the documented checks that read those files.
    Full mode adds:
    - cost, where the diff touches a hot path or growing data: I/O inside a loop over records, unbounded reads or buffers, a resource not released on every path;
    - contract drift: code against API docs, guides and examples; the deliverable set the project requires for this kind of change;
