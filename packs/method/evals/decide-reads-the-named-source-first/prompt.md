@@ -7,4 +7,4 @@ max_turns: 8
 allowed_tools: [Read, Glob, Grep, Skill, AskUserQuestion]
 ---
 
-Help me decide the voltage range of the alternator slider in my simulator. The old app's config, old/app.cfg, lists the good and the bad thresholds.
+Use the decide skill: help me decide the voltage range of the alternator slider in my simulator. The old app's config, old/app.cfg, lists the good and the bad thresholds.

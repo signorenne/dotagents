@@ -1,4 +1,4 @@
 ---
 type: regex
-pattern: '```[\s\S]+?```'
+pattern: '```[^`]*\b(build|design|close|decide)\b[^`]*```'
 ---
