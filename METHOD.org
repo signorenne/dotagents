@@ -198,7 +198,8 @@ a new plan; they are not converted.
 
 * Checks
 
-Three standard-library scripts in the build skill, each one call:
+Three standard-library scripts in the build skill, each one call, and a fourth
+for Claude Code's status line:
 
 - plan_state: the branch, base, HEAD, dirty files, the plan's header, the
   step in progress, the open rulings and the last log lines. The session
@@ -213,6 +214,9 @@ Three standard-library scripts in the build skill, each one call:
   Python comments (the proof the lighter gates of such a diff need); a
   quick-lane change that outgrew its lane is raised before review. Exit 2
   means it could not run and never reads as clean.
+- status_line: the branch, the plan's Status and Next and the context used,
+  in one line, so the state of the work shows without asking for it; it
+  exits 0 on any input. The maintainer's personal layer installs it.
 
 The full lane runs the baseline (the narrow check and the tests that pin the
 unchanged behavior) on the base commit before the first step; the quick

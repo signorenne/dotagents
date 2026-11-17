@@ -15,5 +15,10 @@
   },
   "enabledPlugins": {
     "engineering@synced": false
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "python3 \"$HOME/.agents/skills/build/scripts/status_line.py\"",
+    "refreshInterval": 10
   }
 }

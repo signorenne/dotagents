@@ -1141,9 +1141,11 @@ class Manifest(unittest.TestCase):
         # items to it; both come out, and a settings file the install created goes away.
         layer = self.home / "layer"
         layer.mkdir()
+        line = {"type": "command", "command": "python3 status_line.py", "refreshInterval": 10}
         (layer / "claude-settings.json").write_text(json.dumps({"permissions": {"allow": ["Bash(make *)"]},
-                                                                "enabledPlugins": {"x@y": False}}))
+                                                                "enabledPlugins": {"x@y": False}, "statusLine": line}))
         self.run_install("--personal", str(layer))
+        self.assertEqual(json.loads((self.home / ".claude/settings.json").read_text())["statusLine"], line)
         self.run_install("--uninstall")
         self.assertFalse((self.home / ".claude/settings.json").exists())
         self.assertEqual(sorted(p.name for p in self.home.iterdir()), [".agents-backup", ".claude", "layer"])

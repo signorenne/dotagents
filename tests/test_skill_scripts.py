@@ -5,6 +5,7 @@
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import shutil
 import subprocess
@@ -565,6 +566,32 @@ class PlanScripts(unittest.TestCase):
                     if line.startswith("risk surface: security")]
         self.assertEqual(sorted(surfaces), [f"risk surface: security: {name}"
                                             for name in sorted(("auth.py", "oauth.py", "authorize.go", "authorization.py"))])
+
+    def status_line(self, payload, cwd=None):
+        text = payload if isinstance(payload, str) else json.dumps(payload)
+        return subprocess.run([sys.executable, "-B", str(BUILD / "status_line.py")], cwd=cwd or self.repo,
+                              env=GIT_ENV, input=text, capture_output=True, text=True, check=False)
+
+    def test_the_status_line_shows_the_branch_the_plan_and_the_context_used(self):
+        result = self.status_line({"workspace": {"current_dir": str(self.repo)},
+                                   "context_window": {"used_percentage": 42.4}}, cwd=self.root)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(result.stdout.count("\n"), 1, result.stdout)
+        for part in ("feat/widget", "in progress", "next: S2 add the widget's test", "ctx 42%"):
+            self.assertIn(part, result.stdout)
+
+    def test_the_status_line_without_a_plan_shows_the_branch_and_reads_cwd(self):
+        self.git("switch", "-q", "main")
+        result = self.status_line({"cwd": str(self.repo), "context_window": {"used_percentage": None}}, cwd=self.root)
+        self.assertEqual((result.returncode, result.stdout), (0, "main\n"))
+
+    def test_the_status_line_never_fails_on_bad_input(self):
+        for payload in ("", "not json", "[1, 2]", {"workspace": {"current_dir": str(self.root / "missing")}}):
+            with self.subTest(payload=payload):
+                result = self.status_line(payload)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertEqual(result.stdout.count("\n"), 1, result.stdout)
+                self.assertTrue(result.stdout.strip())
 
     def test_a_base_that_is_not_a_commit_never_reaches_git_as_an_option(self):
         target = self.root / "written-by-git"
