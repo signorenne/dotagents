@@ -39,6 +39,8 @@ If you say "decide": I will take A.
 
 The options include the smallest one that meets the need the user stated; recommend a larger one only by naming the requirement that needs it. Check each option, the recommended one first, against every binding rule (the global rules, the project's AGENTS.md and design docs, accepted decisions) and its main failure mode, and put a conflict in that option's consequence. For an API or design choice, show each option as a short usage snippet (in the interface's preview, otherwise as code blocks in the message) and say how the platform or established projects solve it, or that you did not check.
 
+Gloss in one clause each term, id or file the user has not used in this session. A multi-select question has no "None" option: an empty selection means none.
+
 Without the interface, ask in plain text with the shape above. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Each question in a call carries its own default, so the user can answer only the ones they care about.
 
 After each answer, update the established list in one line. If the answer contradicts an earlier answer, an Accepted decision or a fact, show both sides and ask which one holds; never resolve a contradiction silently.

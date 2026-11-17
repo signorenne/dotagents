@@ -71,7 +71,7 @@ Say which findings you confirmed by running something and which you inferred fro
 
 ## Output
 
-For each test written or changed:
+When the report stands on its own, open it with one line: Verdict: the behaviors pinned and seen failing, the behaviors left untested, the tests skipped or not run, and any manual check still owed. Then, for each test written or changed:
 
 - the behavior it pins, in one sentence, with its source in the contract;
 - the evidence that it can fail: the command and the failing line, or the change to the code that made it fail;

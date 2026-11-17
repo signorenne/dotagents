@@ -32,6 +32,7 @@ Run every git command as git -C <folder>, and read the change's files under that
    - cost, where the diff touches a hot path or growing data: I/O inside a loop over records, unbounded reads or buffers, a resource not released on every path;
    - contract drift: code against API docs, guides and examples; the deliverable set the project requires for this kind of change;
    - rulings: each one in the plan carried out in the diff, or recorded as changed;
+   - design: the dependency direction against the project's architecture doc, the public API's usability from a caller's code, and comments that only restate the code;
    - scope: unrelated edits, speculative abstractions, new dependencies, code that duplicates a helper the repository has (search for it);
    - the change's central claims: for each thing the intent says it does (fixes, handles, keeps, prevents), look for the input, path, caller or platform where it does not hold.
    Quick mode stays bounded: read the diff and the files it touches, follow a suspicion at most one call away, and leave the rest to the "Not verified" list.
