@@ -47,9 +47,11 @@ depend on the model remembering it.
   shared by every tool; the guard and the after-edit hook learn which tool
   called them from =--tool=. The plan-file hooks reach the build skill's
   =planfile.py= by path (=../skills/build/scripts=).
-- /Plan scripts/ : =plan_state.py=, =check_step.py= and =floor_check.py= with
-  their shared =planfile.py= in =home/.agents/skills/build/scripts/=, standard
-  library only (METHOD.org, Checks).
+- /Plan scripts/ : =plan_state.py=, =check_step.py=, =floor_check.py= and
+  =status_line.py= (Claude Code's status line, installed by the personal
+  layer) with their shared =planfile.py= in
+  =home/.agents/skills/build/scripts/=, standard library only (METHOD.org,
+  Checks).
 - /Packs/ : =.claude-plugin/marketplace.json= and =packs/<pack>/=, written by
   =python3 tools/build.py --marketplace=: four Claude Code plugins (method,
   craft, docs, chat) whose folders hold relative links into =home/.agents=
@@ -817,7 +819,7 @@ does not start lacks them. Changed by the maintainer on 12 November 2026 to
 make room in the global rules (9,495 of 9,500 characters). Replaces
 =learning-in-global-rules=.
 
-In: =home/.agents/AGENTS.md= (Learning), =claude-ai/skills/tutor/=.
+In: =claude-ai/skills/tutor/SKILL.md=, =home/.agents/AGENTS.md= (Objective and context).
 
 ** Source and install
 

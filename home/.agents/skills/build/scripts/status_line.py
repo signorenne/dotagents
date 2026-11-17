@@ -10,9 +10,10 @@ state of the work shows without asking for it.
 
 Reads the status line JSON on stdin (workspace.current_dir, else cwd; context_window.
 used_percentage, which may be null) and prints one line, for example
-"feat/widget | in progress | next: S2 add the widget's test | ctx 42%". It makes one git call
-with a short timeout, and on any failure prints a short line and exits 0, since an empty
-output or a non-zero exit leaves the status line blank.
+"feat/widget | in progress | next: S2 add the widget's test | ctx 42%" ("detached" on a
+detached HEAD). It makes one git call with a short timeout (two in a linked worktree), and
+on any failure prints a short line and exits 0, since an empty output or a non-zero exit
+leaves the status line blank.
 """
 
 from __future__ import annotations
@@ -35,8 +36,8 @@ def status(payload: dict) -> str:
     parts = []
     if Path(cwd).is_dir():
         state, _, plan = planfile.locate(cwd, full=False)
-        if state.get("branch"):
-            parts.append(state["branch"])
+        if state:
+            parts.append(state.get("branch") or "detached")
         if plan is not None:
             header = planfile.read(plan)["header"]
             if header.get("Status"):

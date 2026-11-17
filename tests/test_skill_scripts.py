@@ -554,10 +554,37 @@ class PlanScripts(unittest.TestCase):
         self.assertEqual(flagged, ["added suppression: test_a.py: y = 1  # noqa: E501",
                                    "added skip: test_a.py: @unittest.skip('later')"])
 
+    def test_floor_check_misses_no_real_python_suppression_or_skip(self):
+        # Every match on a line is tested, a string-form flag (-Wno-) counts in a string, a
+        # file that does not tokenize keeps the line patterns, and line numbers survive deleted
+        # lines and blank context lines that git prints empty (diff.suppressBlankEmpty).
+        (self.repo / "setup.py").write_text("import os\n\n\nKEEP = 1\nGONE = 2\n\nEND = 3\n")
+        (self.repo / "broken.py").write_text("ok = 1\n")
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "more")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.write_plan("full")
+        self.git("config", "diff.suppressBlankEmpty", "true")
+        (self.repo / "setup.py").write_text(
+            "import os\n\n\nKEEP = 1\n\nEND = 3\n"
+            "x = \"# noqa\"; y = 1  # noqa: E501\n"
+            "z = \"pytest.skip(\"; pytest.skip(\"real\")\n"
+            "ARGS = [\"-Wno-unused-function\"]\n")
+        (self.repo / "broken.py").write_text("ok = 1\ns = \"never closed  # noqa\n")
+        result = self.run_script("floor_check.py")
+        flagged = sorted(line.split(": ", 2)[1] + ": " + line.split(": ", 2)[2]
+                         for line in result.stdout.splitlines() if line.startswith(("added skip", "added suppression")))
+        self.assertEqual(flagged, sorted([
+            'setup.py: x = "# noqa"; y = 1  # noqa: E501',
+            'setup.py: z = "pytest.skip("; pytest.skip("real")',
+            'setup.py: ARGS = ["-Wno-unused-function"]',
+            'broken.py: s = "never closed  # noqa']), result.stdout)
+
     def test_floor_check_reads_auth_as_a_word_in_security_paths(self):
         # author, authors and authoring are not security; auth, oauth, authorize and
         # authorization are.
-        for name in ("docs/skill-authoring.org", "AUTHORS", "auth.py", "oauth.py", "authorize.go", "authorization.py"):
+        for name in ("docs/skill-authoring.org", "AUTHORS", "auth.py", "oauth.py", "authorize.go", "authorization.py",
+                     "cert_authority.go"):
             path = self.repo / name
             path.parent.mkdir(exist_ok=True)
             path.write_text("x\n")
@@ -565,7 +592,8 @@ class PlanScripts(unittest.TestCase):
         surfaces = [line for line in self.run_script("floor_check.py").stdout.splitlines()
                     if line.startswith("risk surface: security")]
         self.assertEqual(sorted(surfaces), [f"risk surface: security: {name}"
-                                            for name in sorted(("auth.py", "oauth.py", "authorize.go", "authorization.py"))])
+                                            for name in sorted(("auth.py", "oauth.py", "authorize.go", "authorization.py",
+                                                                "cert_authority.go"))])
 
     def status_line(self, payload, cwd=None):
         text = payload if isinstance(payload, str) else json.dumps(payload)
@@ -584,6 +612,11 @@ class PlanScripts(unittest.TestCase):
         self.git("switch", "-q", "main")
         result = self.status_line({"cwd": str(self.repo), "context_window": {"used_percentage": None}}, cwd=self.root)
         self.assertEqual((result.returncode, result.stdout), (0, "main\n"))
+
+    def test_the_status_line_names_a_detached_head(self):
+        self.git("switch", "-q", "--detach", "HEAD")
+        result = self.status_line({"cwd": str(self.repo)})
+        self.assertEqual((result.returncode, result.stdout), (0, "detached\n"))
 
     def test_the_status_line_never_fails_on_bad_input(self):
         for payload in ("", "not json", "[1, 2]", {"workspace": {"current_dir": str(self.root / "missing")}}):

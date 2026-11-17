@@ -59,7 +59,7 @@ PATH_SURFACES = (
     ("build", re.compile(r"(^|/)(CMakeLists\.txt|[^/]+\.cmake|CMakePresets\.json|Makefile|meson\.build|"
                          r"BUILD(\.bazel)?|WORKSPACE|Dockerfile|\.github/workflows/[^/]+)$")),
     ("data migration", re.compile(r"(^|/)(migrations?|migrate)/")),
-    ("security", re.compile(r"(^|/)[^/]*(auth(?!or(?!i[sz]))|crypt|secret|password|credential|permission|sandbox|guard)"
+    ("security", re.compile(r"(^|/)[^/]*(auth(?!or(?!i[sz]|it))|crypt|secret|password|credential|permission|sandbox|guard)"
                             r"[^/]*$",
                             re.I)),
     ("public API", re.compile(r"(^|/)(include|api|public)/")),
@@ -111,7 +111,7 @@ def parse_diff(text: str) -> dict:
             number += 1
         elif line.startswith("-"):
             files[current]["removed"].append(line[1:])
-        elif line.startswith(" "):
+        elif line == "" or line.startswith(" "):  # a blank context line git prints empty
             number += 1
     return files
 
@@ -207,8 +207,9 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
 
 def report(files: dict, lane: str, limit: int, spans: dict | None = None) -> tuple[list, list, int]:
     """(problems, surfaces, changed lines). spans maps a Python path to python_spans() of its
-    working-tree text: there a suppression counts only inside a comment and a skip only
-    outside strings and comments."""
+    working-tree text: there a suppression written as a comment (# noqa, # type: ignore and
+    the like) counts only inside a comment, another form (-Wno- in a build file's string)
+    anywhere, and a skip only outside strings and comments. Every match on a line is tested."""
     spans = spans or {}
     problems, surfaces = [], []
     size = 0
@@ -222,11 +223,14 @@ def report(files: dict, lane: str, limit: int, spans: dict | None = None) -> tup
                 problems.append(f"removed test: {path}: {name}")
         comments, strings = spans.get(path) or ({}, {})
         for line, number in zip(change["added"], change.get("numbers") or [0] * len(change["added"])):
-            skip, suppression = SKIPS.search(line), SUPPRESSIONS.search(line)
+            skips, suppressions = list(SKIPS.finditer(line)), list(SUPPRESSIONS.finditer(line))
             if path in spans:
-                skip = skip if skip and not within(strings.get(number, []) + comments.get(number, []), skip.start()) else None
-                suppression = suppression if suppression and within(comments.get(number, []), suppression.start()) \
-                    else None
+                quoted = strings.get(number, []) + comments.get(number, [])
+                skip = any(not within(quoted, hit.start()) for hit in skips)
+                suppression = any(within(comments.get(number, []), hit.start()) or not hit.group(0).startswith("#")
+                                  for hit in suppressions)
+            else:
+                skip, suppression = bool(skips), bool(suppressions)
             if skip:
                 problems.append(f"added skip: {path}: {line.strip()[:100]}")
             if suppression:
@@ -273,7 +277,8 @@ def main(argv=None) -> int:
     if commit is None:
         print(f"floor_check: base {base!r} is not a commit; nothing was checked")
         return 2
-    diff, ok = planfile.git(["diff", "--no-color", "--no-ext-diff", "-M", commit, "--"], args.cwd, timeout=60)
+    diff, ok = planfile.git(["-c", "diff.suppressBlankEmpty=false", "diff", "--no-color", "--no-ext-diff", "-M",
+                             commit, "--"], args.cwd, timeout=60)
     if not ok:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2
