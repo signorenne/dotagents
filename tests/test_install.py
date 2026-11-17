@@ -1130,7 +1130,7 @@ class Manifest(unittest.TestCase):
         self.assertTrue(rules.read_text().endswith("\n\n## Personal\n\n- My vault is ~/v.\n"))
         self.assertTrue(rules.read_text().startswith((ROOT / "home/.agents/AGENTS.md").read_text()))
         self.assertIn("Bash(make *)", json.loads(settings.read_text())["permissions"]["allow"])
-        self.assertEqual(self.manifest()["personal"], str(layer))
+        self.assertEqual(self.manifest()["personal"], str(layer.resolve()))
         self.assertIn("0 change(s).", self.run_install().splitlines())  # reused from the manifest
         self.run_install("--no-personal")
         self.assertEqual(rules.read_bytes(), (ROOT / "home/.agents/AGENTS.md").read_bytes())

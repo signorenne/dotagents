@@ -1318,7 +1318,7 @@ class SessionRefresh(unittest.TestCase):
                 result = self.refresh_with({"cwd": str(cwd), "source": "compact"}, env)
                 self.assertEqual((result.returncode, result.stderr), (0, ""))
                 self.assertIn("Current branch: feat/task", result.stdout)
-                self.assertIn(f"Plan: {(repo / '.private/plans/task.org').as_posix()}", result.stdout)
+                self.assertIn(f"Plan: {(repo / '.private/plans/task.org').resolve().as_posix()}", result.stdout)
                 self.assertIn("Next: S2 the next step", result.stdout)
                 self.assertNotIn("Task notes", result.stdout)
                 self.assertTrue(result.stdout.rstrip("\n").endswith(self.REREAD), result.stdout)

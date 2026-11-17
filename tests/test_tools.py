@@ -1185,7 +1185,7 @@ class BenchmarkRun(unittest.TestCase):
                      ".claude/rules/dotagents-gates.md", ".agents/hooks/guard_bash.py"):
             self.assertTrue((staged / name).is_file(), name)
         run = [entry["argv"] for entry in self.calls("podman") if entry["argv"][0] == "run"][0]
-        self.assertIn(f"{self.python}:/opt/dotagents-python:ro", run)
+        self.assertIn(f"{self.python.resolve()}:/opt/dotagents-python:ro", run)
         self.assertEqual(run[-4:-2], ["--entrypoint", "sleep"])
         self.assertTrue(run[-2].startswith("docker.io/swebench/"), run[-2])  # the image, fully qualified
         record = next(iter(self.records().values()))
