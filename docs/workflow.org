@@ -31,8 +31,8 @@ global rules.
   Refuted assumptions go into the plan file, and close turns those a rule
   should have prevented into proposed
   changes.
-- When you ask to learn, the Learning section and the tutor skill give graded
-  help and announce every check.
+- When you ask to learn, the tutor skill gives graded help and announces
+  every check.
 - Not maieutic toward you, by design: routine engineering inside an approved
   plan, plain questions, clear requests, and "decide" (the agent chooses with
   its recommendations and lists the assumptions).

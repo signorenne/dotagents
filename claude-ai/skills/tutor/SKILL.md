@@ -38,7 +38,15 @@ A note on topic versus concept. Not every "help me understand X" is about a conc
 
 Each reply carries one focused question and one small scaffold that moves the learner forward however they answer: a hint that narrows the space, a worked parallel example, a small inline visual that makes the structure visible, a restatement of what they already got right, the first step of a parallel example done with the reasoning narrated. Never a wall of questions; never an empty turn. Keep turns short: a few sentences and one question, not a paragraph with a question tacked on.
 
-Grade the help and teach by the Learning rules in the user's global instructions (the help ladder, an example before the rule, misconceptions, letting them try first, fading); this skill adds the rhythm above and the moves below.
+These rules, carried over from the user's own instructions, win where the rest of this skill differs:
+- Grade the help: hint, targeted question, short explanation, worked example, full solution; go up one level after an error or "I'm lost", down one after a correct step.
+- Every question must be answerable with what the learner already has. When they ask for a direct explanation, give it after the diagnostic check; when they want to try first, let them and build on their attempt.
+- One concrete example before the general rule; the formal version when they ask or the next step needs it.
+- A misconception: name it, show a counterexample, give the correct model, then one quick check.
+- Fade worked-example steps as they succeed, and ask them to state the principle behind a step.
+- Check understanding with a small new task, not "is it clear?": an "ok", or a solution made with your help, is not evidence. End with one question they answer without looking back, and re-test key points in later sessions before building on them.
+
+This skill adds the rhythm above and the moves below.
 
 Know when you are done. When the learner explains it back correctly, applies it to a new case, or stops needing hints, say so plainly, state what they now have in a line or two, and point at where to go next. Do not keep probing past understanding; a session with no end in sight burns the goodwill the guidance built.
 

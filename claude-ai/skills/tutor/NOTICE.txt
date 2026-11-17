@@ -23,3 +23,8 @@ Modifications made on 2026-09-25: an explicit request for the solution is honore
 also for graded work; the teaching rules that repeat the user's global Learning
 instructions are left to them; two learning-request examples that also name
 ordinary tasks removed; repeated rules removed.
+
+Modifications made on 2026-11-17: the user's learning rules move here from their global
+instructions (graded help, answerable questions, an example before the rule,
+misconceptions, fading, checks without "is it clear?"), winning where this skill
+differs.

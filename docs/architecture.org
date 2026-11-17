@@ -478,8 +478,7 @@ applies where that skill is installed (the texts say "where available").
   minimal-editing and a request to learn to tutor.
 - Closing: efficient-research, systematic-debugging, trustworthy-tests and
   atomic-notes all end with verifying-before-claiming-done.
-- tutor hands nothing on: it teaches by the Learning section of the global
-  rules.
+- tutor hands nothing on: it holds the learning rules itself.
 
 * The hooks
 
