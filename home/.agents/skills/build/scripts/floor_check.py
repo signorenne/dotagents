@@ -59,7 +59,8 @@ PATH_SURFACES = (
     ("build", re.compile(r"(^|/)(CMakeLists\.txt|[^/]+\.cmake|CMakePresets\.json|Makefile|meson\.build|"
                          r"BUILD(\.bazel)?|WORKSPACE|Dockerfile|\.github/workflows/[^/]+)$")),
     ("data migration", re.compile(r"(^|/)(migrations?|migrate)/")),
-    ("security", re.compile(r"(^|/)[^/]*(auth|crypt|secret|password|credential|permission|sandbox|guard)[^/]*$",
+    ("security", re.compile(r"(^|/)[^/]*(auth(?!or(?!i[sz]))|crypt|secret|password|credential|permission|sandbox|guard)"
+                            r"[^/]*$",
                             re.I)),
     ("public API", re.compile(r"(^|/)(include|api|public)/")),
 )
@@ -78,11 +79,15 @@ LINE_SURFACES = (
 )
 
 
+HUNK = re.compile(r"^@@ -\d+(?:,\d+)? \+(\d+)")
+
+
 def parse_diff(text: str) -> dict:
-    """{path: {"added": [lines], "removed": [lines]}} from a unified diff. The --- and +++
-    lines name the file only in its header, before its first @@, since a hunk line can
-    start with them too (a removed "-- comment"); a deleted file keeps its old path."""
-    files, current, old, header = {}, None, None, False
+    """{path: {"added": [lines], "removed": [lines], "numbers": [new line number of each added
+    line]}} from a unified diff. The --- and +++ lines name the file only in its header,
+    before its first @@, since a hunk line can start with them too (a removed "-- comment");
+    a deleted file keeps its old path."""
+    files, current, old, header, number = {}, None, None, False, 0
     for line in text.splitlines():
         if line.startswith("diff --git "):
             current, old, header = None, None, True
@@ -93,16 +98,47 @@ def parse_diff(text: str) -> dict:
             name = line[4:].strip()
             current = old if name == "/dev/null" else name[2:] if name.startswith("b/") else name
             if current is not None:
-                files.setdefault(current, {"added": [], "removed": []})
+                files.setdefault(current, {"added": [], "removed": [], "numbers": []})
         elif line.startswith("@@"):
             header = False
+            found = HUNK.match(line)
+            number = int(found.group(1)) if found else 0
         elif header or current is None:
             continue
         elif line.startswith("+"):
             files[current]["added"].append(line[1:])
+            files[current]["numbers"].append(number)
+            number += 1
         elif line.startswith("-"):
             files[current]["removed"].append(line[1:])
+        elif line.startswith(" "):
+            number += 1
     return files
+
+
+def python_spans(text: str) -> tuple[dict, dict] | None:
+    """({line: [(start, end)] of comments}, {line: [(start, end)] of strings}) for Python
+    source, columns as in the line, or None when it does not tokenize. A string over several
+    lines covers each of them."""
+    kinds = {tokenize.STRING} | {getattr(tokenize, name) for name in ("FSTRING_START", "FSTRING_MIDDLE",
+                                                                       "FSTRING_END") if hasattr(tokenize, name)}
+    comments, strings = {}, {}
+    try:
+        for token in tokenize.generate_tokens(io.StringIO(text).readline):
+            (row, col), (end_row, end_col) = token.start, token.end
+            if token.type == tokenize.COMMENT:
+                comments.setdefault(row, []).append((col, end_col))
+            elif token.type in kinds:
+                for line in range(row, end_row + 1):
+                    strings.setdefault(line, []).append((col if line == row else 0,
+                                                         end_col if line == end_row else 10 ** 9))
+    except (tokenize.TokenError, SyntaxError):
+        return None
+    return comments, strings
+
+
+def within(spans: list, column: int) -> bool:
+    return any(start <= column < end for start, end in spans)
 
 
 def test_names(lines: list) -> list:
@@ -169,8 +205,11 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
     return None
 
 
-def report(files: dict, lane: str, limit: int) -> tuple[list, list, int]:
-    """(problems, surfaces, changed lines)."""
+def report(files: dict, lane: str, limit: int, spans: dict | None = None) -> tuple[list, list, int]:
+    """(problems, surfaces, changed lines). spans maps a Python path to python_spans() of its
+    working-tree text: there a suppression counts only inside a comment and a skip only
+    outside strings and comments."""
+    spans = spans or {}
     problems, surfaces = [], []
     size = 0
     for path, change in sorted(files.items()):
@@ -181,10 +220,16 @@ def report(files: dict, lane: str, limit: int) -> tuple[list, list, int]:
                 added.remove(name)
             else:
                 problems.append(f"removed test: {path}: {name}")
-        for line in change["added"]:
-            if SKIPS.search(line):
+        comments, strings = spans.get(path) or ({}, {})
+        for line, number in zip(change["added"], change.get("numbers") or [0] * len(change["added"])):
+            skip, suppression = SKIPS.search(line), SUPPRESSIONS.search(line)
+            if path in spans:
+                skip = skip if skip and not within(strings.get(number, []) + comments.get(number, []), skip.start()) else None
+                suppression = suppression if suppression and within(comments.get(number, []), suppression.start()) \
+                    else None
+            if skip:
                 problems.append(f"added skip: {path}: {line.strip()[:100]}")
-            if SUPPRESSIONS.search(line):
+            if suppression:
                 problems.append(f"added suppression: {path}: {line.strip()[:100]}")
         for label, pattern in PATH_SURFACES:
             if pattern.search(path):
@@ -237,7 +282,17 @@ def main(argv=None) -> int:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2
     lane = (args.lane or header.get("Lane", "")).lower()
-    problems, surfaces, size = report(parse_diff(diff), lane, args.quick_limit)
+    files = parse_diff(diff)
+    root, _ = planfile.git(["rev-parse", "--show-toplevel"], args.cwd)
+    spans = {}
+    for path, change in files.items():
+        current = Path(root) / path if root else None
+        if path.endswith(".py") and current is not None and current.is_file() and \
+                any(SKIPS.search(line) or SUPPRESSIONS.search(line) for line in change["added"]):
+            found = python_spans(current.read_text(encoding="utf-8", errors="replace"))
+            if found is not None:
+                spans[path] = found
+    problems, surfaces, size = report(files, lane, args.quick_limit, spans)
     print(f"base {base}, {size} changed lines" + (f", lane {lane}" if lane else ""))
     changed = code_change([name for name in names.splitlines() if name] + state["untracked"], commit, args.cwd)
     print("docs or comments only: " + ("yes" if changed is None else f"no: {changed}"))

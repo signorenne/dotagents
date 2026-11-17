@@ -538,6 +538,34 @@ class PlanScripts(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stdout)
                 self.assertIn(f"docs or comments only: {verdict}\n", result.stdout)
 
+    def test_floor_check_counts_python_suppressions_and_skips_only_outside_strings(self):
+        # A Python line that only mentions a suppression inside a string or a docstring adds
+        # none, nor does one that names a skip in a string or a comment; a real comment or
+        # decorator still does.
+        (self.repo / "test_a.py").write_text(
+            (self.repo / "test_a.py").read_text()
+            + "S = \"# noqa: E501 and @unittest.skip('x')\"\n"
+            + '"""Doc mentioning # type: ignore\nand @pytest.mark.skip here."""\n'
+            + "# a comment naming @unittest.skip\ny = 1  # noqa: E501\n\n\n@unittest.skip('later')\ndef test_three():\n    pass\n")
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        flagged = [line for line in result.stdout.splitlines() if line.startswith(("added skip", "added suppression"))]
+        self.assertEqual(flagged, ["added suppression: test_a.py: y = 1  # noqa: E501",
+                                   "added skip: test_a.py: @unittest.skip('later')"])
+
+    def test_floor_check_reads_auth_as_a_word_in_security_paths(self):
+        # author, authors and authoring are not security; auth, oauth, authorize and
+        # authorization are.
+        for name in ("docs/skill-authoring.org", "AUTHORS", "auth.py", "oauth.py", "authorize.go", "authorization.py"):
+            path = self.repo / name
+            path.parent.mkdir(exist_ok=True)
+            path.write_text("x\n")
+        self.git("add", "-A")
+        surfaces = [line for line in self.run_script("floor_check.py").stdout.splitlines()
+                    if line.startswith("risk surface: security")]
+        self.assertEqual(sorted(surfaces), [f"risk surface: security: {name}"
+                                            for name in sorted(("auth.py", "oauth.py", "authorize.go", "authorization.py"))])
+
     def test_a_base_that_is_not_a_commit_never_reaches_git_as_an_option(self):
         target = self.root / "written-by-git"
         self.plan.write_text(PLAN.format(base=f"--output={target}", lane="full"))
