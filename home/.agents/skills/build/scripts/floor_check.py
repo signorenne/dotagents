@@ -262,6 +262,9 @@ def main(argv=None) -> int:
     if not state:
         print("floor_check: not a git repository; nothing was checked")
         return 2
+    if state.get("unknown"):
+        print("floor_check: git status failed; nothing was checked")
+        return 2
     header = planfile.read(plan)["header"] if plan else {}
     base = args.base or header.get("Base")
     if not base:
@@ -278,7 +281,7 @@ def main(argv=None) -> int:
         print(f"floor_check: base {base!r} is not a commit; nothing was checked")
         return 2
     diff, ok = planfile.git(["-c", "diff.suppressBlankEmpty=false", "diff", "--no-color", "--no-ext-diff", "-M",
-                             commit, "--"], args.cwd, timeout=60)
+                             "--src-prefix=a/", "--dst-prefix=b/", commit, "--"], args.cwd, timeout=60)
     if not ok:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2

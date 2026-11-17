@@ -24,6 +24,7 @@ TASK_BRANCH = re.compile(r"^[a-z]+/([A-Za-z0-9._-]+)$")
 HEADER_LINE = re.compile(r"^- (" + "|".join(HEADER_KEYS) + r"): *(.*)$")
 SECTION = re.compile(r"^(?:\* +|## +)(.+?)\s*$")
 SEPARATOR_ROW = re.compile(r"^\|[-+:| ]+\|?$")
+CELL_BREAK = re.compile(r"(?<!\\)\|")
 LOG_FIELDS = ("time", "step", "kind", "commit", "result", "tests", "command")
 PLAN_SUFFIXES = (".org", ".md")
 # Seconds per git call; a hook with a time limit lowers it before calling in.
@@ -101,7 +102,7 @@ def sections(text: str) -> tuple[dict, dict]:
 
 def table(body: str) -> list:
     """The rows of the first table in a section body, as dicts keyed by the lower-case
-    header cells."""
+    header cells. A pipe written as \\| (the markdown escape) stays inside its cell."""
     rows = []
     for line in body.splitlines():
         stripped = line.strip()
@@ -111,7 +112,10 @@ def table(body: str) -> list:
             continue
         if SEPARATOR_ROW.match(stripped):
             continue
-        cells = [cell.strip() for cell in stripped.strip("|").split("|")]
+        inner = stripped[1:]
+        if inner.endswith("|") and not inner.endswith("\\|"):
+            inner = inner[:-1]
+        cells = [cell.strip().replace("\\|", "|") for cell in CELL_BREAK.split(inner)]
         rows.append(cells)
     if not rows:
         return []
@@ -161,7 +165,8 @@ def commit_of(revision: str, cwd) -> str | None:
 
 def head_state(cwd, full: bool = True) -> dict:
     """Branch, short HEAD, modified tracked files and untracked files (working notes left out)
-    of the repository at cwd; {} outside one. Without full, only the branch, for hooks that
+    of the repository at cwd; {} outside one. "unknown" is true when a git status call failed
+    or timed out, so the two lists say nothing. Without full, only the branch, for hooks that
     run on every turn."""
     branch, ok = git(["branch", "--show-current"], cwd)
     if not ok:
@@ -169,12 +174,13 @@ def head_state(cwd, full: bool = True) -> dict:
     if not full:
         return {"branch": branch, "head": "", "dirty": [], "untracked": []}
     head, _ = git(["rev-parse", "--short", "HEAD"], cwd)
-    status, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd)
+    status, tracked_ok = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd)
     # Every .private folder holds working notes (and this skill's own output): never counted.
-    untracked, _ = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal", "--", ":/",
-                        ":(top,exclude,glob)**/.private/**"], cwd)
+    untracked, untracked_ok = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal",
+                                   "--", ":/", ":(top,exclude,glob)**/.private/**"], cwd)
     return {"branch": branch, "head": head, "dirty": [line for line in status.splitlines() if line],
-            "untracked": [line[3:] for line in untracked.splitlines() if line.startswith("??")]}
+            "untracked": [line[3:] for line in untracked.splitlines() if line.startswith("??")],
+            "unknown": not (tracked_ok and untracked_ok)}
 
 
 def locate(cwd, full: bool = True) -> tuple[dict, Path | None, Path | None]:

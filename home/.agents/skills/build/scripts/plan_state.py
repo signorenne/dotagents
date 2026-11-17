@@ -54,8 +54,11 @@ def describe(cwd, excerpt: bool) -> tuple[int, list]:
     if not excerpt:
         dirty = state["dirty"]
         lines.append(f"Branch: {state['branch'] or '(detached)'}  HEAD: {state['head']}")
-        lines.append(f"Modified tracked files: {len(dirty)}" + (": " + ", ".join(d[3:] for d in dirty[:10])
-                                                                if dirty else ""))
+        if state.get("unknown"):
+            lines.append("Modified tracked files: unknown (git status failed)")
+        else:
+            lines.append(f"Modified tracked files: {len(dirty)}" + (": " + ", ".join(d[3:] for d in dirty[:10])
+                                                                    if dirty else ""))
         if state["untracked"]:
             lines.append(f"Untracked: {len(state['untracked'])}: " + ", ".join(state["untracked"][:10]))
     if plan is None:

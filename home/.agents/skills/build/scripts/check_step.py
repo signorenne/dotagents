@@ -14,7 +14,8 @@ first to the guard hook beside the skills (../../hooks/guard_bash.py), and one i
 block is not run. --expect-fail records a failing-first run: the call succeeds when the
 command fails and fails when it passes, because a pass does not show that the test can
 fail. A run with modified or untracked files is logged as "uncommitted(<n>)", never as
-the commit's. --tail 0 prints the whole output (for gate-runner, which searches it).
+the commit's, and as "uncommitted(?)" when git status failed. --tail 0 prints the whole
+output (for gate-runner, which searches it).
 Without a plan file for the branch the check still runs and the result is not logged.
 Exit: the command's code; with --expect-fail 0 when it failed and 1 when it passed; 2
 when the command could not start (also exit 126 or 127 from the shell) or the guard
@@ -119,6 +120,8 @@ def main(argv=None) -> int:
     untracked = state.get("untracked", []) if state else []  # working notes left out by planfile
     dirty = (state.get("dirty", []) + untracked) if state else []
     commit = f"uncommitted({len(dirty)})" if dirty else (state.get("head") or "-") if state else "-"
+    if state and state.get("unknown"):  # git status failed: the tree was not read
+        commit = "uncommitted(?)"
     print(f"exit {result.returncode}, {'pass' if passed else 'fail'}, tests {count}, {commit}"
           + (f", output {saved}" if saved else ""))
     if plan is not None:

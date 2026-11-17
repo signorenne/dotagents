@@ -375,7 +375,7 @@ class PlanScripts(unittest.TestCase):
         self.git("switch", "-q", "main")
         self.git("worktree", "add", "-q", str(worktree), "feat/widget")
         result = self.run_script("plan_state.py", cwd=worktree)
-        self.assertIn(f"Plan: {self.plan}", result.stdout)
+        self.assertIn(f"Plan: {self.plan.resolve()}", result.stdout)
 
     def test_off_a_task_branch_it_lists_the_open_plans_only(self):
         landed = self.plan.parent / "old.md"
@@ -696,6 +696,52 @@ class PlanScripts(unittest.TestCase):
 
     def test_floor_check_that_cannot_run_exits_2(self):
         self.assertEqual(self.run_script("floor_check.py", "--base", "no-such-ref").returncode, 2)
+
+    def test_an_escaped_pipe_in_a_table_cell_keeps_the_later_columns(self):
+        # A Check cell holds a command; markdown writes a pipe inside a cell as \|.
+        self.plan.write_text(self.plan.read_text().replace(
+            "| S2 | widget test | test_a.py | unit | in progress |",
+            "| S2 | widget test | test_a.py | unit 2>&1 \\| tail -3 | in progress |"))
+        result = self.run_script("plan_state.py")
+        self.assertIn("Steps: 1 done, 1 in progress", result.stdout)
+        self.assertIn("In progress: S2 widget test (files: test_a.py)", result.stdout)
+
+    def with_failing_git_status(self) -> dict:
+        """An environment whose git fails on status and is the real one otherwise."""
+        folder = self.root / "bin"
+        folder.mkdir()
+        fake = folder / "git"
+        fake.write_text('#!/bin/sh\nfor arg in "$@"; do [ "$arg" = status ] && exit 1; done\n'
+                        f'exec "{shutil.which("git")}" "$@"\n')
+        fake.chmod(0o755)
+        return {**GIT_ENV, "PATH": f"{folder}{os.pathsep}{GIT_ENV['PATH']}"}
+
+    def test_a_git_status_that_fails_never_reads_as_a_clean_tree(self):
+        # check_step: a run on a tree it could not read is never logged as the commit's;
+        # floor_check: exit 2 when git failed, it never reads as clean; plan_state says so.
+        (self.repo / "test_a.py").write_text("changed\n")
+        env = self.with_failing_git_status()
+
+        def run(name, *args):
+            return subprocess.run([sys.executable, "-B", str(BUILD / name), *args], cwd=self.repo, env=env,
+                                  capture_output=True, text=True, check=False)
+
+        result = run("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertEqual(self.log()[-1][2:5], ["check", "uncommitted(?)", "pass"])
+        result = run("floor_check.py")
+        self.assertEqual(result.returncode, 2, result.stdout)
+        self.assertIn("git status failed; nothing was checked", result.stdout)
+        result = run("plan_state.py")
+        self.assertIn("Modified tracked files: unknown (git status failed)", result.stdout)
+        self.assertNotIn("Modified tracked files: 0", result.stdout)
+
+    def test_floor_check_reads_the_same_paths_under_a_git_diff_prefix_setting(self):
+        (self.repo / "test_a.py").write_text("def test_one():\n    pass\n")
+        self.git("config", "diff.mnemonicPrefix", "true")  # git then writes c/ and w/, not a/ and b/
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn("removed test: test_a.py: test_two", result.stdout)
 
 
 if __name__ == "__main__":
