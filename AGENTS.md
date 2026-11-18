@@ -11,7 +11,7 @@ the repository itself.
 
 ```text
 home/.agents/AGENTS.md        global rules, installed as ~/.agents/AGENTS.md
-home/.agents/skills/          local skills (decide, spec, implement, branch-review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, isolated-work, mechanical-changes, precise-ui-changes, qt-quick, clean-architecture, event-driven-ui, code-audit)
+home/.agents/skills/          local skills (decide, spec, implement, branch-review, gates, session-close, project-setup, as-built-docs, architecture-doc, plantuml-diagrams, parallel-agents, isolated-work, mechanical-changes, precise-ui-changes, qt-quick, clean-architecture, event-driven-ui, code-audit, notes-from-work)
 home/.agents/agents/          subagents in Claude Code format, the source for every tool's copy
 home/.agents/hooks/           hook scripts shared by every agent
 home/.agents/path-rules.json  path rules: each skill with the file globs that call for it (Claude Code gets ~/.claude/rules/dotagents-<skill>.md)

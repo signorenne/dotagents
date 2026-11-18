@@ -392,6 +392,10 @@ The subagents these skills use:
   given only the claim and the code (the general-purpose subagent in Claude
   Code, elsewhere reviewer told that its target is the claim, not the branch
   diff).
+- notes-from-work has each finding attacked by a subagent given the claims
+  and their sources, not the author's probes (the general-purpose subagent in
+  Claude Code, reviewer elsewhere), and runs the vault's gates through
+  gate-runner and its review through reviewer.
 - mechanical-changes sends its review to reviewer. parallel-agents gates each
   branch through isolated-work, which runs gate-runner on the rebased commit
   (unless the rebase left it unchanged and its pass is logged), and reviews
