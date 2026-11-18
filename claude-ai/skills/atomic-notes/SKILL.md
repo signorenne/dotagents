@@ -26,7 +26,7 @@ When the notes go into an existing collection, search it for each idea and its n
 
 Before writing a fact down, sort it the way efficient-research does. Facts that are numeric, version-specific, current, contested, or that the note is useless without, get confirmed against a primary source: the specification or standard, the vendor's documentation or datasheet, the reference documentation. When a fact cannot be confirmed from what you have, research it online following efficient-research, and open the page before citing it. Without search tools, mark such facts unverified and name the source to check.
 
-- Search before you hedge: mark a fact unverified only after looking for its primary source and not finding it, and say where you looked. Reread a source you opened before calling what it documents unconfirmed.
+- Search before you hedge: with search tools, mark a fact unverified only after looking for its primary source and not finding it, and say where you looked. Reread a source you opened before calling what it documents unconfirmed.
 - Every claim is cited, attributed to the user's material, or marked as your inference.
 - When a source contradicts the material, keep both with their attribution and say in Limits which holds, and for which version.
 - Paraphrase; quote at most a short phrase.
@@ -98,7 +98,7 @@ Each item can fail; fix what fails and check again.
 - Each note holds one idea, its first sentence states it, its title is a claim (or a term, or a question), and a note outside 120 to 400 words of prose passed the test of step 2.
 - Nothing is explained in two places: search the notes for each key fact and number, and cut every full statement beyond the owner's.
 - Every title is exactly as true as its note; no note holds remarks on how it was made.
-- Every claim is cited, attributed or marked as inference; nothing is cited from a search snippet; nothing is marked unverified without a search for it.
+- Every claim is cited, attributed or marked as inference; nothing is cited from a search snippet; nothing is marked unverified without a search for it, where search tools exist.
 - Connections opens with the hub, and every link names its relation in a sentence.
 - Every idea of the map has exactly one home; the hub links every child and is reachable from the entry note; no note is orphaned; titles are unique.
 - In an existing collection, no new note duplicates an old one, and each is linked from an existing note besides its hub.

@@ -6,7 +6,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LIC
 
 # Build
 
-This skill applies the method (defined in METHOD.org of the dotagents repository) and holds what an agent needs to follow it. Scripts: S is this skill's scripts folder, in Claude Code ${CLAUDE_SKILL_DIR}/scripts, elsewhere ~/.agents/skills/build/scripts. Each runs with python3 and prints a short result.
+This skill applies the method (defined in METHOD.org of the dotagents repository) and holds what an agent needs to follow it. Scripts: S is this skill's scripts folder, in Claude Code ${CLAUDE_SKILL_DIR}/scripts, elsewhere ~/.agents/skills/build/scripts. Each runs with python3 and prints a short result. check_step.py runs the words after -- as one program with its arguments: a command that holds a shell operator (&&, a pipe, a redirection) or a leading VAR=value goes after -- as one quoted argument, which runs through the shell.
 
 ## 0. Resume
 
@@ -27,7 +27,7 @@ Direct lane: say in one line the check that shows it done, make the change, run 
 
 ## 3. Write the plan
 
-Path: .private/plans/<slug>.<ext> in the project's prose format; slug in kebab case, also the branch's. In a linked worktree (git rev-parse --path-format=absolute --git-dir --git-common-dir prints two paths) use the main checkout's .private/ by absolute path and never create one in the worktree. When .private/ is not git-ignored, ask once where plans go. Write the plan from what happened, never from intent, and never commit it.
+Path: .private/plans/<slug>.<ext> in the project's prose format; slug in kebab case, also the branch's. In a linked worktree (git rev-parse --path-format=absolute --git-dir --git-common-dir prints two different paths) use the main checkout's .private/ by absolute path and never create one in the worktree. When .private/ is not git-ignored, ask once where plans go. Write the plan from what happened, never from intent, and never commit it.
 
 ```
 #+TITLE: Plan: <change>

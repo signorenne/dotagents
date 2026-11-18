@@ -84,5 +84,6 @@ If the original is ambiguous in a way you cannot resolve, do not guess silently:
 Example.
 Before: "You are an expert senior data analyst with 20 years of experience. It is EXTREMELY IMPORTANT that you think very carefully and deeply about this. Please analyze the attached sales data thoroughly and give me a really good comprehensive analysis. Take your time. Be accurate!!!"
 After: "Analyze the attached sales CSV. Identify the three largest drivers of the Q3 revenue change versus Q2, quantify each, and note any data-quality issues that affect confidence. Output: a short paragraph per driver, then a one-line bottom line. Audience: our CFO."
+Flagged with it: "I assumed Q3 against Q2, three drivers, a CSV and a CFO audience; correct any of these."
 
 Barely shorter, but better, because every line now specifies something the model would otherwise guess.

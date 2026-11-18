@@ -1,9 +1,7 @@
 ' Palette for PlantUML diagrams: day colours, and night colours in the dark block,
 ' which PlantUML applies when the diagram is drawn with -darkmode (as an editor
 ' preview on a dark theme does). Change both blocks together and give every fill
-' its matching text colour. Check a night render with plantuml -tpng -darkmode <file>:
-' -darkmode must come after the -t option, because a -t option after it resets the
-' render to day colours.
+' its matching text colour. Check a night render with plantuml -tpng -darkmode <file>.
 <style>
 root { FontColor #37342d; BackgroundColor #eae6dd }
 document { BackgroundColor #f5f1e8 }

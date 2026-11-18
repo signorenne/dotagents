@@ -32,7 +32,7 @@ workflow rule. Do not record what an owning doc already states and explains.
 * Entry format
 
 #+BEGIN_EXAMPLE
-** D-NNNN: short title
+,** D-NNNN: short title
 :PROPERTIES:
 :STATUS:      Proposed | Accepted | Superseded by D-NNNN
 :PROPOSED_BY: maintainer | contributor | agent

@@ -105,7 +105,7 @@ resolves conflicts and runs the wider validation.
 * Plan file template
 
 #+BEGIN_EXAMPLE
-#+TITLE: Plan: <change>
+,#+TITLE: Plan: <change>
 
 - Status: draft | approved | in progress | in review | built | landed | blocked | dropped
 - Lane: quick | full
@@ -115,19 +115,19 @@ resolves conflicts and runs the wider validation.
 - Review: quick | full
 - Next: <one line a fresh session acts on>
 
-* Intent
+,* Intent
 (frozen at approval: problem, approach, what must hold, out of scope,
 acceptance criteria, unchanged behavior with its tests, who approved and when)
-* Code map
-* Assumptions
+,* Code map
+,* Assumptions
 | Nr | Assumption | Check | Result |
-* Steps
+,* Steps
 | Nr | Step | Files | Check | Status | Commit |
-* Verification
-* Rulings
+,* Verification
+,* Rulings
 | Nr | Ruling | Why | Alternative | Cost if wrong | Review |
-* Dead ends
-* Review
+,* Dead ends
+,* Review
 | Nr | Source | Severity | Location | Finding | Verdict | Evidence |
 #+END_EXAMPLE
 
