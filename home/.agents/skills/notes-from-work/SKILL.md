@@ -31,7 +31,7 @@ Run probes in a throwaway environment (a fresh process with its own name, never 
 
 ## 4. Attack
 
-Give the claims, worded as the notes will state them, to a subagent that did not write them, with the sources, the safety rules for its probes and the instruction not to read your probes. Ask it to try to refute each claim and to answer holds, holds only with narrower wording (giving that wording) or refuted, with its evidence. Use the general-purpose subagent in Claude Code and the tool's default general agent elsewhere, told to write only in its own scratch folder; where the tool has no subagents, say in the report that no independent agent checked the claims. Check each narrowing or refutation yourself before relying on it, then reword: a refuted fix is dropped or moved to the limits, and a claim that does not survive is not written.
+Give the claims, worded as the notes will state them, to a subagent that did not write them, with the sources, the safety rules for its probes and the instruction not to read your probes. Ask it to try to refute each claim and to answer holds, holds only with narrower wording (giving that wording) or refuted, with its evidence. Use the general-purpose subagent in Claude Code and the tool's default general agent elsewhere, told to write only in its own scratch folder; where the tool has no subagents, ask the user before writing claims that no independent agent checked, and say so in step 6. Check each narrowing or refutation yourself before relying on it, then reword: a refuted fix is dropped or moved to the limits, and a claim that does not survive is not written.
 
 ## 5. Write on a vault branch
 
@@ -39,7 +39,7 @@ Give the claims, worded as the notes will state them, to a subagent that did not
 - Write each finding as the kind the vault's rules give it, usually a failure note for a bug or a workaround and a procedure note for a technique: a sentence or two of background, the problem in general terms, the cause and how to tell it, the fix as numbered steps, the verification (the probe that ran and the output seen, with versions and date), the limits of what was not checked, the connections, and the sources (a reference for each documented fact, and where the finding was observed).
 - Keep it clear and concise: one idea per note, each fact in one place, nothing about how the session went.
 - Add the links the vault's rules ask for (its folder index, its troubleshooting map), the clause links of step 2 and the outcome line its rules ask for.
-- Commit each step, then run the vault's documented gates through gate-runner and its review through reviewer, giving both the worktree and the commit expected there, and the reviewer the vault's main as base.
+- Commit, then run the vault's documented gates through gate-runner and its review through reviewer, giving both the worktree and the commit expected there, and the reviewer the vault's main as base.
 
 ## 6. Approve and land
 
