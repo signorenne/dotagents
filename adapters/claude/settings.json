@@ -22,7 +22,8 @@
       "Bash(clang-format-20 *)",
       "Bash(clang-tidy *)",
       "Bash(clang-tidy-20 *)",
-      "Bash(./build/*)"
+      "Bash(./build/*)",
+      "Read(~/memex/**)"
     ],
     "ask": [
       "Bash(git reset --hard *)",
