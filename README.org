@@ -113,7 +113,9 @@ claude plugin install dotagents-method@dotagents   # also: dotagents-craft, dota
 The method pack carries the flow skills, the three subagents, the hooks and
 the global rules (printed by a session-start hook); it does not set Claude
 Code's permission rules or attribution settings, which only =install.py=
-writes. Use one way or the other, not both.
+writes. Use one way or the other, not both. The craft pack depends on the
+method pack, and the docs pack on both, since their skills call those
+subagents and skills: installing one brings what it depends on.
 
 Then:
 

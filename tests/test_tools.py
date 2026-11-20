@@ -108,6 +108,33 @@ class Tools(unittest.TestCase):
         self.assertEqual(scout.read_text(), (self.repo / "home/.agents/agents/scout.md").read_text())
         self.assertFalse((self.repo / "packs/method/agents/stray.md").exists())
 
+    def test_each_pack_manifest_names_the_packs_its_skills_call(self):
+        # craft's skills delegate to method's subagents and skills; docs' also hand steps to
+        # craft's skills (the maintainer's choice of 20 November 2026). Installing one pack
+        # brings what it calls; a pack with no dependency keeps the four plain keys.
+        base = {"name", "description", "version", "author"}
+        expected = {"method": [], "craft": ["dotagents-method"], "docs": ["dotagents-method", "dotagents-craft"],
+                    "chat": []}
+        build = load(self.repo / "tools/build.py", "dotagents_build")
+        self.assertEqual(sorted(build.PACKS), sorted(expected))
+        names = {f"dotagents-{name}" for name in build.PACKS}
+        for name, dependencies in expected.items():
+            with self.subTest(pack=name):
+                manifest = json.loads((self.repo / f"packs/{name}/.claude-plugin/plugin.json").read_text())
+                self.assertEqual(set(manifest), base | ({"dependencies"} if dependencies else set()))
+                self.assertEqual(manifest.get("dependencies", []), dependencies)
+                self.assertLessEqual(set(dependencies), names - {f"dotagents-{name}"})
+
+    def test_validate_fails_on_a_pack_dependency_that_names_no_pack(self):
+        source = self.repo / "tools/build.py"
+        source.write_text(source.read_text().replace(
+            "\n\ndef add(", '\nPACKS["craft"]["depends"] = ["metod"]\n\n\ndef add(', 1))
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertEqual([line for line in result.stdout.splitlines() if line.startswith("FAIL ")],
+                         ["FAIL tools/build.py: pack craft depends on 'metod', which names no other pack of PACKS"])
+
     def test_validate_checks_eval_cases_without_running_them(self):
         case = self.repo / "packs/method/evals/broken"
         (case / "graders").mkdir(parents=True)

@@ -439,7 +439,8 @@ def check_html_comments(rel: Path, text: str, errors: list) -> None:
 
 def check_marketplace(errors: list) -> None:
     """The committed Claude Code marketplace and each pack's links and generated files are what
-    tools/build.py writes, every path in it exists, and every skill sits in exactly one pack."""
+    tools/build.py writes, every path in it exists, every skill sits in exactly one pack, and
+    every pack a pack depends on is another pack of PACKS."""
     spec = importlib.util.spec_from_file_location("dotagents_build", ROOT / "tools" / "build.py")
     build = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(build)
@@ -464,6 +465,10 @@ def check_marketplace(errors: list) -> None:
     for path in build.stray_pack_files(files):
         errors.append(f"{path.relative_to(ROOT)}: a generated file no pack names; run python3 tools/build.py "
                       "--marketplace")
+    for name, pack in build.PACKS.items():
+        for other in pack.get("depends", []):
+            if other not in build.PACKS or other == name:
+                errors.append(f"tools/build.py: pack {name} depends on {other!r}, which names no other pack of PACKS")
     packed = [Path(link).name for link in wanted if "/skills/" in link]
     for folder in skill_folders(HOME / "skills") + skill_folders(ONLINE):
         count = packed.count(folder.name)

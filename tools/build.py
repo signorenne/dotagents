@@ -55,6 +55,10 @@ OWNER = {"name": "Nicolò Plebani"}
 # (tools/validate.py checks it). The method pack also carries the subagents, the hooks and
 # the global rules, which a session-start hook prints (Claude Code loads no CLAUDE.md from
 # a plugin and caps that output at 10,000 characters).
+# depends lists the packs whose subagents or skills a pack's skills call with no fallback
+# in their text; the manifest names them as dependencies (bare names, resolved in this
+# marketplace), so installing the pack brings them. claude plugin validate checks only the
+# form of that list, so tools/validate.py checks that each names another pack here.
 PACKS = {
     "method": {
         "description": "The dotagents method: build in lanes from one plan file, design, close, decide, "
@@ -67,11 +71,13 @@ PACKS = {
         "description": "Craft skills: clean architecture, event-driven UIs, Qt Quick, precise UI changes, "
                        "code audits and notes from work.",
         "skills": ["clean-architecture", "event-driven-ui", "qt-quick", "precise-ui-changes", "code-audit",
-                   "notes-from-work"]},
+                   "notes-from-work"],
+        "depends": ["method"]},
     "docs": {
         "description": "Documentation skills: as-built docs, requirements and architecture, project setup "
                        "for agents, and PlantUML diagrams.",
-        "skills": ["as-built-docs", "architecture-doc", "project-setup", "plantuml-diagrams"]},
+        "skills": ["as-built-docs", "architecture-doc", "project-setup", "plantuml-diagrams"],
+        "depends": ["method", "craft"]},
     "chat": {
         "description": "The skills that also run in chat: debugging, tests that can fail, verification, "
                        "research, decisions, prompts, notes, tutoring and handoffs.",
@@ -163,9 +169,11 @@ def pack_files() -> dict:
     a copy of each subagent in a pack that carries them."""
     files = {}
     for name, pack in PACKS.items():
-        files[f"packs/{name}/.claude-plugin/plugin.json"] = json.dumps(
-            {"name": f"dotagents-{name}", "description": pack["description"], "version": PACK_VERSION,
-             "author": OWNER}, indent=2, ensure_ascii=False) + "\n"
+        manifest = {"name": f"dotagents-{name}", "description": pack["description"], "version": PACK_VERSION,
+                    "author": OWNER}
+        if pack.get("depends"):
+            manifest["dependencies"] = [f"dotagents-{other}" for other in pack["depends"]]
+        files[f"packs/{name}/.claude-plugin/plugin.json"] = json.dumps(manifest, indent=2, ensure_ascii=False) + "\n"
         if pack.get("agents"):
             for agent in sorted((HOME / "agents").glob("*.md")):
                 files[f"packs/{name}/agents/{agent.name}"] = agent.read_text(encoding="utf-8")

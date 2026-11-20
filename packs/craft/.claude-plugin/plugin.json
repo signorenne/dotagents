@@ -4,5 +4,8 @@
   "version": "1.0.0",
   "author": {
     "name": "Nicolò Plebani"
-  }
+  },
+  "dependencies": [
+    "dotagents-method"
+  ]
 }
