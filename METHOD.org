@@ -146,8 +146,9 @@ a new plan; they are not converted.
   their consequences and the recommended one first, at most four per round
   (more go in further rounds of the same approval), a dependent question
   after the answer it depends on. Without the
-  interface they come as a numbered list in one message. The answers approve
-  the plan.
+  interface they come as a numbered list in one message. With no open
+  question, the one question is whether to approve the plan as shown. The
+  answers approve the plan.
 - During the work it stops only for:
   1. a change to the frozen intent (something the maintainer would notice in
      the result);

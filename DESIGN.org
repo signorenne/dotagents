@@ -649,11 +649,13 @@ Claude Code AskUserQuestion): one question per item, its options with their
 consequences and the recommended one first, at most four per round (more
 go in further rounds of the same approval), a dependent question after the
 answer it depends on; without the interface,
-a numbered list in one message. The answers approve the plan. decide does
-the same, and confirms each decision as its own question, never one yes for
-a list. Changed by the maintainer on 12 November 2026, who had asked 15
+a numbered list in one message. With no open question, the one question is
+whether to approve the plan as shown. The answers approve the plan. decide
+does the same, and confirms each decision as its own question, never one yes
+for a list. Changed by the maintainer on 12 November 2026, who had asked 15
 times in past sessions to be asked one question at a time through the
-interface. Replaces =grouped-questions=.
+interface; the clause for a plan with no open question added by the
+maintainer on 20 November 2026. Replaces =grouped-questions=.
 
 In: =METHOD.org=, =home/.agents/skills/build/SKILL.md=,
 =home/.agents/skills/decide/SKILL.md=, =home/.agents/AGENTS.md= (Decisions).
