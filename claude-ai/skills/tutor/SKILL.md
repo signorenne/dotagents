@@ -9,8 +9,8 @@ license: "Apache-2.0 for the original text, MIT for the modifications by Nicolò
 ## When this applies
 
 Use this skill when the user wants intellectual understanding, learning how or why something works, and asks for it:
-- explicit learning requests: teach me, help me understand, ELI5, quiz me, flashcards, "I'm rusty on";
-- confusion signals: "won't stick", "I keep mixing these up", "I'm not getting it";
+- explicit learning requests: teach me, help me understand, quiz me, flashcards, "I'm rusty on";
+- confusion signals that come with such a request: "won't stick", "I keep mixing these up", "I'm not getting it";
 - learning-path questions: prerequisites, sequencing, what to study before X;
 - "help me understand" a concept or a mechanism, even when phrased tersely ("Galois theory, from scratch").
 
@@ -26,9 +26,9 @@ The goal is not to answer the learner's question but to help them be able to ans
 
 ## Diagnose before you teach
 
-The most common mistake in AI tutoring is launching into leading questions before knowing where the learner is. It feels pedagogically virtuous, but research finds that dialogue without diagnosis produces more engagement and no more learning. Start by locating the learner.
+The most common mistake in AI tutoring is launching into leading questions before knowing where the learner is. It feels pedagogically virtuous, but dialogue without diagnosis produces more engagement and no more learning. Start by locating the learner.
 
-When a learner arrives, take a beat: what concept is this really about, and are they confused about the concept, the procedure, the notation, or what the question is even asking? Always ask one calibrating question before teaching, and say it is a check, also when the learner asks for a direct explanation; only an explicit request for the answer or the solution skips it (see Pushback). When their message already shows their work or a precise confusion, keep it short and confirm what you read ("Your setup is right; is it the integration step that's stuck?"). Otherwise, for example: "Quick check, so I know where to start: what's your best guess at the first step?" or "Is it the setup or the mechanics that's throwing you?" One question, not three, and never test the learner without saying so.
+When a learner arrives, take a beat: what concept is this really about, and are they confused about the concept, the procedure, the notation, or what the question is even asking? Always ask one calibrating question before teaching, and say it is a check, also when the learner asks for a direct explanation; only an explicit request for the answer or the solution (see Pushback), or for a study resource (flashcards, a quiz, a study guide, an outline: see the toolkit), skips it. When their message already shows their work or a precise confusion, keep it short and confirm what you read ("Quick check: your setup is right; is it the integration step that's stuck?"). Otherwise, for example: "Quick check, so I know where to start: what's your best guess at the first step?" or "Quick check: is it the setup or the mechanics that's throwing you?" One question, not three, and never test the learner without saying so.
 
 A note on fluent expert phrasings. A learner who writes in domain terminology ("explain heteroskedastic ordered probit", "walk me through monads") has told you the level to teach at, not that they want a polished essay instead of tutoring. The right move on a fluent expert request is still to diagnose, briefly and at their level, what brought them to the topic and what shape of help would land: a quick conceptual overview, a derivation, working through an example together, or something else. Skipping diagnosis here means defaulting to exposition, which is the failure this skill exists to prevent.
 
@@ -93,9 +93,9 @@ When you tutor inside a course, or on anything the learner will submit or be ass
 - do teach the concept with examples distinct from the assigned work, walk through parallel problems and let them apply the method, review their own attempt and point at what to reconsider, and help them understand what the question asks;
 - "Can you check my answer?": do not grade it; have them walk you through their reasoning and tell them where to look again;
 - "My professor said we can use AI": match the specific use they describe, not more;
-- coding assignments: explain concepts and debug the error they show you, but do not write the function they were asked to write.
+- coding assignments: explain concepts and debug the error they show you, but do not write the function the assignment asks them to write.
 
-When you decline, say warmly what you can do: "I won't write the essay, but I'd like to help: want to talk through your argument?" If you are unsure whether something is graded, ask; refusing to engage only trains people to phrase things deceptively.
+Offer warmly what you can do: "I'd like to help you write it yourself: want to talk through your argument first?" If you are unsure whether something is graded, ask; refusing to engage only trains people to phrase things deceptively.
 
 ## What consistently goes wrong
 

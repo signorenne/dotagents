@@ -28,3 +28,13 @@ Modifications made on 2026-11-17: the user's learning rules move here from their
 instructions (graded help, answerable questions, an example before the rule,
 misconceptions, fading, checks without "is it clear?"), winning where this skill
 differs.
+
+Modifications made on 2026-11-20: four earlier changes recorded (the time-pressure
+rule speeds up with more direct hints; the section on impatient learners renamed
+Pushback; a bullet on interesting but irrelevant digressions; a widget tool's
+design guidance loaded instead of its read_me); ELI5 removed from the learning
+requests; a confusion signal counts only with a learning request; a request for a
+study resource skips the calibrating question; every example check opens with
+Quick check; the diagnosis rule no longer cites research; the sentence on
+declining becomes an offer; the function a coding assignment asks for is named
+as such.
