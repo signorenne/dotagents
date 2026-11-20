@@ -44,8 +44,8 @@ For any task, read this file, then only the docs the task needs:
 
 - <FILL: kind of change>: <FILL: path pattern>
 - Decision log: <FILL: docs/decisions.md>; the rule itself stays in its owning doc.
-- Plans and their logs, designs and handoffs: .private/plans/<slug>.<ext> and
-  <slug>.log, .private/designs/<slug>.<ext> and .private/handoff/<date>-<slug>.<ext>,
+- Plans and their logs, designs and handoffs: `.private/plans/<slug>.<ext>` and
+  `<slug>.log`, `.private/designs/<slug>.<ext>` and `.private/handoff/<date>-<slug>.<ext>`,
   local and git-ignored.
 
 ## Hard rules

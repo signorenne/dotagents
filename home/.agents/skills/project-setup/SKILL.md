@@ -6,7 +6,7 @@ license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LIC
 
 # Project setup
 
-Templates live in the templates/ folder next to this file (in Claude Code: ${CLAUDE_SKILL_DIR}/templates; elsewhere ~/.agents/skills/project-setup/templates). Every <FILL: ...> marker must be replaced with verified facts or the line removed; none may remain in the result. A template names other docs by file name (VISION, the docs map): write each as a link with the path where that doc lives, and drop the mention of a doc the run does not create. A sentence a template states outside a marker is a default: it stays only where the repository shows nothing else.
+Templates live in the templates/ folder next to this file (in Claude Code: ${CLAUDE_SKILL_DIR}/templates; elsewhere ~/.agents/skills/project-setup/templates). Every <FILL: ...> marker must be replaced with verified facts or the line removed; none may remain in the result. A template names other docs by file name (VISION, the docs map): write each as a link with the path where that doc lives, and drop the mention of a doc the repository will not have after the run. A sentence a template states outside a marker is a default: it stays only where the repository shows nothing else.
 
 ## 1. Survey (delegate to scout)
 
@@ -19,7 +19,7 @@ Use the decide skill only for what the repository does not answer, typically whe
 - the files you will create or change, each with its source template;
 - the docs of the set you skip and why: STYLE_GUIDE without code, AI_DISCLAIMER unless the request asks for it;
 - each topic an existing doc already owns, which the new doc links to; moving that content into the new doc happens only on the user's yes to this line;
-- the style defaults the user may drop, where the repository shows no convention of its own: no em or en dashes, the words to avoid, the commit subject form, the branch model.
+- the style defaults the user may drop, where the repository shows no convention of its own: no em or en dashes, the words to avoid, the commit subject form.
 
 ## 3. AGENTS.md
 
@@ -27,7 +27,7 @@ Use the decide skill only for what the repository does not answer, typically whe
 - If it does not exist: draft it from the template, filling each section from the survey. Keep it under about 200 lines; a line belongs there only if removing it would cause an agent to make a mistake.
 - Validation commands: run each command once (delegate to gate-runner when output is long). Keep only commands that worked; mark any you could not run as "not verified" and tell the user.
 - If CLAUDE.md, GEMINI.md or .github/copilot-instructions.md duplicates rules or does not point to AGENTS.md, propose replacing it with its bridge from templates/bridges/, keeping its notes for that tool alone below the pointer: Claude Code reads AGENTS.md only when there is no CLAUDE.md, so a CLAUDE.md that merely mentions AGENTS.md without importing it leaves it without the rules.
-- Create the three bridges when missing, without asking: CLAUDE.md from templates/bridges/CLAUDE.md.template, GEMINI.md from templates/bridges/GEMINI.md.template and .github/copilot-instructions.md from templates/bridges/copilot-instructions.md.template. Every tool then reaches AGENTS.md without per-machine settings (Copilot CLI and Cursor, which also read CLAUDE.md, load the rules twice, and Gemini CLI may too where its context.fileName also names AGENTS.md; that cost is accepted). Codex needs none: AGENTS.md is its own file. With a CLAUDE.md, Claude Code no longer reads nested AGENTS.md files by itself: check what it loaded (/memory) and give each folder whose AGENTS.md it does not load a CLAUDE.md that imports it.
+- Create the three bridges when missing, without asking: CLAUDE.md from templates/bridges/CLAUDE.md.template, GEMINI.md from templates/bridges/GEMINI.md.template and .github/copilot-instructions.md from templates/bridges/copilot-instructions.md.template. Every tool then reaches AGENTS.md without per-machine settings (Copilot CLI and Cursor, which also read CLAUDE.md, load the rules twice, and Gemini CLI may too where its context.fileName also names AGENTS.md; that cost is accepted). Codex needs none: AGENTS.md is its own file. With a CLAUDE.md, Claude Code no longer reads nested AGENTS.md files by itself: find every nested AGENTS.md by a search for the file name and give each folder that has no CLAUDE.md one that imports it.
 
 ## 4. Project docs
 

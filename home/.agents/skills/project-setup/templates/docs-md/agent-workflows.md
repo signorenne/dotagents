@@ -40,7 +40,7 @@ with open design choices, or a change across modules.
    open design choices that are the maintainer's, each with options,
    consequences and a recommendation, one per item in the question box when
    the tool has one.
-3. Write the design to .private/designs/<slug>.md with the sections below.
+3. Write the design to `.private/designs/<slug>.md` with the sections below.
    A reader without access to the discussion must be able to build from it:
    name files, types, functions, error behavior and commands.
 4. Record each new decision that meets the bar in "When to record" of
@@ -129,10 +129,10 @@ acceptance criteria, unchanged behavior with its tests, who approved and when)
 | Nr | Source | Severity | Location | Finding | Verdict | Evidence |
 ```
 
-Every quick or full change keeps one at .private/plans/<slug>.md, updated
+Every quick or full change keeps one at `.private/plans/<slug>.md`, updated
 as each step, ruling and finding happens, from what happened rather than from
 intent; the facts a command can record (checks, failing-first runs, gates,
-commits) go to <slug>.log beside it through scripts and hooks. Rulings stay
+commits) go to `<slug>.log` beside it through scripts and hooks. Rulings stay
 "pending" until the maintainer keeps or changes them. A later session resumes
 from its Status and Next. It is local and never committed.
 
@@ -155,5 +155,5 @@ Verify before use (files and symbols the next session depends on):
 How to check it (per result: command or steps, expected visible result; mark what needs a human look):
 ```
 
-It goes to .private/handoff/<date>-<slug>.md. Commands still needed lists
+It goes to `.private/handoff/<date>-<slug>.md`. Commands still needed lists
 every documented gate not run since the last change, never empty by omission.
