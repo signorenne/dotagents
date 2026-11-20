@@ -706,6 +706,46 @@ class PlanScripts(unittest.TestCase):
         self.assertIn("Steps: 1 done, 1 in progress", result.stdout)
         self.assertIn("In progress: S2 widget test (files: test_a.py)", result.stdout)
 
+    def test_floor_check_reads_untracked_files_as_added_lines(self):
+        # A new file not yet added is part of the change: its skips, suppressions and risk
+        # surfaces count, and so do its lines, one by one inside an untracked folder; a binary
+        # file is listed and not scanned.
+        (self.repo / "test_new.py").write_text(
+            "import unittest\n\n\n@unittest.skip('later')\ndef test_new():\n    x = 1  # noqa: F841\n")
+        (self.repo / "pkg").mkdir()
+        (self.repo / "pkg/auth.py").write_text("TOKEN = 1\n")
+        (self.repo / "pkg/blob.bin").write_bytes(b"\x00\x01")
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(f"base {self.base}, 7 changed lines", result.stdout)
+        self.assertIn("added skip: test_new.py: @unittest.skip('later')", result.stdout)
+        self.assertIn("added suppression: test_new.py: x = 1  # noqa: F841", result.stdout)
+        self.assertIn("risk surface: security: pkg/auth.py", result.stdout)
+        self.assertIn("untracked, counted as added: pkg/auth.py, test_new.py\n", result.stdout)
+        self.assertIn("untracked, binary, not scanned: pkg/blob.bin\n", result.stdout)
+        # A name with a space and an accent stays whole; a link counts its target as one line.
+        (self.repo / "dir é").mkdir()
+        (self.repo / "dir é/nota.md").write_text("Nota.\n")
+        (self.repo / "link.py").symlink_to("pkg")  # a folder: read through the link, it would fail
+        result = self.run_script("floor_check.py")
+        self.assertIn(f"base {self.base}, 9 changed lines", result.stdout)
+        self.assertIn("untracked, counted as added: dir é/nota.md, link.py, pkg/auth.py, test_new.py\n", result.stdout)
+
+    def test_floor_check_leaves_working_notes_out_also_when_they_are_not_ignored(self):
+        (self.repo / ".gitignore").write_text("")
+        self.git("commit", "-q", "-am", "track nothing ignored")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.write_plan("full")
+        (self.repo / "sub/.private").mkdir(parents=True)
+        (self.repo / "sub/.private/notes.md").write_text("# noqa\n" * 50)
+        (self.repo / "extra.py").write_text("y = 1  # type: ignore\n")
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        self.assertIn(f"base {self.base}, 1 changed lines", result.stdout)
+        self.assertIn("added suppression: extra.py: y = 1  # type: ignore", result.stdout)
+        self.assertIn("untracked, counted as added: extra.py\n", result.stdout)
+        self.assertNotIn(".private", result.stdout)
+
     def test_plan_state_warns_of_a_row_with_more_cells_than_its_header(self):
         # An unescaped pipe in a cell shifts the later columns: the Status read is the wrong cell.
         result = self.run_script("plan_state.py")

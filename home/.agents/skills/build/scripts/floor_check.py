@@ -10,8 +10,10 @@ docs-only change needs before it runs the lighter gates (METHOD.org, Checks).
   python3 floor_check.py [--base REF] [--cwd DIR] [--lane quick|full] [--quick-limit 100]
 
 The base is --base, else the plan's Base, else the merge base with main (or master). The
-diff is the base against the working tree, so uncommitted work counts; untracked files
-are listed apart. Test, skip and suppression patterns cover Python, C and C++ (GoogleTest,
+diff is the base against the working tree, so uncommitted work counts, and so does each
+untracked file git does not ignore (every .private folder left out), read as added lines
+and printed as "untracked, counted as added: <paths>"; a binary one (a NUL byte in its
+first 8,000 bytes) is printed as "untracked, binary, not scanned: <paths>". Test, skip and suppression patterns cover Python, C and C++ (GoogleTest,
 Catch2, Qt Test), JavaScript and TypeScript, Go, Java, Kotlin and Rust; risk surfaces are
 path and line patterns, hints for the agent's judgment. The lane is --lane, else the
 plan's Lane.
@@ -24,6 +26,7 @@ from __future__ import annotations
 
 import argparse
 import io
+import os
 import re
 import sys
 import tokenize
@@ -205,6 +208,39 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
     return None
 
 
+def untracked_files(cwd) -> tuple[list, bool]:
+    """(paths relative to the repository root, ok): every untracked file that is not
+    ignored, one by one also inside an untracked folder, with every .private folder left
+    out, also where the project does not ignore it."""
+    listed, ok = planfile.git(["ls-files", "--others", "--exclude-standard", "--full-name", "-z", "--", ":/",
+                               ":(top,exclude,glob)**/.private/**"], cwd, timeout=60)
+    return [path for path in listed.split("\0") if path], ok
+
+
+def read_untracked(root: Path, paths: list) -> tuple[dict, list]:
+    """({path: change} with every line of each text file as an added line numbered from 1,
+    [binary paths]). A file whose first 8,000 bytes hold a NUL byte is binary, and so is one
+    that cannot be read; a symbolic link holds its target, as git diff shows it."""
+    files, binary = {}, []
+    for path in paths:
+        current = root / path
+        try:
+            data = os.readlink(current).encode() if current.is_symlink() else current.read_bytes()
+        except OSError:
+            binary.append(path)
+            continue
+        if b"\0" in data[:8000]:
+            binary.append(path)
+            continue
+        lines = data.decode("utf-8", errors="replace").splitlines()
+        files[path] = {"added": lines, "removed": [], "numbers": list(range(1, len(lines) + 1))}
+    return files, binary
+
+
+def listed(paths: list) -> str:
+    return ", ".join(paths[:10]) + (f" and {len(paths) - 10} more" if len(paths) > 10 else "")
+
+
 def report(files: dict, lane: str, limit: int, spans: dict | None = None) -> tuple[list, list, int]:
     """(problems, surfaces, changed lines). spans maps a Python path to python_spans() of its
     working-tree text: there a suppression written as a comment (# noqa, # type: ignore and
@@ -289,9 +325,15 @@ def main(argv=None) -> int:
     if not ok:
         print(f"floor_check: git diff {base} failed; nothing was checked")
         return 2
+    untracked, ok = untracked_files(args.cwd)
+    root, root_ok = planfile.git(["rev-parse", "--show-toplevel"], args.cwd)
+    if not ok or not root_ok:
+        print("floor_check: git ls-files failed; nothing was checked")
+        return 2
     lane = (args.lane or header.get("Lane", "")).lower()
     files = parse_diff(diff)
-    root, _ = planfile.git(["rev-parse", "--show-toplevel"], args.cwd)
+    added, binary = read_untracked(Path(root), untracked)
+    files.update(added)
     spans = {}
     for path, change in files.items():
         current = Path(root) / path if root else None
@@ -302,10 +344,12 @@ def main(argv=None) -> int:
                 spans[path] = found
     problems, surfaces, size = report(files, lane, args.quick_limit, spans)
     print(f"base {base}, {size} changed lines" + (f", lane {lane}" if lane else ""))
-    changed = code_change([name for name in names.splitlines() if name] + state["untracked"], commit, args.cwd)
+    changed = code_change([name for name in names.splitlines() if name] + untracked, commit, args.cwd)
     print("docs or comments only: " + ("yes" if changed is None else f"no: {changed}"))
-    if state["untracked"]:
-        print(f"untracked, not counted: {', '.join(state['untracked'][:10])}")
+    if added:
+        print(f"untracked, counted as added: {listed(sorted(added))}")
+    if binary:
+        print(f"untracked, binary, not scanned: {listed(sorted(binary))}")
     for line in surfaces:
         print(f"risk surface: {line}")
     for line in problems:
