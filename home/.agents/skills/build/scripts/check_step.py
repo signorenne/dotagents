@@ -16,6 +16,10 @@ command fails and fails when it passes, because a pass does not show that the te
 fail. A run with modified or untracked files is logged as "uncommitted(<n>)", never as
 the commit's, and as "uncommitted(?)" when git status failed. --tail 0 prints the whole
 output (for gate-runner, which searches it).
+The logged test count counts failed tests too: unittest's "Ran N tests" summed over runs,
+else the last jest "Tests: ... N total", ctest "failed out of N" or JUnit "Tests run: N",
+else cargo's passed and failed summed over its "test result:" lines, else pytest's last
+summary line (passed, failed and errors), else the last "N passed"; "-" when none.
 Without a plan file for the branch the check still runs and the result is not logged.
 Exit: the command's code; with --expect-fail 0 when it failed and 1 when it passed; 2
 when the command could not start (also exit 126 or 127 from the shell) or the guard
@@ -37,13 +41,16 @@ sys.dont_write_bytecode = True
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import planfile  # beside this script
 
-COUNTS = (
-    re.compile(r"^Ran (\d+) tests? in ", re.M),                       # unittest
-    re.compile(r"\b(\d+) passed\b"),                                  # pytest
-    re.compile(r"tests? failed out of (\d+)"),                        # ctest
-    re.compile(r"^Tests run: (\d+)", re.M),                           # JUnit
+UNITTEST = re.compile(r"^Ran (\d+) tests? in ", re.M)                  # summed over runs
+LAST_COUNTS = (
     re.compile(r"^Tests:\s+.*?(\d+) total", re.M),                    # jest
+    re.compile(r"tests? failed out of (\d+)"),                        # ctest
+    re.compile(r"^(?:\[[A-Z]+\] )?Tests run: (\d+)", re.M),           # JUnit (Maven prints [INFO])
 )
+CARGO = re.compile(r"^test result: .*?(\d+) passed; (\d+) failed", re.M)  # summed over test binaries
+PYTEST_LINE = re.compile(r"\bin \d+(?:\.\d+)?s\b")                  # the summary line ends with the time
+PYTEST_COUNT = re.compile(r"\b(\d+) (?:passed|failed|errors?)\b")
+PASSED = re.compile(r"\b(\d+) passed\b")
 
 
 GUARD = Path(__file__).resolve().parents[3] / "hooks" / "guard_bash.py"
@@ -64,11 +71,24 @@ def guard_refusal(command: str) -> str | None:
 
 
 def test_count(output: str) -> str:
-    for pattern in COUNTS:
+    """The number of tests the output reports, failed ones included, or "-"; the first rule
+    with a match wins."""
+    found = UNITTEST.findall(output)
+    if found:
+        return str(sum(int(n) for n in found))
+    for pattern in LAST_COUNTS:
         found = pattern.findall(output)
         if found:
-            return str(found[-1])
-    return "-"
+            return found[-1]
+    found = CARGO.findall(output)
+    if found:
+        return str(sum(int(passed) + int(failed) for passed, failed in found))
+    for line in reversed(output.splitlines()):
+        counts = PYTEST_COUNT.findall(line) if PYTEST_LINE.search(line) else []
+        if counts:
+            return str(sum(int(n) for n in counts))
+    found = PASSED.findall(output)
+    return found[-1] if found else "-"
 
 
 def main(argv=None) -> int:

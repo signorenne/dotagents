@@ -409,6 +409,37 @@ class PlanScripts(unittest.TestCase):
         self.assertEqual(len(saved), 1)
         self.assertIn("Ran 3 tests", saved[0].read_text())
 
+    def test_check_step_counts_the_tests_of_each_runner(self):
+        # A count that drops when a test fails, or reads only the last of several summaries,
+        # hides a lost test when the gates are compared with the baseline.
+        check_step = load("check_step", BUILD / "check_step.py")
+        maven = ("Tests run: 3, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.1 s - in a.FooTest\n"
+                 "Tests run: 4, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.2 s - in a.BarTest\n"
+                 "\nResults:\n\nTests run: 7, Failures: 1, Errors: 0, Skipped: 0\n")
+        cargo = ("test result: ok. 12 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.01s\n"
+                 "   Doc-tests widget\n"
+                 "test result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.00s\n")
+        samples = (
+            ("Ran 3 tests in 0.1s\n\nOK\n", "3"),
+            ("Ran 3 tests in 0.1s\n\nOK\nRan 4 tests in 0.2s\n\nOK\n", "7"),
+            ("Tests:       1 failed, 3 passed, 4 total\n", "4"),
+            ("Test Suites: 1 passed, 1 total\nTests:       1 failed, 3 passed, 4 total\nSnapshots:   0 total\n", "4"),
+            ("100% tests passed, 0 tests failed out of 12\n", "12"),
+            ("75% tests passed, 1 tests failed out of 4\n", "4"),
+            (maven, "7"),
+            ("".join(f"[INFO] {line}\n" if line else "\n" for line in maven.splitlines()), "7"),
+            (cargo, "12"),
+            ("test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.1s\n", "3"),
+            ("==================== 2 failed in 0.30s ====================\n", "2"),
+            ("collected 9 items\n\n=== 3 failed, 5 passed, 1 skipped in 0.12s ===\n", "8"),
+            ("1 passed, 2 errors in 0.50s\n", "3"),
+            ("widgets: 5 passed\n", "5"),
+            ("all good\n", "-"),
+        )
+        for output, expected in samples:
+            with self.subTest(output=output):
+                self.assertEqual(check_step.test_count(output), expected)
+
     def test_check_step_logs_a_dirty_tree_as_uncommitted_and_passes_the_exit_code_on(self):
         (self.repo / "test_a.py").write_text("changed\n")
         result = self.run_script("check_step.py", "--step", "S2", "--", sys.executable, "-c", "raise SystemExit(3)")
