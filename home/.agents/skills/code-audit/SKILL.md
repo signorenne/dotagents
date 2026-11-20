@@ -17,7 +17,7 @@ Goal: a short list of problems the owner can act on and trust. A wrong finding c
 
 ## 2. Find candidates
 
-- Map the area with scout; for a large repository, at most about four read-only subagents, one per area (in Claude Code the general-purpose subagent with model sonnet and effort medium, told not to edit; return the fixed report form, at most 40 lines: a status word (done, partial or too-big), then one row per candidate, path:line | kind | one-line reason). Then read yourself the code each candidate depends on.
+- Map the area with scout; for a large repository, at most about four read-only subagents, one per area (in Claude Code the general-purpose subagent with model sonnet and effort medium, elsewhere the tool's default general agent, told not to edit; return the fixed report form, at most 40 lines: a status word (done, partial or too-big), then one row per candidate, path:line | kind | one-line reason). An area reported too-big is split and read again. Then read yourself the code each candidate depends on.
 - Look in this order:
   - security: input reaching a dangerous call, secrets in code, missing authorization, unsafe parsing or deserialization, each named with its CWE;
   - likely bugs: wrong results, races, resource leaks, unchecked errors, boundary mistakes, undefined behavior, mismatches with a contract or spec;
