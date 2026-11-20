@@ -100,9 +100,10 @@ def sections(text: str) -> tuple[dict, dict]:
     return header, {title: "\n".join(lines) for title, lines in bodies.items()}
 
 
-def table(body: str) -> list:
-    """The rows of the first table in a section body, as dicts keyed by the lower-case
-    header cells. A pipe written as \\| (the markdown escape) stays inside its cell."""
+def table_rows(body: str) -> list:
+    """The cells of each row of the first table in a section body, the header row first,
+    separator rows left out. A pipe written as \\| (the markdown escape) stays inside its
+    cell."""
     rows = []
     for line in body.splitlines():
         stripped = line.strip()
@@ -117,10 +118,25 @@ def table(body: str) -> list:
             inner = inner[:-1]
         cells = [cell.strip().replace("\\|", "|") for cell in CELL_BREAK.split(inner)]
         rows.append(cells)
+    return rows
+
+
+def table(body: str) -> list:
+    """The rows of the first table in a section body, as dicts keyed by the lower-case
+    header cells. A pipe written as \\| (the markdown escape) stays inside its cell."""
+    rows = table_rows(body)
     if not rows:
         return []
     keys = [cell.lower() for cell in rows[0]]
     return [dict(zip(keys, cells + [""] * (len(keys) - len(cells)))) for cells in rows[1:]]
+
+
+def overlong_rows(body: str) -> list:
+    """(first cell, cell count, header cell count) for each row of the first table in a
+    section body that has more cells than its header: an unescaped pipe inside a cell,
+    whose later columns table() would read shifted and cut."""
+    rows = table_rows(body)
+    return [(cells[0], len(cells), len(rows[0])) for cells in rows[1:] if len(cells) > len(rows[0])]
 
 
 def read(plan: Path) -> dict:

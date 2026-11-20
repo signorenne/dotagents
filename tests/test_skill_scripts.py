@@ -706,6 +706,21 @@ class PlanScripts(unittest.TestCase):
         self.assertIn("Steps: 1 done, 1 in progress", result.stdout)
         self.assertIn("In progress: S2 widget test (files: test_a.py)", result.stdout)
 
+    def test_plan_state_warns_of_a_row_with_more_cells_than_its_header(self):
+        # An unescaped pipe in a cell shifts the later columns: the Status read is the wrong cell.
+        result = self.run_script("plan_state.py")
+        self.assertNotIn("Malformed row", result.stdout)
+        self.plan.write_text(self.plan.read_text().replace(
+            "| S2 | widget test | test_a.py | unit | in progress |",
+            "| S2 | widget test | test_a.py | unit 2>&1 | tail -3 | in progress |"))
+        warning = ("Malformed row in Steps: S2 has 7 cells, the header has 6; write a pipe inside a cell "
+                   "as \\| in markdown and \\vert in org")
+        lines = self.run_script("plan_state.py").stdout.splitlines()
+        self.assertIn(warning, lines)
+        steps = next(number for number, line in enumerate(lines) if line.startswith("Steps:"))
+        self.assertLess(lines.index(warning), steps)
+        self.assertNotIn("Malformed row", self.run_script("plan_state.py", "--excerpt").stdout)
+
     def with_failing_git_status(self) -> dict:
         """An environment whose git fails on status and is the real one otherwise."""
         folder = self.root / "bin"

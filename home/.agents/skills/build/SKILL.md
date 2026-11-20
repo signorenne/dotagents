@@ -54,7 +54,7 @@ Path: .private/plans/<slug>.<ext> in the project's prose format; slug in kebab c
 | Nr | Source | Severity | Location | Finding | Verdict | Evidence |
 ```
 
-In markdown the title is "# Plan: <change>" and each section a "## " heading; tables stay the same. The quick lane writes the header, a short Intent with its acceptance criteria, the Steps table and Verification, and adds Rulings, Dead ends or Review when their first row comes.
+In markdown the title is "# Plan: <change>" and each section a "## " heading; tables stay the same. A pipe inside a table cell is written \| in markdown and \vert in org. The quick lane writes the header, a short Intent with its acceptance criteria, the Steps table and Verification, and adds Rulings, Dead ends or Review when their first row comes.
 
 - Intent, frozen at approval: the problem, the approach, what must always hold, what is out of scope, the acceptance criteria as observable behaviors a test or command can fail, observed where the effect is consumed, and the unchanged behavior as WHEN <condition> the system SHALL CONTINUE TO <behavior>, each with the test that pins it (path and name). Self-contained: no "as discussed". Compared measurements come from one session with known spread.
 - Code map: the commit it was checked on, then exact files, symbols and lines, what to reuse, what not to touch. For each function or mechanism a step relies on, its early returns, guards, preconditions and the code that runs before it (initialization, registration), and why the step's effect happens, with file:line.

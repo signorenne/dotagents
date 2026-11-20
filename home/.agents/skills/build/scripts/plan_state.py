@@ -7,6 +7,9 @@ state header, the step in progress, the open rulings and the last log lines.
   python3 plan_state.py [--cwd DIR]
   python3 plan_state.py --excerpt [--max-chars 4000]   the bounded form the session hook prints
 
+The full form also prints, before the steps, "Malformed row in <Section>: ..." for each
+row of the Steps, Rulings, Review or Assumptions table with more cells than its header
+(a pipe inside a cell not written as \\| in markdown or \\vert in org).
 On a branch that is not a task branch (<type>/<slug>) or has no plan file, it lists the
 open plans of the working-notes folder instead. Exit 0, or 2 outside a git repository.
 """
@@ -86,6 +89,11 @@ def describe(cwd, excerpt: bool) -> tuple[int, list]:
     lines.append("  " + ", ".join(f"{key} {header[key]}" for key in planfile.HEADER_KEYS[:-1] if key in header))
     if header.get("Next"):
         lines.append(f"Next: {header['Next']}")
+    if not excerpt:  # the excerpt stays bounded
+        for name in ("Steps", "Rulings", "Review", "Assumptions"):
+            for first, count, width in planfile.overlong_rows(data["sections"].get(name, "")):
+                lines.append(f"Malformed row in {name}: {first} has {count} cells, the header has {width}; "
+                             "write a pipe inside a cell as \\| in markdown and \\vert in org")
     lines += step_lines(data["steps"], state, commits)
     pending = [row for row in data["rulings"] if row.get("review", "").lower() in ("", "pending")]
     if pending:
