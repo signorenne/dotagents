@@ -117,6 +117,18 @@ class Folders(CommandCase):
         self.assertEqual(status, 1, out)
         self.assertIn("b.png: no reference", out)
 
+    def test_reference_without_a_new_frame_fails(self):
+        # A state not rendered again is not shown unmoved; the frame that was rendered still passes.
+        for name in ("a.png", "b.png"):
+            (self.before / name).write_bytes(b"")
+        (self.after / "a.png").write_bytes(b"")
+        with mock.patch.object(nothing_moved, "load_pair", return_value=((2, 2), (2, 2), bytes(4))):
+            status, out = self.check()
+        self.assertEqual(status, 1, out)
+        self.assertIn(f"FAIL b.png: no new frame under {self.after}", out)
+        self.assertIn("ok   a.png: 0 changed pixels", out)
+        self.assertIn("FAIL: 1 of 2 frames failed", out)
+
     def test_bad_rectangle_is_a_usage_error(self):
         (self.after / "a.png").write_bytes(b"")
         self.assertEqual(self.check("--allow", "8,8,4,4")[0], 2)

@@ -12,8 +12,9 @@ Usage:
       Compares each PNG under --after with the PNG at the same relative path under
       --before. A pixel counts as changed when one of its R, G, B or A values differs
       by more than N (0 to 254). Fails when a changed pixel lies outside every --allow
-      rectangle, when a frame changed size, or when a frame under --after has no
-      reference. A rectangle is left,top,right,bottom in pixels, right and bottom
+      rectangle, when a frame changed size, when a frame under --after has no
+      reference, or when a reference under --before has no new frame (that state was
+      not rendered, so nothing shows it unmoved). A rectangle is left,top,right,bottom in pixels, right and bottom
       excluded. Without --allow, every change counts as outside, which shows where
       frames changed.
 
@@ -152,10 +153,10 @@ def check(args: argparse.Namespace) -> int:
             failed += 1
         else:
             print(f"ok   {name}: {found.inside} changed pixels, all inside the allowed areas")
-    unmatched = len(set(references) - set(frames))
-    if unmatched:
-        print(f"note: {unmatched} references have no new frame and were not compared")
-    print(f"{'FAIL' if failed else 'PASS'}: {failed} of {len(frames)} frames failed")
+    for name in sorted(set(references) - set(frames)):
+        print(f"FAIL {name}: no new frame under {args.after}")
+        failed += 1
+    print(f"{'FAIL' if failed else 'PASS'}: {failed} of {len(set(references) | set(frames))} frames failed")
     return 1 if failed else 0
 
 
