@@ -559,7 +559,7 @@ class PlanScripts(unittest.TestCase):
             ({"docs/guide.org": "* Guide 2\n", "lib.py": lib + "# trailing\n"}, "yes"),
             ({"lib.py": lib.replace("# data", "# other")}, "no: lib.py"),
             ({"lib.py": lib.replace("return 1", "return 2")}, "no: lib.py"),
-            ({"a.c": "int x; /* changed */\n"}, "no: a.c"),
+            ({"a.c": "int y; /* c */\n"}, "no: a.c"),
             ({"app.json": '{"a": 2}\n'}, "no: app.json"),
             ({"logo.png": b"\x89PNG\r\n\x1a\n\x01"}, "no: logo.png"),
             ({"docs/diagram.svg": "<svg>2</svg>\n", "notes.md": "* Notes\n"}, "yes"),
@@ -588,6 +588,113 @@ class PlanScripts(unittest.TestCase):
                 result = self.run_script("floor_check.py")
                 self.assertEqual(result.returncode, 0, result.stdout)
                 self.assertIn(f"docs or comments only: {verdict}\n", result.stdout)
+
+    def test_floor_check_tells_c_and_cpp_comments_from_code(self):
+        # A C or C++ diff is comments only when the compiler sees the same tokens on the same
+        # lines and columns and every comment a tool or warning reads stays in place: a
+        # comment code follows on its line, a NOLINT, the line after a NOLINTNEXTLINE, a
+        # comment before a case label and a comment line indented less than the next code
+        # count as code, and so does a file that does not lex for certain.
+        lib = ('#pragma once\n#include <vector>\n\n/**\n * @file\n * @brief A library.\n */\n\n'
+               "// A line comment.\n"
+               "inline constexpr int big{1'000};  // a trailing comment\n"
+               'inline constexpr char const* greeting{"a  // not a comment"};\n'
+               'inline constexpr char const* raw{R"x(/* kept */\n  two  \n)x"};\n'
+               "inline constexpr char quote{'\"'};\n"
+               "#define TWICE(v) \\\n  ((v) + (v))\n"
+               "int* p = 0;  // NOLINT(modernize-use-nullptr)\n"
+               "// NOLINTNEXTLINE(modernize-use-nullptr)\nint* q = 0;\n"
+               "void g();\ninline auto f(int c) -> int {\n  switch (c) {\n    case 0:\n      g();\n"
+               "      // falls through\n    case 1:\n      g();\n      break;\n    // before default\n"
+               "    default:\n      break;\n  }\n  if (c)\n    g();\n  g();\n  return /* mid */ c;\n}\n")
+        fixtures = {"src/lib.hpp": lib, "a.c": "int x; /* c */\n", "b.c": "int x = 1'000; // c\n",
+                    "id.hpp": "int x1'b /* a' */\n", "hn.hpp": "#include <a//b.h>\n", "foor.hpp": 'int s = sizeof FOOR"a(";  /* c */\n',
+                    "raw2.hpp": 'auto r = R"(a\\\nb)";\n', "bad.hpp": "/* open\n",
+                    "tidy.hpp": "int* p = 0;  // NOLINT(modernize-use-nullptr)\nint y;\n",
+                    "tests/test_lib.cpp": "// a test\nint t;\n", "tests/fixtures/f.cpp": "// data\nint d;\n"}
+        for name, content in fixtures.items():
+            (self.repo / name).parent.mkdir(parents=True, exist_ok=True)
+            (self.repo / name).write_text(content)
+        self.git("add", "-A")
+        self.git("commit", "-q", "-m", "c and c++")
+        self.base = self.git("rev-parse", "--short", "HEAD")
+        self.write_plan("full")
+
+        def swap(old, new, text=lib):
+            self.assertIn(old, text)
+            return text.replace(old, new, 1)
+
+        moved = swap("// A line comment.\n", "")
+        cases = (
+            # Comments nothing reads: rewritten, moved, added, on a line with a digit separator.
+            ({"src/lib.hpp": swap(" * @brief A library.", " * @brief A small library.")}, "yes", 0),
+            ({"src/lib.hpp": swap("void g();\n", "// A line comment.\nvoid g();\n", moved)}, "yes", 0),
+            ({"src/lib.hpp": swap("// a trailing comment", "// another")}, "yes", 0),
+            ({"src/lib.hpp": swap("    g();\n  g();\n", "    g();\n  // same column\n  g();\n")}, "yes", 0),
+            ({"src/lib.hpp": swap("// A line comment.", "// A line comment.\f int hidden;")}, "yes", 0),
+            ({"a.c": "int x; /* changed */\n"}, "yes", 0),
+            ({"a.c": b"int x; /* changed */\r"}, "yes", 0),
+            ({"tests/test_lib.cpp": "// the test\nint t;\n"}, "yes", 0),
+            ({"foor.hpp": 'int s = sizeof FOOR"a(";  /* d */\n'}, "yes", 0),
+            ({"src/lib.hpp": swap("// a trailing comment", "// another").replace("\n", "\r\n").encode()},
+             "yes", 1),  # every line is added again, the NOLINT one among them
+            # A comment code follows on its line.
+            ({"src/lib.hpp": swap("return /* mid */ c;", "return c;")}, "no: src/lib.hpp", 0),
+            # Literals and header names.
+            ({"src/lib.hpp": swap('"a  // not a comment"', '"a // not a comment"')}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("  two  \n", "  two\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("/* kept */", "/* gone */")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("{'\"'}", "{'\\''}")}, "no: src/lib.hpp", 0),
+            ({"id.hpp": "int x1'b /* b' */\n"}, "no: id.hpp", 0),
+            ({"hn.hpp": "#include <a//c.h>\n"}, "no: hn.hpp", 0),
+            ({"raw2.hpp": 'auto r = R"(ab)";\n'}, "no: raw2.hpp", 0),
+            # Comments a tool or a warning reads.
+            ({"src/lib.hpp": swap("  // NOLINT(modernize-use-nullptr)", "")}, "no: src/lib.hpp", 0),
+            ({"tidy.hpp": "int* p = 0;\nint y;\n"}, "no: tidy.hpp", 0),
+            ({"src/lib.hpp": swap("// NOLINTNEXTLINE(modernize-use-nullptr)\n",
+                                  "// NOLINTNEXTLINE(modernize-use-nullptr)\n// note\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// falls through", "// next")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// before default", "// other")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("    g();\n  g();\n", "    g();\n// low\n  g();\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// A line comment.", "// A line comment. NOLINT")}, "no: src/lib.hpp", 1),
+            # Splices, indentation and code.
+            ({"src/lib.hpp": swap("#define TWICE(v) \\\n", "#define TWICE(v)\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("#define TWICE(v) \\\n", "#define TWICE(v) \\  \n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("#define TWICE(v) \\\n", "#define TWICE(v) \\ /* c */\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("  g();\n  return", "    g();\n  return")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("big{1'000}", "big{1'001}")}, "no: src/lib.hpp", 0),
+            # Files that do not lex for certain, and files that are not there.
+            ({"src/lib.hpp": lib + "/* open\n"}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": lib + "/* a /* b */\n"}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// A line comment.\n", "// A line \\\ncomment.\n")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// A line comment.", "// A line comment ??/")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": swap("// A line comment.", "// A line \u202e comment.")}, "no: src/lib.hpp", 0),
+            ({"src/lib.hpp": lib.encode().replace(b"A line comment", b"A \xff comment", 1)}, "", 2),
+            ({"bad.hpp": "/* open more\n"}, "no: bad.hpp", 0),
+            ({"b.c": "int x = 1'000; // d\n"}, "no: b.c", 0),
+            ({"a.c": "int x; //* c */\n"}, "no: a.c", 0),
+            ({"tests/fixtures/f.cpp": "// the data\nint d;\n"}, "no: tests/fixtures/f.cpp", 0),
+            ({"new.cpp": "// new\n"}, "no: new.cpp", 0),
+            ({"src/lib.hpp": None}, "no: src/lib.hpp", 0),
+        )
+        for files, verdict, code in cases:
+            with self.subTest(files=sorted(files), verdict=verdict, content=str(files)[:160]):
+                self.git("checkout", "-q", "HEAD", "--", ".")
+                self.git("clean", "-fdq")
+                for name, content in files.items():
+                    path = self.repo / name
+                    if content is None:
+                        path.unlink()
+                    else:
+                        path.write_bytes(content) if isinstance(content, bytes) else path.write_text(content)
+                result = self.run_script("floor_check.py")
+                self.assertEqual(result.returncode, code, result.stdout)
+                if code == 2:  # a diff that is not UTF-8 is never read: nothing was checked
+                    self.assertIn("nothing was checked", result.stdout)
+                    continue
+                self.assertIn(f"docs or comments only: {verdict}\n", result.stdout)
+                if code:
+                    self.assertIn("added suppression: src/lib.hpp:", result.stdout)
 
     def test_floor_check_counts_python_suppressions_and_skips_only_outside_strings(self):
         # A Python line that only mentions a suppression inside a string or a docstring adds

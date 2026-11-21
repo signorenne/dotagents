@@ -4,8 +4,8 @@
 """Compare a change with its base and report what must never pass unnoticed: removed
 tests, added skips, added suppressions, the size of the change and the risk surfaces it
 touches. A quick-lane change that outgrew its lane is reported as raised to the full lane.
-It also says whether the diff changes only documentation or Python comments, the proof a
-docs-only change needs before it runs the lighter gates (METHOD.org, Checks).
+It also says whether the diff changes only documentation or Python, C or C++ comments, the
+proof a docs-only change needs before it runs the lighter gates (METHOD.org, Checks).
 
   python3 floor_check.py [--base REF] [--cwd DIR] [--lane quick|full] [--quick-limit 100]
 
@@ -27,6 +27,7 @@ could not run (no repository, unknown base, git failed); it never reads as clean
 from __future__ import annotations
 
 import argparse
+import bisect
 import io
 import os
 import re
@@ -75,6 +76,21 @@ DOCS = re.compile(r"\.(md|markdown|org|rst|adoc)$|(^|/)(README|LICENSE|CHANGELOG
 TEST_DATA = re.compile(r"(^|/)(tests?|testdata|test_data|fixtures?|__snapshots__|golden)/", re.I)
 DIRECTIVE = re.compile(r"#\s*(type:|noqa|pragma|pylint:|fmt:|isort:|mypy:|pyright:|ruff:|nosec)", re.I)
 HEADER = re.compile(r"^#!|^[ \t\f]*#.*?coding[:=]")  # a shebang or an encoding line: comments that run
+C_FAMILY = re.compile(r"\.(c|cc|cpp|cxx|c\+\+|h|hh|hpp|hxx|h\+\+|ipp|inl|tpp)$")
+C_ONLY = re.compile(r"\.[ch]$")  # C, or a header C may include: no C++ forms
+DATA_FOLDERS = re.compile(r"(^|/)(testdata|test_data|fixtures?|__snapshots__|golden)/", re.I)
+# Comments a tool reads, and GCC's level-2 fall-through note (-Wimplicit-fallthrough=2).
+C_DIRECTIVE = re.compile(r"NOLINT|clang-format\s+(?:on|off)|IWYU\s+pragma|cppcheck-suppress|[LG]COVR?_EXCL|"
+                         r"coverity\[|NOSONAR|codechecker_|NOTREACHED|falls?[ \t-]*thr(?:ough|u)", re.I)
+# A NUL, a trigraph, a bidirectional control (GCC's -Wbidi-chars), and a backslash that blanks
+# keep from its newline (a splice GCC and Clang warn about): read as code, never modelled.
+C_REFUSED = re.compile(r"\0|\?\?[=/'()!<>-]|[\u202a-\u202e\u2066-\u2069]|\\[ \t\f\v]+\n")
+RAW_PREFIXES = ("R", "u8R", "uR", "UR", "LR")
+RAW_DELIMITER = re.compile(r"[^ ()\\\t\v\f\n]{0,16}")
+HEADER_NAME_BEFORE = re.compile(r"^[ \t\f\v]*(?:#|%:)[ \t\f\v]*(?:include|include_next|import|embed)[ \t\f\v]*$|"
+                                r"__has_(?:include|include_next|embed)[ \t\f\v]*\([ \t\f\v]*$")
+LABEL = re.compile(r"(?:case|default)\b")
+BLANK = " \t\f\v"
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
                              r"std::atomic|\basyncio\.|\bgo func\b|\bsynchronized\b|\bQThread\b|ThreadPool")),
@@ -179,15 +195,170 @@ def directives(text: str) -> list | None:
         return None
 
 
+def visual_column(text: str, start: int, position: int) -> int:
+    """The column of position in the line that starts at start, a tab to the next multiple of
+    8, as GCC counts for -Wmisleading-indentation."""
+    width = 0
+    for char in text[start:position]:
+        width = width + 8 - width % 8 if char == "\t" else width + 1
+    return width
+
+
+def c_lines(text: str, c_only: bool = False) -> list | None:
+    """C (C99 or later) or C++ (C++11 or later) source as its physical lines without the
+    comments nothing reads, or None when it does not lex or may mean something else under
+    another language or standard. Lexing runs on the spliced text (backslash-newline removed,
+    translation phase 2), raw strings on the original text where the standard reverts
+    splices; the lines are the original's, every splice kept. A comment is dropped only when
+    nothing but blanks and dropped comments follow it on its spliced line, no tool reads it
+    (C_DIRECTIVE), it touches no line right after one a C_DIRECTIVE comment ends on
+    (NOLINTNEXTLINE and the like), and its next code token is no case or default label
+    (GCC's -Wimplicit-fallthrough=1 reads any comment there). A line left with only dropped
+    comments goes, unless it is indented less than the next line with code
+    (-Wmisleading-indentation reads it) or dropping would end it in a new backslash. A .c or
+    .h file (c_only) refuses C++ forms, and C89's //* reading."""
+    text = text.replace("\r\n", "\n").replace("\r", "\n")
+    if C_REFUSED.search(text):
+        return None
+    parts, origin, last = [], [], 0
+    for found in re.finditer(r"\\\n", text):
+        parts.append(text[last:found.start()])
+        origin.extend(range(last, found.start()))
+        last = found.end()
+    parts.append(text[last:])
+    origin.extend(range(last, len(text) + 1))
+    spliced = "".join(parts)
+    size, tokens, i, word = len(spliced), [], 0, ""
+
+    def add(kind, start, end):  # spliced positions in, original positions kept
+        tokens.append((kind, origin[start], origin[end - 1] + 1))
+
+    def quoted(start):
+        end, quote = start + 1, spliced[start]
+        while end < size and spliced[end] != quote:
+            if spliced[end] == "\n":
+                return None
+            end += 2 if spliced[end] == "\\" else 1
+        return None if end >= size else end + 1
+
+    while i < size:
+        char = spliced[i]
+        number = word[:1].isdigit() or (word[:1] == "." and word[1:2].isdigit())
+        if char == "\n":
+            add("newline", i, i + 1)
+            i, word = i + 1, ""
+        elif spliced.startswith("//", i):
+            if c_only and spliced.startswith("//*", i):
+                return None  # C89 reads / then /*
+            end = spliced.find("\n", i)
+            end = size if end == -1 else end
+            if "\n" in text[origin[i]:origin[end]]:
+                return None  # a // comment a splice continues: -Wcomment
+            add("comment", i, end)
+            i, word = end, ""
+        elif spliced.startswith("/*", i):
+            close = spliced.find("*/", i + 2)
+            if close == -1 or "/*" in spliced[i + 2:close]:
+                return None  # unterminated, or -Wcomment
+            add("comment", i, close + 2)
+            i, word = close + 2, ""
+        elif char == '"' and word in RAW_PREFIXES:
+            if c_only:
+                return None
+            start = origin[i]
+            delimiter = RAW_DELIMITER.match(text, start + 1).group(0)
+            if not text.startswith("(", start + 1 + len(delimiter)):
+                return None
+            close = text.find(")" + delimiter + '"', start + 2 + len(delimiter))
+            if close == -1:
+                return None
+            stop = close + len(delimiter) + 2
+            tokens.append(("literal", start, stop))
+            i, word = bisect.bisect_left(origin, stop), ""
+        elif char == "'" and number:
+            if c_only or not (spliced[i + 1:i + 2].isalnum() or spliced[i + 1:i + 2] == "_"):
+                return None  # a C digit separator needs C23; a quote ending a number is odd
+            add("code", i, i + 1)
+            word += char
+            i += 1
+        elif char in "\"'":
+            end = quoted(i)
+            if end is None:
+                return None
+            add("literal", i, end)
+            i, word = end, ""
+        elif char == "<" and HEADER_NAME_BEFORE.search(spliced, spliced.rfind("\n", 0, i) + 1, i):
+            end = spliced.find(">", i)
+            if end == -1 or "\n" in spliced[i:end]:
+                return None
+            add("literal", i, end + 1)
+            i, word = end + 1, ""
+        else:
+            add("code", i, i + 1)
+            if char.isalnum() or char in "_$" or (number and (char == "." or (char in "+-" and word[-1:] in "eEpP"))):
+                word += char
+            elif char == "." and spliced[i + 1:i + 2].isdigit():
+                word = char
+            else:
+                word = ""
+            i += 1
+    breaks = [position for position, char in enumerate(text) if char == "\n"]
+    line_of = lambda position: bisect.bisect_left(breaks, position)
+    pinned = {line_of(end - 1) + 1 for kind, start, end in tokens
+              if kind == "comment" and C_DIRECTIVE.search(text, start, end)}
+    dropped, clear, upcoming = [], True, None
+    for kind, start, end in reversed(tokens):
+        if kind == "newline":
+            clear = True
+        elif kind in ("code", "literal"):
+            if text[start:end].strip(BLANK):
+                clear, upcoming = False, start
+        elif not clear or C_DIRECTIVE.search(text, start, end) or \
+                any(line in pinned for line in range(line_of(start), line_of(end - 1) + 1)) or \
+                (upcoming is not None and LABEL.match(text, upcoming)):
+            clear = False
+        else:
+            dropped.append((start, end))
+    drop, in_literal, first_code = bytearray(len(text) + 1), bytearray(len(text) + 1), {}
+    for start, end in dropped:
+        drop[start:end] = b"\1" * (end - start)
+    for kind, start, end in tokens:
+        if kind == "literal":
+            in_literal[start:end] = b"\1" * (end - start)
+        if kind in ("code", "literal") and text[start:end].strip(BLANK):
+            first_code.setdefault(line_of(start), start)
+    starts, ends = [0] + [position + 1 for position in breaks], breaks + [len(text)]
+    result = []
+    for number, (start, end) in enumerate(zip(starts, ends)):
+        raw = text[start:end]
+        kept = "".join(text[position] for position in range(start, end) if not drop[position])
+        kept = kept if in_literal[end] else kept.rstrip(BLANK)
+        touched = any(drop[start:end + 1])
+        if touched and kept.endswith("\\") and not raw.endswith("\\"):
+            result.append(raw.rstrip(BLANK))  # dropping the comment would make a splice
+        elif kept or not touched:
+            result.append(kept)
+        elif raw.strip(BLANK):
+            following = next((line for line in range(number + 1, len(starts)) if line in first_code), None)
+            own = start + len(raw) - len(raw.lstrip(" \t"))
+            if following is not None and visual_column(text, start, own) < \
+                    visual_column(text, starts[following], first_code[following]):
+                result.append(raw.rstrip(BLANK))
+    return result
+
+
 def code_change(paths: list, commit: str, cwd) -> str | None:
-    """The first changed path that is code, or None when every path is a documentation file or
-    a Python file whose tokens other than comments, its shebang, its encoding line and its
-    tool directives (# noqa, # type: ignore and the like) are unchanged. A build or
-    dependency file, a file under a test data folder, a code file of another language, an
-    untracked code file and any other file count as code: the conservative reading, since
-    only Python's comments are told apart from code here. Documentation is decided by
-    extension (a .txt only when named like README or under docs/), and an image or diagram
-    only under docs/."""
+    """The first changed path that is code, or None when every path is a documentation file, a
+    Python file whose tokens other than comments, its shebang, its encoding line and its tool
+    directives (# noqa, # type: ignore and the like) are unchanged, or a C or C++ file whose
+    c_lines are unchanged (one under a test data folder other than tests/ excepted). A build
+    or dependency file, another file under a test data folder, a code file of another
+    language, an untracked code file and any other file count as code: the conservative
+    reading. Documentation is decided by extension (a .txt only when named like README or
+    under docs/), and an image or diagram only under docs/. Not seen here: line numbers that
+    an added or removed comment line moves (__LINE__, assert, source_location), a compiler
+    flag that reads other comments (clang's -Wdocumentation), and C89, which reads an added
+    // comment as code."""
     root, ok = planfile.git(["rev-parse", "--show-toplevel"], cwd)
     header = lambda text: [line for line in text.splitlines()[:2] if HEADER.match(line)]
     if not ok:
@@ -204,6 +375,20 @@ def code_change(paths: list, commit: str, cwd) -> str | None:
             before, after = python_tokens(old), python_tokens(new)
             if before is None or before != after or header(old) != header(new) or \
                     directives(old) != directives(new):
+                return path
+        elif C_FAMILY.search(path) and not DATA_FOLDERS.search(path):
+            old, found = planfile.git(["show", f"{commit}:{path}"], cwd)
+            current = Path(root) / path
+            if not found or not current.is_file():
+                return path
+            try:
+                new = current.read_bytes().decode("utf-8")
+            except UnicodeDecodeError:
+                return path
+            new = new.replace("\r\n", "\n").replace("\r", "\n").rstrip("\n")  # as git show reads
+            c_only = bool(C_ONLY.search(path))
+            before = c_lines(old, c_only)
+            if before is None or before != c_lines(new, c_only):
                 return path
         elif CODE.search(path) or TEST_DATA.search(path) or not DOCS.search(path):
             return path
