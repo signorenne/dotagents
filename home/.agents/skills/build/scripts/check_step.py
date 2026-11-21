@@ -17,7 +17,8 @@ fail. A run with modified or untracked files is logged as "uncommitted(<n>)", ne
 the commit's, and as "uncommitted(?)" when git status failed. --tail 0 prints the whole
 output (for gate-runner, which searches it).
 The logged test count counts failed tests too: unittest's "Ran N tests" summed over runs,
-else the last jest "Tests: ... N total", ctest "failed out of N" or JUnit "Tests run: N",
+else the last jest "Tests: ... N total" or ctest "failed out of N", else JUnit's "Tests
+run: N" after each Maven "Results:" header summed (the last "Tests run: N" without one),
 else cargo's passed and failed summed over its "test result:" lines, else pytest's last
 summary line (passed, failed and errors), else the last "N passed"; "-" when none.
 Without a plan file for the branch the check still runs and the result is not logged.
@@ -45,8 +46,9 @@ UNITTEST = re.compile(r"^Ran (\d+) tests? in ", re.M)                  # summed 
 LAST_COUNTS = (
     re.compile(r"^Tests:\s+.*?(\d+) total", re.M),                    # jest
     re.compile(r"tests? failed out of (\d+)"),                        # ctest
-    re.compile(r"^(?:\[[A-Z]+\] )?Tests run: (\d+)", re.M),           # JUnit (Maven prints [INFO])
 )
+JUNIT = re.compile(r"^(?:\[[A-Z]+\] )?Tests run: (\d+)", re.M)       # Maven prints [INFO] or [ERROR]
+RESULTS = re.compile(r"^(?:\[[A-Z]+\] )?Results:\s*$", re.M)        # Maven: one section per module
 CARGO = re.compile(r"^test result: .*?(\d+) passed; (\d+) failed", re.M)  # summed over test binaries
 PYTEST_LINE = re.compile(r"\bin \d+(?:\.\d+)?s\b")                  # the summary line ends with the time
 PYTEST_COUNT = re.compile(r"\b(\d+) (?:passed|failed|errors?)\b")
@@ -80,6 +82,10 @@ def test_count(output: str) -> str:
         found = pattern.findall(output)
         if found:
             return found[-1]
+    found = JUNIT.findall(output)
+    if found:  # the total after each module's Results header, else the last line
+        totals = [int(match.group(1)) for part in RESULTS.split(output)[1:] if (match := JUNIT.search(part))]
+        return str(sum(totals)) if totals else found[-1]
     found = CARGO.findall(output)
     if found:
         return str(sum(int(passed) + int(failed) for passed, failed in found))

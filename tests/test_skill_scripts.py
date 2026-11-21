@@ -440,11 +440,18 @@ class PlanScripts(unittest.TestCase):
             ("75% tests passed, 1 tests failed out of 4\n", "4"),
             (maven, "7"),
             ("".join(f"[INFO] {line}\n" if line else "\n" for line in maven.splitlines()), "7"),
+            # A multi-module build prints a Results section with its total per module.
+            ("[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0, Time elapsed: 0.1 s - in a.ATest\n"
+             "[INFO] Results:\n[INFO] Tests run: 5, Failures: 0, Errors: 0, Skipped: 0\n"
+             "[INFO] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0, Time elapsed: 0.1 s - in b.BTest\n"
+             "[ERROR] Results:\n[ERROR] Failures:\n[ERROR]   BTest.test_b:12 expected 1\n"
+             "[ERROR] Tests run: 3, Failures: 1, Errors: 0, Skipped: 0\n", "8"),
             (cargo, "12"),
             ("test result: FAILED. 2 passed; 1 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.1s\n", "3"),
             ("==================== 2 failed in 0.30s ====================\n", "2"),
             ("collected 9 items\n\n=== 3 failed, 5 passed, 1 skipped in 0.12s ===\n", "8"),
             ("1 passed, 2 errors in 0.50s\n", "3"),
+            ("=== 1 passed in 0.10s ===\nrerun of the failures\n=== 2 failed, 3 passed in 0.20s ===\n", "5"),
             ("widgets: 5 passed\n", "5"),
             ("all good\n", "-"),
         )
