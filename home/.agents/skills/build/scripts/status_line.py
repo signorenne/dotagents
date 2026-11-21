@@ -43,8 +43,13 @@ LIMITS = (("five_hour", "5h"), ("seven_day", "7d"))  # the windows of rate_limit
 
 
 def number(value) -> bool:
-    """A finite int or float; a bool is not one."""
-    return isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value)
+    """A finite int or float; a bool is not one, nor an int too large for a float."""
+    if isinstance(value, bool) or not isinstance(value, (int, float)):
+        return False
+    try:
+        return math.isfinite(value)
+    except OverflowError:
+        return False
 
 
 def field(holder: dict, name: str) -> dict:

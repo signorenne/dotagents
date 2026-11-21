@@ -836,17 +836,19 @@ class PlanScripts(unittest.TestCase):
                 self.assertEqual(self.status_text({"cwd": str(self.root / "missing"), "rate_limits": limits}), shown)
 
     def test_the_status_line_leaves_out_what_is_missing_or_garbled(self):
-        soon, nan, infinity = self.NOW + 600, float("nan"), float("inf")
+        # huge is an integer JSON can hold and a float cannot.
+        soon, nan, infinity, huge = self.NOW + 600, float("nan"), float("inf"), 10 ** 400
         for fields, shown in (
                 ({}, "no repository"),
                 # A limit shows only with a finite number as its use, whatever its reset says.
                 ({"rate_limits": [37]}, "no repository"),
                 ({"rate_limits": {"five_hour": "37%"}}, "no repository"),
                 *(({"rate_limits": {"five_hour": {"used_percentage": used, "resets_at": soon}}}, "no repository")
-                  for used in (None, True, "37", nan, infinity)),
+                  for used in (None, True, "37", nan, infinity, huge)),
                 # The time to the reset shows only for a finite number.
                 *(({"rate_limits": {"five_hour": {"used_percentage": 37, "resets_at": reset}}}, "5h 37%")
-                  for reset in (None, True, "soon", nan, infinity)),
+                  for reset in (None, True, "soon", nan, infinity, huge)),
+                ({"context_window": {"used_percentage": huge}, "effort": {"level": "high"}}, "high"),
                 ({"rate_limits": {"five_hour": {"used_percentage": 37}}}, "5h 37%"),
                 ({"rate_limits": {"seven_day": {"used_percentage": 12, "resets_at": soon}}}, "7d 12% (10m)"),
                 # The use is rounded as the context is, half to even.
