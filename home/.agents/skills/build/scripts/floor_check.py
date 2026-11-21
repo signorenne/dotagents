@@ -13,7 +13,9 @@ The base is --base, else the plan's Base, else the merge base with main (or mast
 diff is the base against the working tree, so uncommitted work counts, and so does each
 untracked file git does not ignore (every .private folder left out), read as added lines
 and printed as "untracked, counted as added: <paths>"; a binary one (a NUL byte in its
-first 8,000 bytes) is printed as "untracked, binary, not scanned: <paths>". Test, skip and suppression patterns cover Python, C and C++ (GoogleTest,
+first 8,000 bytes) is printed as "untracked, binary, not scanned: <paths>", and an
+untracked nested repository, which git lists as one folder, as "untracked nested
+repository, not scanned: <paths>"; neither changes the exit code. Test, skip and suppression patterns cover Python, C and C++ (GoogleTest,
 Catch2, Qt Test), JavaScript and TypeScript, Go, Java, Kotlin and Rust; risk surfaces are
 path and line patterns, hints for the agent's judgment. The lane is --lane, else the
 plan's Lane.
@@ -217,15 +219,24 @@ def untracked_files(cwd) -> tuple[list, bool]:
     return [path for path in listed.split("\0") if path], ok
 
 
-def read_untracked(root: Path, paths: list) -> tuple[dict, list]:
+def read_untracked(root: Path, paths: list) -> tuple[dict, list, list]:
     """({path: change} with every line of each text file as an added line numbered from 1,
-    [binary paths]). A file whose first 8,000 bytes hold a NUL byte is binary, and so is one
-    that cannot be read; a symbolic link holds its target, as git diff shows it."""
-    files, binary = {}, []
+    [binary paths], [nested repositories]). A file whose first 8,000 bytes hold a NUL byte
+    is binary, and so is one that cannot be read; a symbolic link holds its target, as git
+    diff shows it. git lists an untracked nested repository as one entry ending in /."""
+    files, binary, nested = {}, [], []
     for path in paths:
+        if path.endswith("/"):
+            nested.append(path)
+            continue
         current = root / path
         try:
-            data = os.readlink(current).encode() if current.is_symlink() else current.read_bytes()
+            if current.is_symlink():
+                data = os.readlink(current).encode()
+            else:
+                with current.open("rb") as handle:
+                    data = handle.read(8000)
+                    data += b"" if b"\0" in data else handle.read()
         except OSError:
             binary.append(path)
             continue
@@ -234,7 +245,7 @@ def read_untracked(root: Path, paths: list) -> tuple[dict, list]:
             continue
         lines = data.decode("utf-8", errors="replace").splitlines()
         files[path] = {"added": lines, "removed": [], "numbers": list(range(1, len(lines) + 1))}
-    return files, binary
+    return files, binary, nested
 
 
 def listed(paths: list) -> str:
@@ -332,7 +343,7 @@ def main(argv=None) -> int:
         return 2
     lane = (args.lane or header.get("Lane", "")).lower()
     files = parse_diff(diff)
-    added, binary = read_untracked(Path(root), untracked)
+    added, binary, nested = read_untracked(Path(root), untracked)
     files.update(added)
     spans = {}
     for path, change in files.items():
@@ -350,6 +361,8 @@ def main(argv=None) -> int:
         print(f"untracked, counted as added: {listed(sorted(added))}")
     if binary:
         print(f"untracked, binary, not scanned: {listed(sorted(binary))}")
+    if nested:
+        print(f"untracked nested repository, not scanned: {listed(sorted(nested))}")
     for line in surfaces:
         print(f"risk surface: {line}")
     for line in problems:

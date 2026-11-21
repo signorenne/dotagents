@@ -774,6 +774,19 @@ class PlanScripts(unittest.TestCase):
         self.assertIn(f"base {self.base}, 9 changed lines", result.stdout)
         self.assertIn("untracked, counted as added: dir é/nota.md, link.py, pkg/auth.py, test_new.py\n", result.stdout)
 
+    def test_floor_check_names_an_untracked_nested_repository_and_binary_files_keep_the_exit_code(self):
+        # git lists a nested repository as one folder entry: floor_check cannot read inside it
+        # and says so; neither it nor a binary file changes the exit code (R8).
+        (self.repo / "inner").mkdir()
+        self.git("init", "-q", cwd=self.repo / "inner")
+        (self.repo / "inner/test_x.py").write_text("import pytest\n\n\n@pytest.mark.skip\ndef test_x():\n    pass\n")
+        (self.repo / "blob.bin").write_bytes(b"\x00" * 10)
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("untracked nested repository, not scanned: inner/\n", result.stdout)
+        self.assertIn("untracked, binary, not scanned: blob.bin\n", result.stdout)
+        self.assertIn("docs or comments only: no: blob.bin\n", result.stdout)
+
     def test_floor_check_leaves_working_notes_out_also_when_they_are_not_ignored(self):
         (self.repo / ".gitignore").write_text("")
         self.git("commit", "-q", "-am", "track nothing ignored")
