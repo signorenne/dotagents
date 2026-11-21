@@ -63,7 +63,8 @@ each edge carries:
   that name a skill, no em or en dash in any tracked or trackable file, no
   unfilled template marker, no hidden text, the global rules under 200
   lines, every Python file compiling, every Org link reaching an existing
-  file and its =CUSTOM_ID= or heading). The hidden-text check reads every
+  file and its =CUSTOM_ID= or heading, every path an instruction file names
+  inside the installed tree existing). The hidden-text check reads every
   tracked or trackable text file, code and tests included, and reports,
   with line, column and code point, each character a reader does not see
   but a model reads: zero width characters, bidirectional controls,

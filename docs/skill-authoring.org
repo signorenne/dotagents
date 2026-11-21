@@ -96,7 +96,9 @@ The body, which guides the agent once loaded:
 Then:
 
 - Nothing contradicts the global rules or a rule in [[file:../DESIGN.org][DESIGN.org]].
-- Every skill, subagent, file, command and flag it names exists and works.
+- Every skill, subagent, file, command and flag it names exists and works
+  (=tools/validate.py= checks only that the paths it names under its own
+  folder and =~/.agents/= exist).
 - =python3 tools/validate.py=, =python3 -m unittest discover -s tests= and
   =python3 tools/build.py= pass.
 - Tested in a real session (below) when the maintainer asks for it; the

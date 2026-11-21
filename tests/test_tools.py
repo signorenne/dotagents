@@ -227,6 +227,36 @@ class Tools(unittest.TestCase):
         self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
         self.assertEqual(self.run_tool("validate.py", ["--write-sizes"]).returncode, 0)
 
+    def test_validate_rejects_a_named_path_that_does_not_exist(self):
+        # A path an instruction file names inside the installed tree must exist: after a rename
+        # the instruction would send an agent to a script, a template or a subagent that is gone.
+        self.add_skill("pathy", body="\n".join([
+            "Run ${CLAUDE_SKILL_DIR}/scripts/present.py, never ${CLAUDE_SKILL_DIR}/scripts/gone.py.",
+            "Elsewhere ~/.agents/skills/pathy/scripts/present.py or ~/.agents/skills/pathy/scripts/lost.py.",
+            "Run $S/present.py and $S/absent.py; read refs/notes.md and refs/missing.md, in refs/ itself.",
+            "Twice: ~/.agents/agents/nobody.md and again ~/.agents/agents/nobody.md.",
+            "Fine: ~/.agents/skills/<name>/SKILL.md, ~/.agents/skills/*/SKILL.md and ~/.agents/agents/reviewer.md.",
+            "Fine: ~/.agents/skills/trustworthy-tests/SKILL.md, a claude.ai skill, and ~/.agents/skills/build/scripts.",
+            "Fine, the project's own: scriptsx/tool.py, docs/guide.md and .private/plans/x.org.", ""]))
+        folder = self.repo / "home/.agents/skills/pathy"
+        for name in ("scripts/present.py", "refs/notes.md"):
+            (folder / name).parent.mkdir()
+            (folder / name).write_text("x = 1\n", encoding="utf-8")
+        for name, path in (("home/.agents/agents/scout.md", "~/.agents/skills/build/scripts/renamed.py"),
+                           ("home/.agents/AGENTS.md", "~/.agents/hooks/none.py")):
+            with (self.repo / name).open("a", encoding="utf-8") as handle:
+                handle.write(f"\nSee {path}.\n")
+        self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
+        result = self.run_tool("validate.py")
+        self.assertEqual(result.returncode, 1, result.stdout)
+        named = [line for line in result.stdout.splitlines() if line.endswith(", which does not exist")]
+        self.assertEqual(sorted(named), sorted(
+            [f"FAIL home/.agents/skills/pathy/SKILL.md: names {path}, which does not exist"
+             for path in ("${CLAUDE_SKILL_DIR}/scripts/gone.py", "~/.agents/skills/pathy/scripts/lost.py", "$S/absent.py",
+                          "refs/missing.md", "~/.agents/agents/nobody.md")]
+            + ["FAIL home/.agents/agents/scout.md: names ~/.agents/skills/build/scripts/renamed.py, which does not exist",
+               "FAIL home/.agents/AGENTS.md: names ~/.agents/hooks/none.py, which does not exist"]))
+
     def test_validate_holds_each_instruction_file_to_its_size_baseline(self):
         # Fixed baselines of 10k bytes, so 11k bytes is exactly 10% more whatever the real
         # files' length; a skill, the global rules and a subagent; padding partly in a

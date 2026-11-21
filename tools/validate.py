@@ -46,7 +46,12 @@ Checks:
   (relative to the linking file; ~ and absolute paths are not checked), ::#id and #id
   a CUSTOM_ID of the target file, ::*Heading and *Heading one of its headings (title
   without tags, any run of spaces as one); links in src and example blocks or in
-  =verbatim= and ~code~ spans, web links and other searches are not checked.
+  =verbatim= and ~code~ spans, web links and other searches are not checked;
+- every path the global rules, a SKILL.md or a subagent names inside the installed tree
+  exists, as a file or a folder: a path after ~/.agents/ (in home/.agents, and for
+  skills/ also in claude-ai/skills), and in a SKILL.md a path after ${CLAUDE_SKILL_DIR}/
+  (the skill's folder), after $S/ (its scripts folder) or starting with the name of a
+  folder of the skill; a path with a placeholder or a glob (<, > or *) is not checked.
 """
 
 import importlib.util
@@ -581,6 +586,48 @@ def check_sizes(errors: list) -> None:
         errors.append(f"tools/size-baseline.json: {name} no longer exists; run python3 tools/validate.py --write-sizes")
 
 
+# A run of the characters a path, a placeholder (<name>) or a glob is written with.
+PATH_TOKEN = re.compile(r"[\w.$~{}<>*/-]+")
+SKILL_DIR_PREFIX = "${CLAUDE_SKILL_DIR}/"  # Claude Code's name for a skill's folder
+SCRIPTS_PREFIX = "$S/"  # a skill's shorthand for its scripts folder (the build skill defines it)
+INSTALLED_PREFIX = "~/.agents/"  # where install.py puts home/.agents, and every skill under skills/
+
+
+def named_paths(text: str, folder) -> list:
+    """(token, the places it may be) for each path the text names inside the installed tree.
+    folder is the skill's folder for a SKILL.md, None for any other instruction file."""
+    own = {entry.name for entry in folder.iterdir() if entry.is_dir()} if folder else set()
+    found = []
+    for token in dict.fromkeys(match.rstrip(".") for match in PATH_TOKEN.findall(text)):
+        if "/" not in token or any(mark in token for mark in "<>*"):
+            continue
+        if token.startswith(INSTALLED_PREFIX):
+            rest = token[len(INSTALLED_PREFIX):]
+            places = [HOME / rest]
+            if rest.startswith("skills/"):
+                places.append(ONLINE / rest[len("skills/"):])
+        elif folder and token.startswith(SKILL_DIR_PREFIX):
+            places = [folder / token[len(SKILL_DIR_PREFIX):]]
+        elif folder and token.startswith(SCRIPTS_PREFIX):
+            places = [folder / "scripts" / token[len(SCRIPTS_PREFIX):]]
+        elif folder and token.split("/", 1)[0] in own:
+            places = [folder / token]
+        else:
+            continue
+        found.append((token, places))
+    return found
+
+
+def check_named_paths(errors: list) -> None:
+    """Every path an instruction file names inside the installed tree exists, so a renamed
+    script, template or subagent cannot leave an instruction pointing at nothing."""
+    for path in sized_files():
+        folder = path.parent if path.name == "SKILL.md" else None
+        for token, places in named_paths(path.read_text(encoding="utf-8"), folder):
+            if not any(place.exists() for place in places):
+                errors.append(f"{path.relative_to(ROOT).as_posix()}: names {token}, which does not exist")
+
+
 def main() -> int:
     if "--write-sizes" in sys.argv[1:]:
         SIZE_BASELINE.write_text(json.dumps(sizes(), indent=1, sort_keys=True) + "\n", encoding="utf-8")
@@ -600,6 +647,7 @@ def main() -> int:
     check_marketplace(errors)
     check_evals(errors)
     check_sizes(errors)
+    check_named_paths(errors)
 
     for agent in sorted((HOME / "agents").glob("*.md")):
         check_agent(agent, errors)
