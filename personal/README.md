@@ -8,8 +8,8 @@ python3 install.py --personal personal (recorded, so later runs apply it too;
 - claude-settings.json: merged into Claude Code's settings after the shared
   fragment (values only; hooks belong in the shared layer). It sets the
   status line to the build skill's status_line.py (branch, plan status and
-  next step, context used), refreshed every 10 seconds so it stays current
-  while background work runs.
+  next step, context used, rate limits, model and effort), refreshed every
+  10 seconds so it stays current while background work runs.
 
 Someone else installing dotagents leaves this folder out, or points
 --personal at a folder of their own.

@@ -11,6 +11,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 from pathlib import Path
 from unittest import mock
@@ -784,9 +785,8 @@ class PlanScripts(unittest.TestCase):
         result = self.status_line({"workspace": {"current_dir": str(self.repo)},
                                    "context_window": {"used_percentage": 42.4}}, cwd=self.root)
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertEqual(result.stdout.count("\n"), 1, result.stdout)
-        for part in ("feat/widget", "in progress", "next: S2 add the widget's test", "ctx 42%"):
-            self.assertIn(part, result.stdout)
+        # The whole line: without a limit, a model or an effort in the input, nothing else shows.
+        self.assertEqual(result.stdout, "feat/widget | in progress | next: S2 add the widget's test | ctx 42%\n")
 
     def test_the_status_line_without_a_plan_shows_the_branch_and_reads_cwd(self):
         self.git("switch", "-q", "main")
@@ -805,6 +805,78 @@ class PlanScripts(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 self.assertEqual(result.stdout.count("\n"), 1, result.stdout)
                 self.assertTrue(result.stdout.strip())
+
+    NOW = 1_000_000.0  # the fixed clock of the status line tests that run in this process
+
+    def status_text(self, payload):
+        """The status line of an input at the fixed clock, without the user's git configuration."""
+        module = sys.modules.get("status_line") or load("status_line", BUILD / "status_line.py")
+        with mock.patch.dict(os.environ, GIT_ENV):
+            return module.status(payload, self.NOW)
+
+    def test_the_status_line_shows_the_limits_the_model_and_the_effort(self):
+        payload = {"workspace": {"current_dir": str(self.repo)}, "context_window": {"used_percentage": 42.4},
+                   "rate_limits": {"five_hour": {"used_percentage": 37.2, "resets_at": self.NOW + 2 * 3600 + 30 * 60},
+                                   "seven_day": {"used_percentage": 12,
+                                                 "resets_at": self.NOW + 4 * 86400 + 3 * 3600 + 30 * 60}},
+                   "model": {"id": "claude-fable-5-2", "display_name": "Fable 5.2"}, "effort": {"level": "high"}}
+        self.assertEqual(self.status_text(payload),
+                         "feat/widget | in progress | next: S2 add the widget's test | ctx 42% | 5h 37% (2h30m) | "
+                         "7d 12% (4d3h) | Fable 5.2 high")
+
+    def test_the_status_line_formats_the_time_to_a_reset(self):
+        # The whole minutes left, rounded down, as their two largest units; no time once the
+        # reset is not after now.
+        for left, shown in ((0, "5h 37%"), (-5, "5h 37%"), (59, "5h 37% (0m)"), (60, "5h 37% (1m)"),
+                            (3599, "5h 37% (59m)"), (3600, "5h 37% (1h00m)"), (3900, "5h 37% (1h05m)"),
+                            (86399, "5h 37% (23h59m)"), (86400, "5h 37% (1d0h)"),
+                            (4 * 86400 + 3 * 3600 + 30 * 60, "5h 37% (4d3h)")):
+            with self.subTest(left=left):
+                limits = {"five_hour": {"used_percentage": 37, "resets_at": self.NOW + left}}
+                self.assertEqual(self.status_text({"cwd": str(self.root / "missing"), "rate_limits": limits}), shown)
+
+    def test_the_status_line_leaves_out_what_is_missing_or_garbled(self):
+        soon, nan, infinity = self.NOW + 600, float("nan"), float("inf")
+        for fields, shown in (
+                ({}, "no repository"),
+                # A limit shows only with a finite number as its use, whatever its reset says.
+                ({"rate_limits": [37]}, "no repository"),
+                ({"rate_limits": {"five_hour": "37%"}}, "no repository"),
+                *(({"rate_limits": {"five_hour": {"used_percentage": used, "resets_at": soon}}}, "no repository")
+                  for used in (None, True, "37", nan, infinity)),
+                # The time to the reset shows only for a finite number.
+                *(({"rate_limits": {"five_hour": {"used_percentage": 37, "resets_at": reset}}}, "5h 37%")
+                  for reset in (None, True, "soon", nan, infinity)),
+                ({"rate_limits": {"five_hour": {"used_percentage": 37}}}, "5h 37%"),
+                ({"rate_limits": {"seven_day": {"used_percentage": 12, "resets_at": soon}}}, "7d 12% (10m)"),
+                # The use is rounded as the context is, half to even.
+                ({"rate_limits": {"five_hour": {"used_percentage": 37.5}}}, "5h 38%"),
+                ({"rate_limits": {"five_hour": {"used_percentage": 0.5}}}, "5h 0%"),
+                # A context that is not finite leaves only its own part out.
+                ({"context_window": {"used_percentage": infinity}, "effort": {"level": "high"}}, "high"),
+                ({"context_window": {"used_percentage": nan}}, "no repository"),
+                # The model's name, else its id; the effort after it; either one alone.
+                ({"model": "Fable 5.2"}, "no repository"),
+                ({"model": {"display_name": "", "id": "claude-fable-5-2"}}, "claude-fable-5-2"),
+                ({"model": {"display_name": 5, "id": "claude-fable-5-2"}}, "claude-fable-5-2"),
+                ({"model": {"display_name": "Fable 5.2", "id": "claude-fable-5-2"}}, "Fable 5.2"),
+                ({"model": {"display_name": "Fable 5.2"}, "effort": "high"}, "Fable 5.2"),
+                ({"effort": {"level": "high"}}, "high"),
+                ({"effort": {"level": ""}}, "no repository"),
+                ({"effort": {"level": 3}}, "no repository")):
+            with self.subTest(fields=fields):
+                self.assertEqual(self.status_text({"cwd": str(self.root / "missing"), **fields}), shown)
+
+    def test_the_status_line_prints_the_limits_from_the_real_clock(self):
+        # The script run as a program reads the clock itself. A reset 4 days, 3 hours and 30
+        # minutes ahead shows as 4d3h for the next 30 minutes; a reset already past shows no time.
+        self.git("switch", "-q", "main")
+        now = time.time()
+        limits = {"five_hour": {"used_percentage": 37, "resets_at": now - 60},
+                  "seven_day": {"used_percentage": 12, "resets_at": now + 4 * 86400 + 3 * 3600 + 30 * 60}}
+        result = self.status_line({"cwd": str(self.repo), "rate_limits": limits,
+                                   "model": {"display_name": "Fable 5.2"}, "effort": {"level": "high"}}, cwd=self.root)
+        self.assertEqual((result.returncode, result.stdout), (0, "main | 5h 37% | 7d 12% (4d3h) | Fable 5.2 high\n"))
 
     def test_a_base_that_is_not_a_commit_never_reaches_git_as_an_option(self):
         target = self.root / "written-by-git"
