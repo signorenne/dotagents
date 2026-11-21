@@ -84,12 +84,18 @@ C_DIRECTIVE = re.compile(r"NOLINT|clang-format\s+(?:on|off)|IWYU\s+pragma|cppche
                          r"coverity\[|NOSONAR|codechecker_|NOTREACHED|falls?[ \t-]*thr(?:ough|u)", re.I)
 # A NUL, a trigraph, a bidirectional control (GCC's -Wbidi-chars), and a backslash that blanks
 # keep from its newline (a splice GCC and Clang warn about): read as code, never modelled.
-C_REFUSED = re.compile(r"\0|\?\?[=/'()!<>-]|[\u202a-\u202e\u2066-\u2069]|\\[ \t\f\v]+\n")
+C_REFUSED = re.compile(r"\0|\?\?[=/'()!<>-]|[\u061c\u200e\u200f\u202a-\u202e\u2066-\u2069]|\\[ \t\f\v]+\n")
 RAW_PREFIXES = ("R", "u8R", "uR", "UR", "LR")
 RAW_DELIMITER = re.compile(r"[^ ()\\\t\v\f\n]{0,16}")
-HEADER_NAME_BEFORE = re.compile(r"^[ \t\f\v]*(?:#|%:)[ \t\f\v]*(?:include|include_next|import|embed)[ \t\f\v]*$|"
-                                r"__has_(?:include|include_next|embed)[ \t\f\v]*\([ \t\f\v]*$")
-LABEL = re.compile(r"(?:case|default)\b")
+# The code of a line before a header name (comments as blanks), and a line where a < may open
+# one in a spelling not listed: a comment after an unclosed < there is not read as one.
+HEADER_NAME_BEFORE = re.compile(r"[ \t\f\v]*(?:(?:#|%:)[ \t\f\v]*(?:include|include_next|import|embed|"
+                                r"pragma[ \t\f\v]+GCC[ \t\f\v]+dependency)|(?:export[ \t\f\v]+)?import)[ \t\f\v]*|"
+                                r".*\b__has_(?:include|include_next|embed)[ \t\f\v]*\([ \t\f\v]*")
+HEADER_NAME_LINE = re.compile(r"[ \t\f\v]*(?:#|%:|(?:export[ \t\f\v]+)?import\b)|.*\b__has_")
+# A case or default label, or a user label (GCC's -Wimplicit-fallthrough=1 reads a comment
+# before either); an access specifier is no label.
+LABEL = re.compile(r"(?:case|default)\b|(?!(?:public|private|protected)\b)[A-Za-z_$][\w$]*[ \t\f\v]*:(?!:)")
 BLANK = " \t\f\v"
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
@@ -213,9 +219,10 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
     nothing but blanks and dropped comments follow it on its spliced line, no tool reads it
     (C_DIRECTIVE), it touches no line right after one a C_DIRECTIVE comment ends on
     (NOLINTNEXTLINE and the like), and its next code token is no case or default label
-    (GCC's -Wimplicit-fallthrough=1 reads any comment there). A line left with only dropped
-    comments goes, unless it is indented less than the next line with code
-    (-Wmisleading-indentation reads it) or dropping would end it in a new backslash. A .c or
+    (GCC's -Wimplicit-fallthrough=1 reads any comment there, and before a user label). A
+    line left with only dropped comments goes, unless a splice joins it to the line above,
+    it is indented less than the next line with code (-Wmisleading-indentation reads it), or
+    dropping would end it in a new backslash. A .c or
     .h file (c_only) refuses C++ forms, and C89's //* reading."""
     text = text.replace("\r\n", "\n").replace("\r", "\n")
     if C_REFUSED.search(text):
@@ -228,10 +235,13 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
     parts.append(text[last:])
     origin.extend(range(last, len(text) + 1))
     spliced = "".join(parts)
-    size, tokens, i, word = len(spliced), [], 0, ""
+    size, tokens, i, word, line_code = len(spliced), [], 0, "", ""
 
     def add(kind, start, end):  # spliced positions in, original positions kept
+        nonlocal line_code
         tokens.append((kind, origin[start], origin[end - 1] + 1))
+        line_code = "" if kind == "newline" else line_code + (
+            spliced[start:end] if kind == "code" else " " if kind == "comment" else '""')
 
     def quoted(start):
         end, quote = start + 1, spliced[start]
@@ -254,12 +264,16 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
             end = size if end == -1 else end
             if "\n" in text[origin[i]:origin[end]]:
                 return None  # a // comment a splice continues: -Wcomment
+            if HEADER_NAME_LINE.match(line_code) and line_code.count("<") > line_code.count(">"):
+                return None  # maybe inside a header name of a spelling not listed
             add("comment", i, end)
             i, word = end, ""
         elif spliced.startswith("/*", i):
             close = spliced.find("*/", i + 2)
             if close == -1 or "/*" in spliced[i + 2:close]:
                 return None  # unterminated, or -Wcomment
+            if HEADER_NAME_LINE.match(line_code) and line_code.count("<") > line_code.count(">"):
+                return None  # maybe inside a header name of a spelling not listed
             add("comment", i, close + 2)
             i, word = close + 2, ""
         elif char == '"' and word in RAW_PREFIXES:
@@ -274,6 +288,7 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
                 return None
             stop = close + len(delimiter) + 2
             tokens.append(("literal", start, stop))
+            line_code += '""'
             i, word = bisect.bisect_left(origin, stop), ""
         elif char == "'" and number:
             if c_only or not (spliced[i + 1:i + 2].isalnum() or spliced[i + 1:i + 2] == "_"):
@@ -287,7 +302,7 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
                 return None
             add("literal", i, end)
             i, word = end, ""
-        elif char == "<" and HEADER_NAME_BEFORE.search(spliced, spliced.rfind("\n", 0, i) + 1, i):
+        elif char == "<" and HEADER_NAME_BEFORE.fullmatch(line_code):
             end = spliced.find(">", i)
             if end == -1 or "\n" in spliced[i:end]:
                 return None
@@ -338,6 +353,8 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
             result.append(raw.rstrip(BLANK))  # dropping the comment would make a splice
         elif kept or not touched:
             result.append(kept)
+        elif text[start - 2:start] == "\\\n":
+            result.append(raw.rstrip(BLANK))  # a splice joins it to the line above
         elif raw.strip(BLANK):
             following = next((line for line in range(number + 1, len(starts)) if line in first_code), None)
             own = start + len(raw) - len(raw.lstrip(" \t"))
