@@ -38,7 +38,7 @@ When a newer request supersedes an older one (a new search, the next theme, the 
 
 ## Files
 
-Writes go through a writer thread, coalesced per file and retried after a delay when they fail. Write crash-safe: a temporary file in the same directory with the target's mode and owner, flush and fsync it, rename it over the target, then fsync the directory; remove the temporary file on failure. On Apple platforms fsync does not make the drive write the data: use fcntl with F_FULLFSYNC there.
+Writes go through a writer thread, coalesced per file and retried after a delay when they fail. Write crash-safe: a temporary file in the same directory with the target's mode and owner, flush and fsync it, rename it over the target, then fsync the directory; remove the temporary file on failure. On Apple platforms fsync does not make the drive write the data: use fcntl with F_FULLFSYNC there. On Windows, FlushFileBuffers on the temporary file, then MoveFileEx with MOVEFILE_REPLACE_EXISTING and MOVEFILE_WRITE_THROUGH, with no directory step.
 
 ## Errors and shutdown
 
