@@ -92,10 +92,11 @@ RAW_DELIMITER = re.compile(r"[^ ()\\\t\v\f\n]{0,16}")
 HEADER_NAME_BEFORE = re.compile(r"[ \t\f\v]*(?:(?:#|%:)[ \t\f\v]*(?:include|include_next|import|embed|"
                                 r"pragma[ \t\f\v]+GCC[ \t\f\v]+dependency)|(?:export[ \t\f\v]+)?import)[ \t\f\v]*|"
                                 r".*\b__has_(?:include|include_next|embed)[ \t\f\v]*\([ \t\f\v]*")
-HEADER_NAME_LINE = re.compile(r"[ \t\f\v]*(?:#|%:|(?:export[ \t\f\v]+)?import\b)|.*\b__has_")
+HEADER_NAME_LINE = re.compile(r"[ \t\f\v]*(?:(?:#|%:)(?![ \t\f\v]*(?:if|elif|ifdef|ifndef|elifdef|elifndef|define|"
+                              r"undef|line|error|warning)\b)|(?:export[ \t\f\v]+)?import\b)")
 # A case or default label, or a user label (GCC's -Wimplicit-fallthrough=1 reads a comment
 # before either); an access specifier is no label.
-LABEL = re.compile(r"(?:case|default)\b|(?!(?:public|private|protected)\b)[A-Za-z_$][\w$]*[ \t\f\v]*:(?!:)")
+LABEL = re.compile(r"(?:case|default)\b|(?!(?:public|private|protected)\b)[A-Za-z_$][\w$]*\s*:(?!:)")
 BLANK = " \t\f\v"
 LINE_SURFACES = (
     ("threading", re.compile(r"std::thread|\bpthread_|\bthreading\.|\bThread\(|\bstd::mutex|\bMutex\b|"
@@ -321,19 +322,21 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
     line_of = lambda position: bisect.bisect_left(breaks, position)
     pinned = {line_of(end - 1) + 1 for kind, start, end in tokens
               if kind == "comment" and C_DIRECTIVE.search(text, start, end)}
-    dropped, clear, upcoming = [], True, None
+    dropped, clear, ahead = [], True, ""  # ahead: the code after a token, comments as blanks
     for kind, start, end in reversed(tokens):
         if kind == "newline":
-            clear = True
+            clear, ahead = True, ("\n" + ahead)[:80]
         elif kind in ("code", "literal"):
-            if text[start:end].strip(BLANK):
-                clear, upcoming = False, start
-        elif not clear or C_DIRECTIVE.search(text, start, end) or \
-                any(line in pinned for line in range(line_of(start), line_of(end - 1) + 1)) or \
-                (upcoming is not None and LABEL.match(text, upcoming)):
-            clear = False
+            clear = clear and not text[start:end].strip(BLANK)
+            ahead = (text[start:end] + ahead)[:80]
         else:
-            dropped.append((start, end))
+            if not clear or C_DIRECTIVE.search(text, start, end) or \
+                    any(line in pinned for line in range(line_of(start), line_of(end - 1) + 1)) or \
+                    LABEL.match(ahead.lstrip()):
+                clear = False
+            else:
+                dropped.append((start, end))
+            ahead = (" " + ahead)[:80]
     drop, in_literal, first_code = bytearray(len(text) + 1), bytearray(len(text) + 1), {}
     for start, end in dropped:
         drop[start:end] = b"\1" * (end - start)
@@ -354,7 +357,7 @@ def c_lines(text: str, c_only: bool = False) -> list | None:
         elif kept or not touched:
             result.append(kept)
         elif text[start - 2:start] == "\\\n":
-            result.append(raw.rstrip(BLANK))  # a splice joins it to the line above
+            result.append("\0")  # a splice joins it to the line above: where it is, not what, counts
         elif raw.strip(BLANK):
             following = next((line for line in range(number + 1, len(starts)) if line in first_code), None)
             own = start + len(raw) - len(raw.lstrip(" \t"))

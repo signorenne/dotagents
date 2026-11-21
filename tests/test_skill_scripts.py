@@ -607,13 +607,15 @@ class PlanScripts(unittest.TestCase):
                "void g();\ninline auto f(int c) -> int {\n  switch (c) {\n    case 0:\n      g();\n"
                "      // falls through\n    case 1:\n      g();\n      break;\n    // before default\n"
                "    default:\n      break;\n  }\n  if (c)\n    g();\n  g();\n  return /* mid */ c;\n}\n")
-        hn = ("#include <a//b.h>\n#include /* x */ <a//b.h>\n#if __has_include (<a//b.h>)\n#endif\n"
-              "%:include_next <a//b.h>\n#pragma GCC dependency <a//b.h>\nimport <a//b.h>;\n")
+        hn = ("#include <a//b.h>  // first\n#include /* x */ <a//b.h>\n#if __has_include (<a//b.h>)\n#endif\n"
+              "%:include_next <a//b.h>\n#pragma GCC dependency <a//b.h>\nimport <a//b.h>;\n"
+              "#if __cplusplus < 202002L  // old\n#endif\n"
+              "#define MIN(a, b) ((a) < (b) ? (a) : (b))  // smaller\n")
         xmacro = "#define COLORS(X) \\\n  X(red) \\\n  X(green) \\\n  // X(blue) retired\nenum class color { red, green };\n"
         label = ("void g();\nvoid f(int c) {\n  switch (c) {\n    case 0:\n      g();\n      // any\n    lbl:\n"
-                 "    case 1:\n      g();\n  }\n}\nstruct s {\n  // members\npublic:\n  int m;\n};\n")
+                 "    case 1:\n      g();\n      // two\n    two /**/ :\n    case 2:\n      g();\n  }\n}\nstruct s {\n  // members\npublic:\n  int m;\n};\n")
         fixtures = {"src/lib.hpp": lib, "a.c": "int x; /* c */\n", "b.c": "int x = 1'000; // c\n",
-                    "id.hpp": "int x1'b /* a' */\n", "hn.hpp": hn, "xmacro.hpp": xmacro, "label.cpp": label, "foor.hpp": 'int s = sizeof FOOR"a(";  /* c */\n',
+                    "id.hpp": "int x1'b /* a' */\n", "hn.hpp": hn, "alias.hpp": "#pragma include_alias(<a//b.h>, <c.h>)\n", "xmacro.hpp": xmacro, "label.cpp": label, "foor.hpp": 'int s = sizeof FOOR"a(";  /* c */\n',
                     "raw2.hpp": 'auto r = R"(a\\\nb)";\n', "bad.hpp": "/* open\n",
                     "tidy.hpp": "int* p = 0;  // NOLINT(modernize-use-nullptr)\nint y;\n", "swallow.hpp": "// note\nint y;\n",
                     "tests/test_lib.cpp": "// a test\nint t;\n", "tests/fixtures/f.cpp": "// data\nint d;\n"}
@@ -651,18 +653,25 @@ class PlanScripts(unittest.TestCase):
             ({"src/lib.hpp": swap("/* kept */", "/* gone */")}, "no: src/lib.hpp", 0),
             ({"src/lib.hpp": swap("{'\"'}", "{'\\''}")}, "no: src/lib.hpp", 0),
             ({"id.hpp": "int x1'b /* b' */\n"}, "no: id.hpp", 0),
-            *(({"hn.hpp": swap(line, line.replace("b.h", "c.h"), hn)}, "no: hn.hpp", 0)
+            *(({"hn.hpp": swap(line, line.replace("b.h", "d.h"), hn)}, "no: hn.hpp", 0)
               for line in hn.splitlines() if "b.h" in line),
+            ({"hn.hpp": swap("// first", "// one", hn)}, "yes", 0),
+            ({"alias.hpp": "#pragma include_alias(<a//d.h>, <c.h>)\n"}, "no: alias.hpp", 0),
+            ({"hn.hpp": swap("// old", "// older", hn)}, "yes", 0),
+            ({"hn.hpp": swap("// smaller", "// the smaller", hn)}, "yes", 0),
             ({"raw2.hpp": 'auto r = R"(ab)";\n'}, "no: raw2.hpp", 0),
             # Comments a tool or a warning reads.
             ({"src/lib.hpp": swap("  // NOLINT(modernize-use-nullptr)", "")}, "no: src/lib.hpp", 0),
             ({"tidy.hpp": "int* p = 0;\nint y;\n"}, "no: tidy.hpp", 0),
             ({"label.cpp": swap("      // any\n", "", label)}, "no: label.cpp", 0),
+            ({"label.cpp": swap("      // two\n", "", label)}, "no: label.cpp", 0),
             ({"label.cpp": swap("// members", "// fields", label)}, "yes", 0),
             ({"src/lib.hpp": swap("    case 1:\n      g();\n", "    case 1:\n\t// tab\n      g();\n")}, "yes", 0),
             # A comment line a splice joins to the line above.
             ({"xmacro.hpp": swap("  // X(blue) retired\n", "", xmacro)}, "no: xmacro.hpp", 0),
-            ({"xmacro.hpp": swap("  X(green) \\\n", "  X(green) \\\n  // note\n", xmacro)}, "no: xmacro.hpp", 0),
+            ({"xmacro.hpp": swap("  X(red) \\\n", "  X(red) \\\n  // note\n", xmacro)}, "no: xmacro.hpp", 0),
+            ({"xmacro.hpp": swap("  X(green) \\\n", "  X(green) \\\n  // note\n", xmacro)}, "yes", 0),
+            ({"xmacro.hpp": swap("  // X(blue) retired\n", "  /* X(blue) retired */\n", xmacro)}, "yes", 0),
             ({"src/lib.hpp": swap("// NOLINTNEXTLINE(modernize-use-nullptr)\n",
                                   "// NOLINTNEXTLINE(modernize-use-nullptr)\n// note\n")}, "no: src/lib.hpp", 0),
             ({"src/lib.hpp": swap("// falls through", "// next")}, "no: src/lib.hpp", 0),
