@@ -747,11 +747,15 @@ In: =METHOD.org= (Review and triage), =home/.agents/skills/build/SKILL.md=
 :CUSTOM_ID: docs-only-gates
 :END:
 When floor_check shows that a diff changes only documentation files or
-Python comments, the full gates are the documented checks that read those
-files, not the build and the whole test suite. A comment in another
-language counts as code until a check tells it apart. Accepted by the
-maintainer on 12 November 2026, after full builds ran for docs-only
-changes.
+Python, C or C++ comments, the full gates are the documented checks that
+read those files, not the build and the whole test suite. A comment in
+another language counts as code until a check tells it apart, and so does
+a C or C++ comment that code follows on its line, that a tool or a warning
+reads (NOLINT, a fall-through note, one before a case label, one indented
+less than the next code line), or that sits in a file the check cannot
+read for certain. Accepted by the maintainer on 12 November 2026, after
+full builds ran for docs-only changes; widened to C and C++ comments on 20
+November 2026, after a moved C++ comment block ran the full gates.
 
 In: =METHOD.org= (Checks), =home/.agents/skills/build/SKILL.md= (section 6),
 the global rules (Agentic work), =home/.agents/skills/build/scripts/floor_check.py=.

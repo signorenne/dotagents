@@ -212,7 +212,7 @@ for Claude Code's status line:
 - floor_check: compares the diff with the base and reports removed tests,
   added skips and added suppressions, the size of the diff and the risk
   surfaces it touches, and whether the diff changes only documentation or
-  Python comments (the proof the lighter gates of such a diff need); a
+  Python, C or C++ comments (the proof the lighter gates of such a diff need); a
   quick-lane change that outgrew its lane is raised before review. Exit 2
   means it could not run and never reads as clean.
 - status_line: the branch, the plan's Status and Next and the context used,
@@ -226,7 +226,7 @@ lane does not. A step ends when its check passes and its deliverables
 acceptance checks pass: nothing is polished after them, and anything worth
 more becomes a deferred line or a new plan. The narrow check runs per step, the full gates once on the
 last commit, through gate-runner; when floor_check says the diff changes only
-docs or Python comments, the full gates are the documented checks that read
+docs or Python, C or C++ comments, the full gates are the documented checks that read
 those files.
 
 * Resume and short contexts
