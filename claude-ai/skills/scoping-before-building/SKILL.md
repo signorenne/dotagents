@@ -23,7 +23,7 @@ The question to ask is the one whose answer would change what you produce. Nothi
 | Clear | Constraints given, one obvious right answer, small and reversible | Build it. State any assumption inline. No questions. |
 | Bounded | One artifact, a few real unknowns, a wrong guess costs a rewrite | If a reasonable default exists, build under it and state it in one line; otherwise one question, with the shape you would build under your best guess in the same message (step 5). |
 | Open | Multiple parts, competing approaches, or expensive to redo | Scope properly: the rest of this skill. |
-| Oversized | Several independent systems in one sentence | Decompose first; do not refine details of something that needs splitting. |
+| Oversized | Several independent systems in one sentence | Decompose first; do not refine details of something that needs splitting; then show the parts as the shape (step 5) and scope the first one. |
 
 Getting this wrong in either direction is a failure: treating a clear request as open wastes the user's time and reads as stalling; treating an open request as clear produces confident work aimed at the wrong target.
 
@@ -56,7 +56,7 @@ Scale this to the work: a bounded request with a reasonable default needs no sha
 
 ## Handoff
 
-Once the shape is agreed, stop scoping and build. Raising questions after approval stalls the work and makes the approval meaningless; note new questions as you hit them and raise them with the draft.
+Once the shape is agreed, stop scoping and build. Raising questions after approval stalls the work and makes the approval meaningless; new questions wait for the draft, except when the work outgrows the agreed shape (Red flags): then stop and re-scope.
 
 Example. "Can you build me a dashboard for our sales data?"
 Weak (over-processing): eight questions about auth, hosting, roles and refresh intervals before writing anything.

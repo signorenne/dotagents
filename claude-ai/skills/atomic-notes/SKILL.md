@@ -26,7 +26,7 @@ When the notes go into an existing collection, search it for each idea and its n
 
 Before writing a fact down, sort it the way efficient-research does. Facts that are numeric, version-specific, current, contested, or that the note is useless without, get confirmed against a primary source: the specification or standard, the vendor's documentation or datasheet, the reference documentation. When a fact cannot be confirmed from what you have, research it online following efficient-research, and open the page before citing it. Without search tools, mark such facts unverified and name the source to check.
 
-- Search before you hedge: with search tools, mark a fact unverified only after looking for its primary source and not finding it, and say where you looked. Reread a source you opened before calling what it documents unconfirmed.
+- Search before you hedge: with search tools, mark a fact unverified only after looking for its primary source and not finding it, and say in your reply where you looked. Reread a source you opened before calling what it documents unconfirmed.
 - Every claim is cited, attributed to the user's material, or marked as your inference.
 - When a source contradicts the material, keep both with their attribution and say in Limits which holds, and for which version.
 - Paraphrase; quote at most a short phrase.
@@ -52,7 +52,7 @@ Sentences and paragraphs:
 - One idea per sentence, subject and verb near the start, a condition before what it conditions.
 - One topic per paragraph, opening with its topic sentence; at most about 150 words.
 - Active voice and present tense; verbs, not nouns made from them ("decides", not "makes a decision").
-- No filler ("it is important to note", "basically", "there is", an unneeded "you can"), no hedge beyond the real uncertainty, one word where a phrase says the same, no restating the title.
+- No filler ("it is important to note", "basically", "there is", an unneeded "you can"), no hedge beyond the real uncertainty, one word where a phrase says the same, no restating the title after the first sentence.
 
 ## 6. Write the hub
 
@@ -68,7 +68,7 @@ Sentences and paragraphs:
 1. Read every page involved in full and map its ideas (step 1).
 2. Each idea that earns a note (step 2) becomes one and takes its explanation, numbers and caveats with it. The old page becomes the hub and keeps its ID and file, so links to it still land.
 3. Two notes on one idea become one: the unique content of the other moves in, and links to it are pointed at the survivor.
-4. Keep every existing ID; a moved, split or merged note leaves no broken link and no orphan.
+4. Keep every existing ID; a merged note's ID stays on the survivor as an alias where the format has one, otherwise every link to it is repointed first; a moved, split or merged note leaves no broken link and no orphan.
 5. Account for the old text: list each fact, command, example and reference of the old page with where it went (a note, merged, or dropped as redundant), and report the dropped ones.
 6. The set grows only by the hub's connective sentences, the links and new verified facts. When the new notes hold more than about one and a half times the old prose, cut repetition first.
 

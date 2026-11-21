@@ -85,7 +85,7 @@ The contract: a username is valid when it has 3 to 16 characters.
 
 Weak: one test asserts that valid_username("alice") is true. It passes, and it would still pass with any limits around 5 characters, or with a function that accepts everything.
 
-Strong: tests at each limit and its neighbors, with expected values read from the contract: 2 characters invalid, 3 valid, 16 valid, 17 invalid, and the empty string invalid. The 16-character test failed when the comparison was changed from less than or equal to less than, and the 17-character name from the bug report failed on the unfixed code.
+Strong: tests at each limit and its neighbors, with expected values read from the contract: 2 characters invalid, 3 valid, 16 valid, 17 invalid, and the empty string invalid. The 16-character test failed when the comparison was changed from less than or equal to less than, the 3-character test failed when the lower limit was moved to 4, and the 17-character name from the bug report failed on the unfixed code.
 
 ## Related
 

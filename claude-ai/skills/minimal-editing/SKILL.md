@@ -54,3 +54,5 @@ Strong: the four changed lines, re-raising the exception after the final attempt
 ## Related
 
 If the change fixes a failure, diagnose it first with systematic-debugging, then change only what the diagnosis implicates.
+
+In a repository where the build skill is available, a change of more than one sentence goes to build.

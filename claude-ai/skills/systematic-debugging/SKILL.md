@@ -65,7 +65,7 @@ Say "likely" when it is likely, and keep the narration short.
 
 Example: an intermittent KeyError: 'user_id' in a request handler.
 Weak: replace the lookup with a default value, so the handler now returns wrong data without an error.
-Strong: the key is missing only on requests that skip the session middleware, which is why it happens on the health-check path: that route is registered outside the middleware stack. Register it inside, or exclude the path in the handler. Reproduced on demand by calling /health.
+Strong: the key is missing only on requests that skip the session middleware, which is why it happens on the health-check path: that route is registered outside the middleware stack. Register it inside. Reproduced on demand by calling /health.
 
 ## Related
 

@@ -450,6 +450,7 @@ which the diagram leaves out so that no line crosses the whole map:
 | prompt-optimizer        | Local skills                   | a repository's =AGENTS.md=, to project-setup                                                                                         |
 | context-handoff         | Local skills                   | a handoff inside a repository, to close                                                                                              |
 | systematic-debugging    | Local skills                   | a fix of more than one sentence, to build; work that blocks a UI thread, to event-driven-ui                                          |
+| minimal-editing         | Local skills                   | a change of more than one sentence in a repository, to build                                                                         |
 
 The set is the eleven skills of =claude-ai/skills/= plus decide, uploaded through
 its override. The installer puts all of them in every local agent too, so the
@@ -463,7 +464,8 @@ applies where that skill is installed (the texts say "where available").
   verifying-before-claiming-done before saying it is fixed. It sends work
   that blocks a UI thread to event-driven-ui. trustworthy-tests sends a flaky
   or unclear failure back to systematic-debugging, and minimal-editing sends
-  the fix of a failure there first.
+  the fix of a failure there first and, where build is available, a change of
+  more than one sentence in a repository to build.
 - Choices: efficient-research gathers the facts, decision-analysis commits to
   a recommendation, and a choice inside the user's own project goes to decide,
   which turns to decision-analysis to compare outside products and proposes a
