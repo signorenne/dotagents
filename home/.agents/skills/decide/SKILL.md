@@ -39,9 +39,11 @@ If you say "decide": I will take A.
 
 The options include the smallest one that meets the need the user stated; recommend a larger one only by naming the requirement that needs it. Check each option, the recommended one first, against every binding rule (the global rules, the project's AGENTS.md and design docs, accepted decisions) and its main failure mode, and put a conflict in that option's consequence. For an API or design choice, show each option as a short usage snippet (in the interface's preview, otherwise as code blocks in the message) and say how the platform or established projects solve it, or that you did not check.
 
+Offer only real alternatives, A and B included: an option invented to fill the menu steers the answer. When a point has one real option, or only a free answer (a name, a number), ask one question, whether to take your recommendation, with the options take it and do not take it; the user's own answer goes in the interface's free-text field or the next message.
+
 Gloss in one clause each term, id or file the user has not used in this session. A multi-select question has no "None" option: an empty selection means none.
 
-Without the interface, ask in plain text with the shape above. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Each question in a call carries its own default, so the user can answer only the ones they care about.
+Without the interface, ask in plain text with the shape above. In the interface the question must stand alone (what and why in one sentence), because the dialog can hide the conversation, and several options may be selectable when they combine. Each question in a call carries its own default, so the user can answer only the ones they care about. A question the user leaves unanswered stays open: go on with its default as a stated assumption, and list it in step 5, where the user confirms or changes it.
 
 After each answer, update the established list in one line. If the answer contradicts an earlier answer, an Accepted decision or a fact, show both sides and ask which one holds; never resolve a contradiction silently.
 
@@ -56,6 +58,7 @@ Why: the answers and facts it rests on, and what the chosen option makes harder 
 Rejected: each alternative and the reason.
 Revisit if: the condition that would reopen it.
 Taken without asking: each point a source, the user's stated principle or a convention settled, with its reason.
+Assumed, not answered: each point taken by its default, with that default.
 ```
 
 Ask for explicit confirmation of this text, each decision as its own question in the interface when there are several, never one yes for a list. Show the full text in the conversation before asking, or include it in the question, so it is visible when the user confirms. A confirmation is a yes to this decision; an "ok" given to a different question is not one.
