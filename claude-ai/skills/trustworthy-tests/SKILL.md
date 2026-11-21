@@ -15,6 +15,8 @@ These rules apply to every automated test you write, change or review: unit test
 - Before writing a test, state in one sentence the behavior it pins: the input or state, the action, the observable outcome. Take it from the spec, the documentation, the bug report or the user, not from what the code does today.
 - Derive every expected value independently of the code under test: by hand, from an example in the spec, from a reference implementation or another trusted oracle. Never run the code and paste its output as the expectation: that freezes current behavior, bugs included. A snapshot or golden file is fine only for output meant to stay fixed, and its first version is checked against the contract like any other expected value.
 - When the contract does not settle a case and the answer would change the test, ask (or, inside a caller's step, report it as an open question); otherwise leave that case untested and list it in the report. Never encode a guess as the truth.
+- Find the tests that already pin this behavior before adding one. A behavior has one owning test, at the boundary where its outcome is observable; add a second only for a failure the owner cannot reach, and prefer a new case in the owner's table to a near copy.
+- Write the test against the interface production callers use. An export, flag, parameter or hook that exists only for a test keeps code alive for the test; the exception is the injection of a boundary the test cannot run (the clock, randomness, the network).
 
 ## 2. Write tests that a wrong implementation fails
 
@@ -24,6 +26,10 @@ These rules apply to every automated test you write, change or review: unit test
 - Make a fake of a boundary (a program, a service, a container) behave like the real one wherever the test's claim depends on it: refuse what the real one refuses (an unknown user, a missing file), react to each flag the code relies on, and fail on demand at each call whose failure the code handles, so each handled failure gets a test that makes it fail. A fake that always succeeds or ignores its arguments lets a wrong call pass.
 - Make sure every assertion executes: await asynchronous code in a runner that awaits it, return or await promises, check that callbacks were called, and do not rely on assertions the build can compile out (NDEBUG, python -O).
 - Cover where implementations go wrong: boundaries (zero, one, the limit and its neighbors, empty input), invalid input and error paths, the exact case from a bug report, each form an input accepted before a change to how it is read (for a program path: absolute, relative, and a bare name found on PATH), every place that sets a value whose reading the change alters (search for its writers), each state in which an external call legitimately fails (an empty or unborn repository, a deleted folder), a second run of an operation meant to be idempotent (a retry, rerun or migration), and a caller without permission being refused. One behavior per test, named for that behavior, so a failure says what broke.
+- Choose inputs that tell a right implementation from a wrong one: a square shape hides swapped dimensions, a single element a wrong loop or axis, equal or symmetric values a swapped argument, zero a missing term.
+- Derive a tolerance from the precision of the computation, tight enough that the smallest plausible error (a flipped sign, an off-by-one, a missing term) fails it.
+- In a test of a refusal, make the input valid in every way but the one under test, so no other guard can produce the refusal.
+- Apart from the tests whose behavior the change alters, every existing test runs what it ran before: add tests, cases and fixtures, and leave moving, merging or rewriting shared setup to a separate change, because a failure in a change that does both has two possible causes. Report the duplication you leave.
 - Keep tests deterministic and independent: seed randomness, inject or fix the clock, wait on conditions rather than sleeping, share no mutable state, and pass in any order. A flaky test is not evidence.
 
 ## 3. See every new or changed test fail for the right reason
@@ -61,6 +67,8 @@ Attack each new or changed test: name a plausible wrong implementation, or a sma
 - tests that never run: a file or function name the runner does not collect, a filter, a skip, or a missing registration (compare the runner's count or list with the tests in the diff);
 - deleted or skipped tests, loosened tolerances or matchers, weakened assertions, regenerated snapshots, and changed expected values without cited evidence;
 - fakes that always succeed or ignore the arguments the code relies on, so a handled failure or a flag goes untested;
+- inputs that cannot tell a right implementation from a wrong one, a tolerance that passes a plausible wrong result, and a refusal another guard could have produced;
+- a behavior pinned twice with no distinct failure, and a production export, flag or hook that only tests use;
 - behaviors in the contract, boundaries and error paths with no test.
 
 Say which findings you confirmed by running something and which you inferred from reading.
