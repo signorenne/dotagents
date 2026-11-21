@@ -24,7 +24,7 @@ it writes them down.
 1. Replace every <FILL: ...> marker with verified facts, or delete the line. Check: grep -rn "<FILL" finds nothing.
 2. Validation commands: run each command once before writing it down.
 3. Hard rules: keep only rules whose absence would make an agent err; keep AGENTS.md under about 200 lines.
-4. Link every doc of the set from AGENTS.md's First load, and register each, with every doc the project already had, in the docs map. A template names other docs by file name: write each as a link with its real path, and drop the mention of a doc the project does not get.
+4. Link every doc of the set from AGENTS.md's First load, and register each, with every doc the project already had, in the docs map. A template names other docs by file name: write each as a link with its real path, and drop the mention of a doc the repository will not have after the run.
 5. Rules for one subtree only: a nested AGENTS.md in that folder (read by Codex, Copilot and Cursor), with a CLAUDE.md bridge next to it for Claude Code, which reads AGENTS.md files by itself only in a project without a CLAUDE.md.
 
 ## Why the bridges

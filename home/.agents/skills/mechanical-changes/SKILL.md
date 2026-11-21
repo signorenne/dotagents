@@ -18,7 +18,7 @@ Run it as a build task, in the full lane, when that skill is available: the rule
 
 ## 2. Find every site with a tested matcher
 
-- Use a matcher that understands the language: the compiler's tooling (clang-query, clang-tidy), a language server rename, or a structural tool (Coccinelle, OpenRewrite, jscodeshift, Comby). Only type-aware tools (the compiler's tooling, a language server) tell same-named methods of different types apart. A regex both over- and under-matches; use one only where the syntax is trivial.
+- Use a matcher that understands the language: the compiler's tooling (clang-query, clang-tidy), a language server rename, or a structural tool (Coccinelle, OpenRewrite, jscodeshift, Comby). Only type-aware tools (the compiler's tooling, a language server, OpenRewrite) tell same-named methods of different types apart. A regex both over- and under-matches; use one only where the syntax is trivial.
 - Test the matcher before trusting its count: a file of known cases with traps (sites in comments, strings and macros, templates, look-alike names, multi-line forms) where it must find exactly the expected sites; a real file counted by hand; and an independent count by a different kind of method (the compiler against a text search), with every disagreement explained. A missed site is worse than a false positive. Add each later mistake to the known cases.
 - Record the number of sites and files: later checks must bring it to zero.
 
