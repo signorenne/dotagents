@@ -48,10 +48,12 @@ Checks:
   without tags, any run of spaces as one); links in src and example blocks or in
   =verbatim= and ~code~ spans, web links and other searches are not checked;
 - every path the global rules, a SKILL.md or a subagent names inside the installed tree
-  exists, as a file or a folder: a path after ~/.agents/ (in home/.agents, and for
-  skills/ also in claude-ai/skills), and in a SKILL.md a path after ${CLAUDE_SKILL_DIR}/
-  (the skill's folder), after $S/ (its scripts folder) or starting with the name of a
-  folder of the skill; a path with a placeholder or a glob (<, > or *) is not checked.
+  exists, as a file or a folder: a path after ~/.agents/ or $HOME/.agents/ (in
+  home/.agents, and for skills/ also in claude-ai/skills), and in a SKILL.md a path after
+  ${CLAUDE_SKILL_DIR}/ or $CLAUDE_SKILL_DIR/ (the skill's folder), after $S/ (its scripts
+  folder), or starting with scripts/, references/, assets/, templates/ or the name of
+  another folder the skill has; a path that holds a placeholder, a glob, a brace
+  expansion or a variable (<, >, *, {, } or $ after the prefix) is not checked.
 """
 
 import importlib.util
@@ -586,41 +588,59 @@ def check_sizes(errors: list) -> None:
         errors.append(f"tools/size-baseline.json: {name} no longer exists; run python3 tools/validate.py --write-sizes")
 
 
-# A run of the characters a path, a placeholder (<name>) or a glob is written with.
+# A run of the characters a path, a placeholder (<name>, {name}, $NAME) or a glob is written with.
 PATH_TOKEN = re.compile(r"[\w.$~{}<>*/-]+")
-SKILL_DIR_PREFIX = "${CLAUDE_SKILL_DIR}/"  # Claude Code's name for a skill's folder
-SCRIPTS_PREFIX = "$S/"  # a skill's shorthand for its scripts folder (the build skill defines it)
-INSTALLED_PREFIX = "~/.agents/"  # where install.py puts home/.agents, and every skill under skills/
+# What follows one of these is a path in the installed tree (where install.py puts
+# home/.agents, and every skill under skills/), in the skill's folder (Claude Code's
+# variable, with or without braces), or in its scripts folder (the build skill's shorthand).
+INSTALLED_PREFIXES = ("~/.agents/", "$HOME/.agents/")
+SKILL_DIR_PREFIXES = ("${CLAUDE_SKILL_DIR}/", "$CLAUDE_SKILL_DIR/")
+SCRIPTS_PREFIXES = ("$S/",)
+# The folders a skill keeps its own files in (the Agent Skills layout, and templates): a
+# path that starts with one names a file of the skill even when the skill lacks the folder.
+SKILL_FOLDERS = {"scripts", "references", "assets", "templates"}
+# In the path after its prefix: a placeholder, a glob, a brace expansion or a variable.
+UNRESOLVED_MARKS = "<>*{}$"
+
+
+def after(token: str, prefixes: tuple):
+    """The token without the first of the prefixes it starts with, or None."""
+    return next((token[len(prefix):] for prefix in prefixes if token.startswith(prefix)), None)
 
 
 def named_paths(text: str, folder) -> list:
     """(token, the places it may be) for each path the text names inside the installed tree.
     folder is the skill's folder for a SKILL.md, None for any other instruction file."""
-    own = {entry.name for entry in folder.iterdir() if entry.is_dir()} if folder else set()
+    own = SKILL_FOLDERS | {entry.name for entry in folder.iterdir() if entry.is_dir()} if folder else set()
     found = []
     for token in dict.fromkeys(match.rstrip(".") for match in PATH_TOKEN.findall(text)):
-        if "/" not in token or any(mark in token for mark in "<>*"):
+        if "/" not in token:
             continue
-        if token.startswith(INSTALLED_PREFIX):
-            rest = token[len(INSTALLED_PREFIX):]
-            places = [HOME / rest]
-            if rest.startswith("skills/"):
-                places.append(ONLINE / rest[len("skills/"):])
-        elif folder and token.startswith(SKILL_DIR_PREFIX):
-            places = [folder / token[len(SKILL_DIR_PREFIX):]]
-        elif folder and token.startswith(SCRIPTS_PREFIX):
-            places = [folder / "scripts" / token[len(SCRIPTS_PREFIX):]]
-        elif folder and token.split("/", 1)[0] in own:
-            places = [folder / token]
+        installed = after(token, INSTALLED_PREFIXES)
+        in_skill = after(token, SKILL_DIR_PREFIXES) if folder else None
+        in_scripts = after(token, SCRIPTS_PREFIXES) if folder else None
+        if installed is not None:
+            rest, places = installed, [HOME / installed]
+            if installed.startswith("skills/"):
+                places.append(ONLINE / installed[len("skills/"):])
+        elif in_skill is not None:
+            rest, places = in_skill, [folder / in_skill]
+        elif in_scripts is not None:
+            rest, places = in_scripts, [folder / "scripts" / in_scripts]
+        elif token.split("/", 1)[0] in own:
+            rest, places = token, [folder / token]
         else:
             continue
-        found.append((token, places))
+        if not any(mark in rest for mark in UNRESOLVED_MARKS):
+            found.append((token, places))
     return found
 
 
 def check_named_paths(errors: list) -> None:
     """Every path an instruction file names inside the installed tree exists, so a renamed
-    script, template or subagent cannot leave an instruction pointing at nothing."""
+    script, template or subagent cannot leave an instruction pointing at nothing. A path
+    under a folder of the skill that is neither one of SKILL_FOLDERS nor still there is not
+    seen as a path, so only its prefixed forms catch the rename of such a folder."""
     for path in sized_files():
         folder = path.parent if path.name == "SKILL.md" else None
         for token, places in named_paths(path.read_text(encoding="utf-8"), folder):

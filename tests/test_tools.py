@@ -235,7 +235,11 @@ class Tools(unittest.TestCase):
             "Elsewhere ~/.agents/skills/pathy/scripts/present.py or ~/.agents/skills/pathy/scripts/lost.py.",
             "Run $S/present.py and $S/absent.py; read refs/notes.md and refs/missing.md, in refs/ itself.",
             "Twice: ~/.agents/agents/nobody.md and again ~/.agents/agents/nobody.md.",
+            "Quoted: $HOME/.agents/agents/reviewer.md and $HOME/.agents/agents/ghost.md.",
+            "No braces: $CLAUDE_SKILL_DIR/scripts/present.py and $CLAUDE_SKILL_DIR/scripts/vanished.py.",
+            "A usual folder this skill does not have: references/guide.md.",
             "Fine: ~/.agents/skills/<name>/SKILL.md, ~/.agents/skills/*/SKILL.md and ~/.agents/agents/reviewer.md.",
+            "Fine: ~/.agents/skills/{name}/SKILL.md, ~/.agents/skills/{build,gates}/SKILL.md and $S/$NAME.py.",
             "Fine: ~/.agents/skills/trustworthy-tests/SKILL.md, a claude.ai skill, and ~/.agents/skills/build/scripts.",
             "Fine, the project's own: scriptsx/tool.py, docs/guide.md and .private/plans/x.org.", ""]))
         folder = self.repo / "home/.agents/skills/pathy"
@@ -243,7 +247,8 @@ class Tools(unittest.TestCase):
             (folder / name).parent.mkdir()
             (folder / name).write_text("x = 1\n", encoding="utf-8")
         for name, path in (("home/.agents/agents/scout.md", "~/.agents/skills/build/scripts/renamed.py"),
-                           ("home/.agents/AGENTS.md", "~/.agents/hooks/none.py")):
+                           ("home/.agents/AGENTS.md", "~/.agents/hooks/none.py"),
+                           ("claude-ai/skills/tutor/SKILL.md", "${CLAUDE_SKILL_DIR}/references/gone.md")):
             with (self.repo / name).open("a", encoding="utf-8") as handle:
                 handle.write(f"\nSee {path}.\n")
         self.assertEqual(self.run_tool("build.py", ["--marketplace"]).returncode, 0)
@@ -253,9 +258,11 @@ class Tools(unittest.TestCase):
         self.assertEqual(sorted(named), sorted(
             [f"FAIL home/.agents/skills/pathy/SKILL.md: names {path}, which does not exist"
              for path in ("${CLAUDE_SKILL_DIR}/scripts/gone.py", "~/.agents/skills/pathy/scripts/lost.py", "$S/absent.py",
-                          "refs/missing.md", "~/.agents/agents/nobody.md")]
+                          "refs/missing.md", "~/.agents/agents/nobody.md", "$HOME/.agents/agents/ghost.md",
+                          "$CLAUDE_SKILL_DIR/scripts/vanished.py", "references/guide.md")]
             + ["FAIL home/.agents/agents/scout.md: names ~/.agents/skills/build/scripts/renamed.py, which does not exist",
-               "FAIL home/.agents/AGENTS.md: names ~/.agents/hooks/none.py, which does not exist"]))
+               "FAIL home/.agents/AGENTS.md: names ~/.agents/hooks/none.py, which does not exist",
+               "FAIL claude-ai/skills/tutor/SKILL.md: names ${CLAUDE_SKILL_DIR}/references/gone.md, which does not exist"]))
 
     def test_validate_holds_each_instruction_file_to_its_size_baseline(self):
         # Fixed baselines of 10k bytes, so 11k bytes is exactly 10% more whatever the real
