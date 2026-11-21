@@ -781,6 +781,14 @@ class PlanScripts(unittest.TestCase):
         self.assertIn(f"base {self.base}, 9 changed lines", result.stdout)
         self.assertIn("untracked, counted as added: dir é/nota.md, link.py, pkg/auth.py, test_new.py\n", result.stdout)
 
+    def test_floor_check_reads_an_untracked_python_file_as_a_tracked_one(self):
+        # Its strings and comments are told apart too: a suppression named in a string adds none.
+        (self.repo / "s.py").write_text('S = "# noqa: E501 and @unittest.skip(1)"\n')
+        result = self.run_script("floor_check.py")
+        self.assertEqual(result.returncode, 0, result.stdout)
+        self.assertIn("untracked, counted as added: s.py\n", result.stdout)
+        self.assertIn("nothing removed, skipped or suppressed", result.stdout)
+
     def test_floor_check_names_an_untracked_nested_repository_and_binary_files_keep_the_exit_code(self):
         # git lists a nested repository as one folder entry: floor_check cannot read inside it
         # and says so; neither it nor a binary file changes the exit code (R8).
@@ -823,6 +831,11 @@ class PlanScripts(unittest.TestCase):
         steps = next(number for number, line in enumerate(lines) if line.startswith("Steps:"))
         self.assertLess(lines.index(warning), steps)
         self.assertNotIn("Malformed row", self.run_script("plan_state.py", "--excerpt").stdout)
+        self.plan.write_text(self.plan.read_text().replace(
+            "| R1 | name it widget      | x   | gadget      | a rename      | pending |",
+            "| R1 | name it widget | x | y | gadget | a rename | pending |"))
+        self.assertIn("Malformed row in Rulings: R1 has 7 cells, the header has 6; write a pipe inside a cell "
+                      "as \\| in markdown and \\vert in org", self.run_script("plan_state.py").stdout.splitlines())
 
     def with_failing_git_status(self) -> dict:
         """An environment whose git fails on status and is the real one otherwise."""
