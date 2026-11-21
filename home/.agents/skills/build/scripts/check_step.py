@@ -112,7 +112,7 @@ def main(argv=None) -> int:
         print(f"check_step: blocked by the guard, not run: {refusal}")
         return 2
 
-    state, private, plan = planfile.locate(args.cwd)
+    state, private, plan = planfile.locate(args.cwd, timeout=60)  # a large checkout lists untracked files slowly
     # The whole output stays in the working notes: beside the plan, else in .private/runs.
     folder = plan.with_suffix(".runs") if plan else private / "runs" if private else None
     started = time.strftime("%Y%m%d-%H%M%S")

@@ -814,6 +814,26 @@ class PlanScripts(unittest.TestCase):
         fake.chmod(0o755)
         return {**GIT_ENV, "PATH": f"{folder}{os.pathsep}{GIT_ENV['PATH']}"}
 
+    def test_a_slow_git_status_still_reads_the_tree(self):
+        # A large checkout can take longer than the hooks' short git limit to list untracked
+        # files; the build scripts wait for it instead of reading the tree as unknown.
+        folder = self.root / "bin"
+        folder.mkdir()
+        fake = folder / "git"
+        fake.write_text('#!/bin/sh\nfor arg in "$@"; do [ "$arg" = --untracked-files=normal ] && sleep 6; done\n'
+                        f'exec "{shutil.which("git")}" "$@"\n')
+        fake.chmod(0o755)
+        env = {**GIT_ENV, "PATH": f"{folder}{os.pathsep}{GIT_ENV['PATH']}"}
+
+        def run(name, *args):
+            return subprocess.run([sys.executable, "-B", str(BUILD / name), *args], cwd=self.repo, env=env,
+                                  capture_output=True, text=True, check=False)
+
+        run("check_step.py", "--step", "S2", "--", sys.executable, "-c", "pass")
+        self.assertEqual(self.log()[-1][3], self.base)
+        result = run("floor_check.py")
+        self.assertEqual(result.returncode, 0, result.stdout)
+
     def test_a_git_status_that_fails_never_reads_as_a_clean_tree(self):
         # check_step: a run on a tree it could not read is never logged as the commit's;
         # floor_check: exit 2 when git failed, it never reads as clean; plan_state says so.

@@ -294,7 +294,7 @@ def main(argv=None) -> int:
     parser.add_argument("--lane", choices=("quick", "full", "direct"))
     parser.add_argument("--quick-limit", type=int, default=100)
     args = parser.parse_args(argv)
-    state, _, plan = planfile.locate(args.cwd)
+    state, _, plan = planfile.locate(args.cwd, timeout=60)  # a large checkout lists untracked files slowly
     if not state:
         print("floor_check: not a git repository; nothing was checked")
         return 2

@@ -179,29 +179,31 @@ def commit_of(revision: str, cwd) -> str | None:
     return found if ok and found else None
 
 
-def head_state(cwd, full: bool = True) -> dict:
+def head_state(cwd, full: bool = True, timeout: float | None = None) -> dict:
     """Branch, short HEAD, modified tracked files and untracked files (working notes left out)
     of the repository at cwd; {} outside one. "unknown" is true when a git status call failed
     or timed out, so the two lists say nothing. Without full, only the branch, for hooks that
-    run on every turn."""
+    run on every turn. timeout, for the two status calls, defaults to GIT_TIMEOUT."""
     branch, ok = git(["branch", "--show-current"], cwd)
     if not ok:
         return {}
     if not full:
         return {"branch": branch, "head": "", "dirty": [], "untracked": []}
     head, _ = git(["rev-parse", "--short", "HEAD"], cwd)
-    status, tracked_ok = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd)
+    status, tracked_ok = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=no"], cwd,
+                             timeout=timeout)
     # Every .private folder holds working notes (and this skill's own output): never counted.
     untracked, untracked_ok = git(["--no-optional-locks", "status", "--porcelain", "--untracked-files=normal",
-                                   "--", ":/", ":(top,exclude,glob)**/.private/**"], cwd)
+                                   "--", ":/", ":(top,exclude,glob)**/.private/**"], cwd, timeout=timeout)
     return {"branch": branch, "head": head, "dirty": [line for line in status.splitlines() if line],
             "untracked": [line[3:] for line in untracked.splitlines() if line.startswith("??")],
             "unknown": not (tracked_ok and untracked_ok)}
 
 
-def locate(cwd, full: bool = True) -> tuple[dict, Path | None, Path | None]:
+def locate(cwd, full: bool = True, timeout: float | None = None) -> tuple[dict, Path | None, Path | None]:
     """(head state, working-notes folder, plan file of the current task branch). Off a
-    task branch nothing but the branch is read, and without full nothing more ever."""
+    task branch nothing but the branch is read, and without full nothing more ever.
+    timeout goes to head_state's status calls."""
     state = head_state(cwd, full=False)
     if not state:
         return {}, None, None
@@ -209,5 +211,5 @@ def locate(cwd, full: bool = True) -> tuple[dict, Path | None, Path | None]:
     private = private_folder(cwd) if (slug or full) else None
     plan = plan_for(private, slug) if private and slug else None
     if full:
-        state = head_state(cwd) or state
+        state = head_state(cwd, timeout=timeout) or state
     return state, private, plan
