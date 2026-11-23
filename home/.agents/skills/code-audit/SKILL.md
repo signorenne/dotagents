@@ -1,6 +1,6 @@
 ---
 name: code-audit
-description: "Audits an existing repository or area for problems and writes a local report: security issues, likely bugs and maintainability smells, each confirmed by an independent check and carrying severity, confidence, file:line and evidence, with everything uncertain kept apart as questions for the user. Use when the user asks to audit, inspect or assess code, or to find bugs, code smells, risks or technical debt in a codebase or module. Not for reviewing one change before a commit (branch-review) or documenting code (as-built-docs)."
+description: "Audits an existing repository or area for problems and writes a local report: security issues, likely bugs, maintainability smells and, on request, tests that cannot fail, each confirmed by an independent check and carrying severity, confidence, file:line and evidence, with everything uncertain kept apart as questions for the user. Use when the user asks to audit, inspect or assess code, or to find bugs, code smells, risks or technical debt in a codebase or module. Not for reviewing one change before a commit (branch-review) or documenting code (as-built-docs)."
 license: "MIT, Copyright (c) 2026 Nicolò Plebani (nexenne, signorenne). See LICENSE.txt"
 ---
 
@@ -10,7 +10,7 @@ Goal: a short list of problems the owner can act on and trust. A wrong finding c
 
 ## 1. Scope
 
-- From the request: the area (whole repository, module, files), the concerns (security, bugs, maintainability, a specific worry), and anything already known (a bug report, and the list under "for the audit" in .private/as-built/notes.md when that file exists).
+- From the request: the area (whole repository, module, files), the concerns (security, bugs, maintainability, the tests, a specific worry), and anything already known (a bug report, and the list under "for the audit" in .private/as-built/notes.md when that file exists).
 - Read the project's AGENTS.md, decision log and conventions: a pattern the project chose on purpose is not a smell.
 - Run the project's gates once and record the result, so existing failures are known.
 - The report goes to .private/audit/<date>-<scope>.md when .private/ is git-ignored; otherwise ask once where it goes. It is never committed unless the user asks.
@@ -21,7 +21,8 @@ Goal: a short list of problems the owner can act on and trust. A wrong finding c
 - Look in this order:
   - security: input reaching a dangerous call, secrets in code, missing authorization, unsafe parsing or deserialization, each named with its CWE;
   - likely bugs: wrong results, races, resource leaks, unchecked errors, boundary mistakes, undefined behavior, mismatches with a contract or spec;
-  - maintainability: named smells (duplicated code, long function, feature envy, shotgun surgery, and the like), each kept only with its concrete cost in this code.
+  - maintainability: named smells (duplicated code, long function, feature envy, shotgun surgery, and the like), each kept only with its concrete cost in this code;
+  - tests, when the request names them: the review list of trustworthy-tests (section 5) applied to the area's tests, each kept only with the wrong implementation or small change to the code that still passes it, named, and confirmed by running the test against that change in a scratch copy, or by the section 3 subagent where it cannot run.
 - Use the tools the project has (compiler warnings, sanitizers, static analyzers, linters) and record what they report.
 - Before keeping a candidate, check the code's own guards: validation upstream, invariants the callers keep, tests that cover the case.
 
@@ -32,7 +33,7 @@ Give each candidate a check that could fail: a failing test, a command and its o
 ## 4. Report
 
 1. Scope and method: what was read, which tools and commands ran with their results, what was left out.
-2. Findings, grouped as Security, Likely bugs and Maintainability, strongest first. Each finding has:
+2. Findings, grouped as Security, Likely bugs, Maintainability and Tests, strongest first. Each finding has:
    - a title and file:line (with the path from input to the dangerous call when relevant);
    - what happens and when;
    - severity (Blocker, High, Medium, Low), from the worst credible consequence and how likely it is;

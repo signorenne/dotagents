@@ -230,7 +230,8 @@ when asked in words.
 ** Code quality
 
 - [[file:home/.agents/skills/code-audit/SKILL.md][code-audit]] : writes a local report of confirmed security issues, likely
-  bugs and smells, with every doubt kept apart as a question.
+  bugs, smells and, on request, tests that cannot fail, with every doubt kept
+  apart as a question.
 - [[file:home/.agents/skills/mechanical-changes/SKILL.md][mechanical-changes]] : carries out one behavior-preserving change across
   many files (a rename, a migration, a codemod) in shards that build alone.
 
